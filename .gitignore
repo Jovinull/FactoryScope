@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+
+# Local development state (game installs, logs, smoke-test sandboxes)
+/local/
+*.log
+last_log.txt
+hs_err_pid*
+replay_pid*
+
+# OS
+.DS_Store
+Thumbs.db

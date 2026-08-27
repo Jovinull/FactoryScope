@@ -1,0 +1,93 @@
+apply plugin: "java"
+
+sourceSets.main.java.srcDirs = ["src"]
+sourceSets.test.java.srcDirs = ["test"]
+
+ext{
+    //pinned stable Mindustry release; the game API is not stable across major builds, so avoid "latest"/"be" here
+    mindustryVersion = "v159.7"
+    junitVersion = "5.11.4"
+    isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
+    sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+}
+
+repositories{
+    mavenCentral()
+
+    //Mindustry publishes a fat "dependencies.jar" on every release; this ivy layout pulls that file directly.
+    //It is the approach used by the official mod template and is more reliable than jitpack.
+    ivy{
+        url = "https://github.com/"
+        patternLayout{
+            artifact("/[organisation]/[module]/releases/download/[revision]/dependencies.jar")
+        }
+        metadataSources{ artifact() }
+        content{ includeVersion("Anuken", "Mindustry", mindustryVersion) }
+    }
+}
+
+java{
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+dependencies{
+    //compileOnly: the game already provides Mindustry and Arc at runtime, they must never be bundled into the mod jar
+    compileOnly "Anuken:Mindustry:$mindustryVersion"
+
+    testImplementation "Anuken:Mindustry:$mindustryVersion"
+    testImplementation "org.junit.jupiter:junit-jupiter:$junitVersion"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+tasks.named("test"){
+    useJUnitPlatform()
+    testLogging{
+        events = ["failed"]
+        exceptionFormat = "full"
+    }
+}
+
+jar{
+    archiveFileName = "${project.name}Desktop.jar"
+
+    from(projectDir){
+        include "mod.hjson"
+    }
+
+    from("assets/"){
+        include "**"
+    }
+}
+
+tasks.register("jarAndroid"){
+    dependsOn "jar"
+    def projectName = project.name
+
+    doLast{
+        if(!sdkRoot || !new File(sdkRoot).exists()) throw new GradleException("No valid Android SDK found. Ensure that ANDROID_HOME is set to your Android SDK directory.")
+
+        def platformRoot = new File("$sdkRoot/platforms/").listFiles().sort().reverse().find{ f -> new File(f, "android.jar").exists() }
+        if(!platformRoot) throw new GradleException("No android.jar found. Ensure that you have an Android platform installed.")
+
+        def dependencies = (configurations.compileClasspath.asList() + configurations.runtimeClasspath.asList() + [new File(platformRoot, "android.jar")]).collect{ "--classpath $it.path" }.join(" ")
+        def d8 = isWindows ? "d8.bat" : "d8"
+
+        "$d8 $dependencies --min-api 21 --output ${projectName}Android.jar ${projectName}Desktop.jar"
+            .execute(null, new File("build/libs")).waitForProcessOutput(System.out, System.err)
+    }
+}
+
+//universal desktop + android artifact, matching the layout the Mod Browser expects
+tasks.register("deploy", Jar){
+    def projectName = project.name
+    dependsOn "jarAndroid"
+    dependsOn "jar"
+    archiveFileName = "${projectName}.jar"
+
+    from{ [zipTree("build/libs/${projectName}Desktop.jar"), zipTree("build/libs/${projectName}Android.jar")] }
+
+    doLast{
+        delete{ delete "build/libs/${projectName}Android.jar" }
+    }
+}
