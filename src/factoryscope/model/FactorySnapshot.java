@@ -15,8 +15,14 @@ public final class FactorySnapshot{
     public final int tileX, tileY;
     public final SupportLevel support;
 
-    /** {@code Building.enabled} - false when switched off by a player or by logic. */
+    /** {@code Building.enabled} - false when switched off, whether by a player, by logic, or by the game. */
     public final boolean enabled;
+    /**
+     * {@code Building.allowUpdate()} - false when the game itself refuses to run the building, which is
+     * what {@code checkAllowUpdate()} turns into {@code enabled = false}. Distinguishing the two is the
+     * only way to avoid telling a player that a block outside the playable area was switched off by hand.
+     */
+    public final boolean updateAllowed;
     /** {@code Building.efficiency} - the value that actually scales production this tick. */
     public final float efficiency;
     /** {@code Building.potentialEfficiency} - efficiency ignoring the shouldConsume()/productionValid() gate. */
@@ -65,6 +71,7 @@ public final class FactorySnapshot{
         this.tileY = b.tileY;
         this.support = b.support;
         this.enabled = b.enabled;
+        this.updateAllowed = b.updateAllowed;
         this.efficiency = b.efficiency;
         this.potentialEfficiency = b.potentialEfficiency;
         this.optionalEfficiency = b.optionalEfficiency;
@@ -112,6 +119,7 @@ public final class FactorySnapshot{
         private int tileX, tileY;
         private SupportLevel support = SupportLevel.minimal;
         private boolean enabled = true;
+        private boolean updateAllowed = true;
         private float efficiency;
         private float potentialEfficiency;
         private float optionalEfficiency;
@@ -145,6 +153,11 @@ public final class FactorySnapshot{
 
         public Builder enabled(boolean enabled){
             this.enabled = enabled;
+            return this;
+        }
+
+        public Builder updateAllowed(boolean updateAllowed){
+            this.updateAllowed = updateAllowed;
             return this;
         }
 

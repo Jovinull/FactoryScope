@@ -10,6 +10,11 @@ package factoryscope.analysis;
  * whether its inputs are present.
  */
 public enum DiagnosticReason{
+    /**
+     * The game switched the building off itself because it cannot operate where it stands - outside the
+     * playable area, on an unsupported environment, or on an inactive team.
+     */
+    inoperableHere,
     /** The building is switched off, by a player or by a logic processor. */
     disabled,
     /** The building will not start a new cycle because its own output buffer has nowhere to go. */

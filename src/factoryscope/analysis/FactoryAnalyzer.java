@@ -45,7 +45,10 @@ public final class FactoryAnalyzer{
     /** Conditions that stop production before consumers are ever considered. */
     private static void addGateFinding(FactorySnapshot s, List<Finding> findings){
         if(!s.enabled){
-            findings.add(Finding.of(DiagnosticReason.disabled, Severity.stopped));
+            //the game disables a building it will not run at all; that is not the player switching it off
+            findings.add(Finding.of(s.updateAllowed
+                ? DiagnosticReason.disabled
+                : DiagnosticReason.inoperableHere, Severity.stopped));
             return;
         }
 

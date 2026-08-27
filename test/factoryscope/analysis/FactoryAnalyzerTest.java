@@ -36,6 +36,21 @@ class FactoryAnalyzerTest{
     }
 
     @Test
+    void aBuildingTheGameRefusesToRunIsNotCalledPlayerDisabled(){
+        //Building.checkAllowUpdate sets enabled=false for blocks outside the playable area; blaming the
+        //player for that would send them looking for a switch that does not exist
+        DiagnosticResult result = FactoryAnalyzer.analyze(healthySmelter()
+            .enabled(false)
+            .updateAllowed(false)
+            .efficiency(0f, 0f, 0f)
+            .blockEfficiencyScale(Float.NaN)
+            .build());
+
+        assertEquals(DiagnosticReason.inoperableHere, result.reason());
+        assertEquals(Severity.stopped, result.severity());
+    }
+
+    @Test
     void missingItemIsNamedInTheFinding(){
         DiagnosticResult result = FactoryAnalyzer.analyze(smelterMissing(item("Sand", 0f)));
 

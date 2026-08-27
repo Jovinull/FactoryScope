@@ -53,6 +53,7 @@ public final class MindustryFactoryProbe{
             .position(build.tile.x, build.tile.y)
             .support(crafter ? SupportLevel.full : block.hasConsumers ? SupportLevel.basic : SupportLevel.minimal)
             .enabled(build.enabled)
+            .updateAllowed(build.allowUpdate())
             .efficiency(build.efficiency, build.potentialEfficiency, build.optionalEfficiency)
             .shouldConsume(build.shouldConsume())
             .productionValid(build.productionValid())

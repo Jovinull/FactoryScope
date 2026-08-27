@@ -34,7 +34,7 @@ public final class Diagnostics{
     public static Color color(DiagnosticReason reason){
         return switch(reason){
             case active -> BlockStatus.active.color;
-            case disabled -> BlockStatus.logicDisable.color;
+            case disabled, inoperableHere -> BlockStatus.logicDisable.color;
             case outputBlocked -> BlockStatus.noOutput.color;
             case missingItemInput, missingLiquidInput, insufficientPower,
                  otherConsumerLimited, blockConditionLimited -> BlockStatus.noInput.color;

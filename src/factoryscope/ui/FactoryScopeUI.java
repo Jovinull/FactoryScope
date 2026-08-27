@@ -133,12 +133,25 @@ public final class FactoryScopeUI{
 
         //tapping empty ground is how the player cancels, so it is not an error worth reporting
         if(build == null) return;
-        if(!MindustryFactoryProbe.canInspect(build, Vars.player == null ? null : Vars.player.team())){
+        if(!inspect(build)){
             Vars.ui.showInfoToast(FsBundle.get("inspect.not-visible"), 2f);
-            return;
+        }
+    }
+
+    /**
+     * Opens the diagnostic panel for a building.
+     *
+     * @return false when the building may not be inspected, which for now means the local player
+     * cannot legitimately see it
+     */
+    public static boolean inspect(Building build){
+        if(panel == null || build == null) return false;
+        if(!MindustryFactoryProbe.canInspect(build, Vars.player == null ? null : Vars.player.team())){
+            return false;
         }
 
         panel.inspect(build);
+        return true;
     }
 
     /** Drops every transient reference; safe to call at any time. */

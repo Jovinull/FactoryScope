@@ -38,6 +38,18 @@ flag**: it only makes construction free, and crafters in a sandbox game still ne
 Only the team `cheat` rule short-circuits `updateConsumption`, so that is the only case where
 FactoryScope suppresses input blame.
 
+## `enabled` is not always the player
+
+`Building.checkAllowUpdate()` sets `enabled = false` whenever `allowUpdate()` is false, which happens when
+the building belongs to `Team.derelict`, when the block does not support the current environment, or when
+it stands outside a limited map area with `disableOutsideArea` on. The last case is not exotic: the
+campaign map Ground Zero limits its playable area, and anything built beyond it is switched off by the
+game the moment it appears.
+
+Reporting that as "a player or a logic processor turned this off" sends the player looking for a switch
+that does not exist, so FactoryScope reads `allowUpdate()` alongside `enabled` and reports the two
+separately.
+
 ## `shouldConsume()` and blocked output
 
 `Building.shouldConsume()` returns `enabled` by default, which tells you nothing. `GenericCrafterBuild`

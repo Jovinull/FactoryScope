@@ -11,8 +11,9 @@ and it never modifies the game state it inspects.
 ## Features
 
 - **A verdict, not a dump.** Every inspection ends in a single primary diagnosis: running, disabled,
-  output blocked, item shortage, liquid shortage, power limited, block condition, or an explicit
-  admission that the cause could not be determined.
+  cannot operate here, output blocked, item shortage, liquid shortage, power limited, block condition, or
+  an explicit admission that the cause could not be determined. A building the game itself switched off,
+  such as one outside the playable area, is told apart from one a player or a logic processor turned off.
 - **Efficiency in context.** Current efficiency, the efficiency the building would reach if it were
   unblocked, and any time scale or block-specific multiplier that is in play.
 - **Production rates.** For crafting blocks: theoretical output at full efficiency versus what the

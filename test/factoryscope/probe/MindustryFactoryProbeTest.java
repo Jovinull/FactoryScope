@@ -100,6 +100,38 @@ class MindustryFactoryProbeTest{
     }
 
     @Test
+    void aBuildingOutsideThePlayableAreaIsReportedAsInoperable(){
+        //this is the case Ground Zero produces: the game disables anything built outside the limited area
+        Building smelter = supplied(place(Blocks.siliconSmelter, 12, 12));
+        state.rules.limitMapArea = true;
+        state.rules.disableOutsideArea = true;
+        state.rules.limitX = 0;
+        state.rules.limitY = 0;
+        state.rules.limitWidth = 4;
+        state.rules.limitHeight = 4;
+        smelter.checkAllowUpdate();
+        smelter.updateConsumption();
+
+        FactorySnapshot snapshot = MindustryFactoryProbe.probe(smelter);
+
+        assertFalse(smelter.enabled, "the game itself should have disabled the building");
+        assertFalse(snapshot.updateAllowed);
+        assertEquals(DiagnosticReason.inoperableHere, FactoryAnalyzer.analyze(snapshot).reason());
+    }
+
+    @Test
+    void aDisabledSmelterAndAnInoperableOneAreToldApart(){
+        Building smelter = supplied(place(Blocks.siliconSmelter, 4, 4));
+        smelter.enabled = false;
+        smelter.updateConsumption();
+
+        FactorySnapshot snapshot = MindustryFactoryProbe.probe(smelter);
+
+        assertTrue(snapshot.updateAllowed, "nothing stops this building from running where it stands");
+        assertEquals(DiagnosticReason.disabled, FactoryAnalyzer.analyze(snapshot).reason());
+    }
+
+    @Test
     void anUnpoweredCrafterBlamesPowerRatherThanItems(){
         //the kiln needs sand, lead and power; with materials present only the grid can be at fault
         Building kiln = place(Blocks.kiln, 4, 4);
