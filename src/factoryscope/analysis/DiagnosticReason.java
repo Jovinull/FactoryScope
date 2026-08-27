@@ -35,4 +35,17 @@ public enum DiagnosticReason{
     public int priority(){
         return ordinal();
     }
+
+    /** {@code missingItemInput} becomes {@code missing-item-input}, so bundle keys stay readable. */
+    public String slug(){
+        StringBuilder result = new StringBuilder(name().length() + 4);
+        for(char c : name().toCharArray()){
+            if(Character.isUpperCase(c)){
+                result.append('-').append(Character.toLowerCase(c));
+            }else{
+                result.append(c);
+            }
+        }
+        return result.toString();
+    }
 }

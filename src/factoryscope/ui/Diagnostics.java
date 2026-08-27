@@ -19,12 +19,12 @@ public final class Diagnostics{
 
     /** Short status headline, e.g. "Input shortage". */
     public static String status(DiagnosticReason reason){
-        return FsBundle.get("status." + slug(reason));
+        return FsBundle.get("status." + reason.slug());
     }
 
     /** Full sentence explaining the verdict, with the affected resources filled in. */
     public static String explanation(Finding finding){
-        String key = "diagnosis." + slug(finding.reason) + "." + finding.severity.name();
+        String key = "diagnosis." + finding.reason.slug() + "." + finding.severity.name();
         String text = finding.resources.isEmpty()
             ? FsBundle.get(key)
             : FsBundle.format(key, join(finding.resources));
@@ -61,16 +61,4 @@ public final class Diagnostics{
         return String.join(", ", values);
     }
 
-    /** {@code missingItemInput} to {@code missing-item-input}, so bundle keys stay readable. */
-    private static String slug(DiagnosticReason reason){
-        StringBuilder result = new StringBuilder(reason.name().length() + 4);
-        for(char c : reason.name().toCharArray()){
-            if(Character.isUpperCase(c)){
-                result.append('-').append(Character.toLowerCase(c));
-            }else{
-                result.append(c);
-            }
-        }
-        return result.toString();
-    }
 }

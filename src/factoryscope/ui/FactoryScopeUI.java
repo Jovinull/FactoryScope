@@ -131,10 +131,8 @@ public final class FactoryScopeUI{
         Vec2 world = Core.input.mouseWorld(screen.x, screen.y);
         Building build = Vars.world.buildWorld(world.x, world.y);
 
-        if(build == null){
-            Vars.ui.showInfoToast(FsBundle.get("inspect.nothing-here"), 2f);
-            return;
-        }
+        //tapping empty ground is how the player cancels, so it is not an error worth reporting
+        if(build == null) return;
         if(!MindustryFactoryProbe.canInspect(build, Vars.player == null ? null : Vars.player.team())){
             Vars.ui.showInfoToast(FsBundle.get("inspect.not-visible"), 2f);
             return;

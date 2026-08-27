@@ -106,10 +106,14 @@ public final class FactoryScopePanel extends BaseDialog{
         section("section.efficiency");
         panel(table -> {
             float efficiency = snapshot.efficiency;
-            table.add(new Bar(
+            Bar bar = new Bar(
                 () -> Numbers.percent(efficiency),
                 () -> Diagnostics.efficiencyColor(efficiency),
-                () -> efficiency)).height(20f).growX().padBottom(6f).row();
+                () -> efficiency);
+            //the panel is rebuilt on every refresh, so the bar has to start at its value rather than
+            //restart its fill animation from zero each time
+            bar.snap();
+            table.add(bar).height(20f).growX().padBottom(6f).row();
 
             if(snapshot.potentialEfficiency > snapshot.efficiency + 0.001f){
                 value(table, FsBundle.get("label.potential-efficiency"),
@@ -289,11 +293,15 @@ public final class FactoryScopePanel extends BaseDialog{
     }
 
     private String amountText(ResourceState input){
+        //power has a requirement but nothing "held", so the stored half of the line is dropped
+        boolean held = input.stored >= 0f;
         return switch(input.unit){
-            case perCraft -> FsBundle.format("value.per-craft",
-                Numbers.amount(input.stored), Numbers.amount(input.required));
-            case perSecond -> FsBundle.format("value.per-second",
-                Numbers.amount(input.stored), Numbers.rate(input.required));
+            case perCraft -> held
+                ? FsBundle.format("value.per-craft", Numbers.amount(input.stored), Numbers.amount(input.required))
+                : FsBundle.format("value.needed-per-craft", Numbers.amount(input.required));
+            case perSecond -> held
+                ? FsBundle.format("value.per-second", Numbers.amount(input.stored), Numbers.rate(input.required))
+                : FsBundle.format("value.needed-per-second", Numbers.rate(input.required));
             case none -> "";
         };
     }

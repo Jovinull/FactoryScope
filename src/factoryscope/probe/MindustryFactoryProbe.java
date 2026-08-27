@@ -167,9 +167,10 @@ public final class MindustryFactoryProbe{
         LiquidModule module = build.liquids;
         float stored = module == null ? 0f : module.get(liquid);
 
+        //also catches NaN; a zero or undefined multiplier is a block condition, reported on its own
         float scale = build.efficiencyScale();
-        if(!(scale > 0f) || Float.isNaN(scale)) scale = 1f;
-        float neededThisFrame = amountPerTick * frameTicks * Math.max(timeScale, MIN_FRAME_TICKS) * scale;
+        if(!(scale > 0f)) scale = 1f;
+        float neededThisFrame = amountPerTick * frameTicks * timeScale * scale;
 
         float satisfaction = neededThisFrame <= 0f ? 1f : Math.min(stored / neededThisFrame, 1f);
         return ResourceState.of(ResourceKind.liquid, liquid.localizedName)
