@@ -48,21 +48,22 @@ public final class MindustryFactoryProbe{
         float timeScale = build.timeScale();
         boolean crafter = block instanceof GenericCrafter;
 
-        boolean gateOpen = build.enabled && build.shouldConsume() && build.productionValid();
+        //asked once each: these are overridable, and a mod is entitled to make them expensive
+        boolean shouldConsume = build.shouldConsume();
+        boolean productionValid = build.productionValid();
+        boolean gateOpen = build.enabled && shouldConsume && productionValid;
 
         FactorySnapshot.Builder snapshot = FactorySnapshot.builder(block.localizedName)
-            .position(build.tile.x, build.tile.y)
             .support(crafter ? SupportLevel.full : block.hasConsumers ? SupportLevel.basic : SupportLevel.minimal)
             .enabled(build.enabled)
             .updateAllowed(build.allowUpdate())
             //Tile.setBlock only registers a building for updates when the block updates and we are not in the editor
             .efficiencyTracked(block.update && !Vars.state.isEditor())
-            .efficiency(build.efficiency, build.potentialEfficiency, build.optionalEfficiency)
-            .shouldConsume(build.shouldConsume())
-            .productionValid(build.productionValid())
+            .efficiency(build.efficiency, build.potentialEfficiency)
+            .shouldConsume(shouldConsume)
+            .productionValid(productionValid)
             .timeScale(timeScale)
             .consumersBypassed(build.cheating())
-            .hasConsumers(block.hasConsumers)
             .blockEfficiencyScale(ProductionRates.blockEfficiencyScale(
                 build.efficiency, build.potentialEfficiency, gateOpen));
 

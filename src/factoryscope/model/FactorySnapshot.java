@@ -11,8 +11,6 @@ import java.util.*;
 public final class FactorySnapshot{
     /** Localized block name. */
     public final String blockName;
-    /** Tile coordinates, purely for display. */
-    public final int tileX, tileY;
     public final SupportLevel support;
 
     /** {@code Building.enabled} - false when switched off, whether by a player, by logic, or by the game. */
@@ -35,8 +33,6 @@ public final class FactorySnapshot{
     public final float efficiency;
     /** {@code Building.potentialEfficiency} - efficiency ignoring the shouldConsume()/productionValid() gate. */
     public final float potentialEfficiency;
-    /** {@code Building.optionalEfficiency} - includes optional/boost consumers. */
-    public final float optionalEfficiency;
     /** {@code Building.shouldConsume()} - false means the building refuses to start a new cycle. */
     public final boolean shouldConsume;
     /** {@code Building.productionValid()} - a block-specific precondition, true for all vanilla blocks. */
@@ -49,7 +45,6 @@ public final class FactorySnapshot{
      * Note this is <em>not</em> the sandbox gamemode: sandbox only makes construction free.
      */
     public final boolean consumersBypassed;
-    public final boolean hasConsumers;
 
     /**
      * Ratio of {@code efficiency} to {@code potentialEfficiency}, i.e. the block-specific multiplier applied
@@ -75,20 +70,16 @@ public final class FactorySnapshot{
 
     private FactorySnapshot(Builder b){
         this.blockName = b.blockName;
-        this.tileX = b.tileX;
-        this.tileY = b.tileY;
         this.support = b.support;
         this.enabled = b.enabled;
         this.updateAllowed = b.updateAllowed;
         this.efficiencyTracked = b.efficiencyTracked;
         this.efficiency = b.efficiency;
         this.potentialEfficiency = b.potentialEfficiency;
-        this.optionalEfficiency = b.optionalEfficiency;
         this.shouldConsume = b.shouldConsume;
         this.productionValid = b.productionValid;
         this.timeScale = b.timeScale;
         this.consumersBypassed = b.consumersBypassed;
-        this.hasConsumers = b.hasConsumers;
         this.blockEfficiencyScale = b.blockEfficiencyScale;
         this.craftSpeedMultiplier = b.craftSpeedMultiplier;
         this.outputBufferFull = b.outputBufferFull;
@@ -125,19 +116,16 @@ public final class FactorySnapshot{
 
     public static final class Builder{
         private final String blockName;
-        private int tileX, tileY;
         private SupportLevel support = SupportLevel.minimal;
         private boolean enabled = true;
         private boolean updateAllowed = true;
         private boolean efficiencyTracked = true;
         private float efficiency;
         private float potentialEfficiency;
-        private float optionalEfficiency;
         private boolean shouldConsume = true;
         private boolean productionValid = true;
         private float timeScale = 1f;
         private boolean consumersBypassed;
-        private boolean hasConsumers;
         private float blockEfficiencyScale = Float.NaN;
         private float craftSpeedMultiplier = Float.NaN;
         private boolean outputBufferFull;
@@ -148,12 +136,6 @@ public final class FactorySnapshot{
 
         private Builder(String blockName){
             this.blockName = blockName;
-        }
-
-        public Builder position(int x, int y){
-            this.tileX = x;
-            this.tileY = y;
-            return this;
         }
 
         public Builder support(SupportLevel support){
@@ -176,10 +158,9 @@ public final class FactorySnapshot{
             return this;
         }
 
-        public Builder efficiency(float efficiency, float potentialEfficiency, float optionalEfficiency){
+        public Builder efficiency(float efficiency, float potentialEfficiency){
             this.efficiency = efficiency;
             this.potentialEfficiency = potentialEfficiency;
-            this.optionalEfficiency = optionalEfficiency;
             return this;
         }
 
@@ -200,11 +181,6 @@ public final class FactorySnapshot{
 
         public Builder consumersBypassed(boolean consumersBypassed){
             this.consumersBypassed = consumersBypassed;
-            return this;
-        }
-
-        public Builder hasConsumers(boolean hasConsumers){
-            this.hasConsumers = hasConsumers;
             return this;
         }
 

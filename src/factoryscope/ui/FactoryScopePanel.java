@@ -86,7 +86,7 @@ public final class FactoryScopePanel extends BaseDialog{
             result = FactoryAnalyzer.analyze(snapshot);
         }catch(Exception e){
             FsLog.warnOnce("probe:" + target.block.name,
-                "could not analyse " + target.block.name, e);
+                "could not analyse " + MindustryFactoryProbe.describe(target), e);
             body.add(FsBundle.get("panel.analysis-failed")).color(Pal.remove).padTop(8f);
             return;
         }
@@ -145,8 +145,10 @@ public final class FactoryScopePanel extends BaseDialog{
                     Numbers.multiplier(snapshot.craftSpeedMultiplier), Pal.accent);
             }
             if(isMeaningfulMultiplier(snapshot.blockEfficiencyScale)){
-                value(table, FsBundle.get("label.block-condition"),
-                    Numbers.percent(snapshot.blockEfficiencyScale), Pal.lightOrange);
+                boolean limiting = snapshot.blockEfficiencyScale < 1f;
+                value(table, FsBundle.get(limiting ? "label.block-condition" : "label.block-boost"),
+                    Numbers.percent(snapshot.blockEfficiencyScale),
+                    limiting ? Pal.lightOrange : Pal.accent);
             }
             if(!snapshot.enabled){
                 value(table, FsBundle.get("label.enabled"), FsBundle.get("value.no"), Pal.remove);

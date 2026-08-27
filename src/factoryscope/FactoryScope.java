@@ -1,7 +1,6 @@
 package factoryscope;
 
 import arc.*;
-import factoryscope.probe.*;
 import factoryscope.ui.*;
 import mindustry.*;
 import mindustry.game.EventType.*;

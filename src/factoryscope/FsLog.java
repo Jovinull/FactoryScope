@@ -1,4 +1,4 @@
-package factoryscope.probe;
+package factoryscope;
 
 import arc.util.*;
 
