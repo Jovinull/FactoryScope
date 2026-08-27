@@ -119,8 +119,8 @@ class ModCompatibilityTest{
         assertEquals(SupportLevel.basic, snapshot.support);
         assertFalse(snapshot.shouldConsume);
         assertTrue(snapshot.outputs.isEmpty(), "no production model means no invented rates");
-        assertEquals(DiagnosticReason.haltedUnknownCause, result.reason());
-        assertFalse(result.primary.certain);
+        assertEquals(DiagnosticReason.notConsuming, result.reason(),
+            "declining to consume is a fact; guessing why would not be");
     }
 
     private static Building place(Block block){

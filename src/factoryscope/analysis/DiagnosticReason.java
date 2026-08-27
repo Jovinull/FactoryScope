@@ -19,6 +19,11 @@ public enum DiagnosticReason{
     disabled,
     /** The building will not start a new cycle because its own output buffer has nowhere to go. */
     outputBlocked,
+    /**
+     * The building is not drawing its inputs, and FactoryScope has no production model for the block
+     * that would explain whether that is normal. A unit factory between orders looks like this.
+     */
+    notConsuming,
     /** A mandatory item consumer cannot be satisfied. */
     missingItemInput,
     /** A mandatory liquid consumer cannot be satisfied. */

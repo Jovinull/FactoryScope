@@ -183,6 +183,9 @@ class VanillaSweepTest{
         if(result.reason() == DiagnosticReason.haltedUnknownCause && result.primary.certain){
             problems.add(block.name + ": stated an unestablished cause as fact");
         }
+        if(result.reason() == DiagnosticReason.notConsuming && snapshot.shouldConsume){
+            problems.add(block.name + ": reported as not consuming while shouldConsume() is true");
+        }
         if(result.reason() == DiagnosticReason.outputBlocked && snapshot.support != SupportLevel.full){
             problems.add(block.name + ": claimed a blocked output without a verified production model");
         }

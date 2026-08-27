@@ -19,11 +19,10 @@ final class Factories{
     static FactorySnapshot.Builder healthySmelter(){
         return FactorySnapshot.builder(SILICON_SMELTER)
             .support(SupportLevel.full)
-            .hasConsumers(true)
             .enabled(true)
             .shouldConsume(true)
             .productionValid(true)
-            .efficiency(1f, 1f, 1f)
+            .efficiency(1f, 1f)
             .blockEfficiencyScale(1f)
             .craftSpeedMultiplier(1f)
             .craftTimeSeconds(0.667f)

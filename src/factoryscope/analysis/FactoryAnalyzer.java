@@ -56,8 +56,8 @@ public final class FactoryAnalyzer{
             if(s.support == SupportLevel.full && s.outputBufferFull){
                 findings.add(Finding.of(DiagnosticReason.outputBlocked, Severity.stopped, blockedOutputNames(s)));
             }else{
-                //the building refuses to consume, but only a GenericCrafter has verified semantics for why
-                findings.add(Finding.uncertain(DiagnosticReason.haltedUnknownCause, Severity.stopped, List.of()));
+                //only GenericCrafter has verified semantics for why a building declines to consume
+                findings.add(Finding.of(DiagnosticReason.notConsuming, Severity.stopped));
             }
             return;
         }

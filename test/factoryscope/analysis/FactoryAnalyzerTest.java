@@ -24,7 +24,7 @@ class FactoryAnalyzerTest{
         //Mindustry zeroes efficiency before looking at consumers, so the shortage is real but secondary
         DiagnosticResult result = FactoryAnalyzer.analyze(healthySmelter()
             .enabled(false)
-            .efficiency(0f, 0f, 0f)
+            .efficiency(0f, 0f)
             .blockEfficiencyScale(Float.NaN)
             .input(item("Sand", 0f))
             .build());
@@ -42,7 +42,7 @@ class FactoryAnalyzerTest{
         DiagnosticResult result = FactoryAnalyzer.analyze(healthySmelter()
             .enabled(false)
             .updateAllowed(false)
-            .efficiency(0f, 0f, 0f)
+            .efficiency(0f, 0f)
             .blockEfficiencyScale(Float.NaN)
             .build());
 
@@ -63,8 +63,8 @@ class FactoryAnalyzerTest{
     @Test
     void severalMissingItemsAreGroupedIntoOneFinding(){
         FactorySnapshot snapshot = FactorySnapshot.builder(SILICON_SMELTER)
-            .support(SupportLevel.full).hasConsumers(true)
-            .efficiency(0f, 0f, 0f).blockEfficiencyScale(Float.NaN)
+            .support(SupportLevel.full)
+            .efficiency(0f, 0f).blockEfficiencyScale(Float.NaN)
             .input(item("Sand", 0f))
             .input(item("Coal", 0f))
             .build();
@@ -86,8 +86,8 @@ class FactoryAnalyzerTest{
     @Test
     void partiallySuppliedLiquidReducesRatherThanStops(){
         FactorySnapshot snapshot = FactorySnapshot.builder("Phase Weaver")
-            .support(SupportLevel.full).hasConsumers(true)
-            .efficiency(0.4f, 0.4f, 0.4f).blockEfficiencyScale(1f)
+            .support(SupportLevel.full)
+            .efficiency(0.4f, 0.4f).blockEfficiencyScale(1f)
             .input(item("Thorium", 1f))
             .input(liquid("Cryofluid", 0.4f))
             .build();
@@ -101,7 +101,7 @@ class FactoryAnalyzerTest{
     @Test
     void insufficientPowerIsReportedWhenPowerIsTheLowestInput(){
         FactorySnapshot snapshot = healthySmelter()
-            .efficiency(0.63f, 0.63f, 0.63f)
+            .efficiency(0.63f, 0.63f)
             .input(power(0.63f))
             .build();
 
@@ -115,8 +115,8 @@ class FactoryAnalyzerTest{
     void theLowestInputWinsWhenSeveralAreShort(){
         //efficiency is a minimum over consumers, so a missing item beats a half-supplied grid
         FactorySnapshot snapshot = FactorySnapshot.builder(SILICON_SMELTER)
-            .support(SupportLevel.full).hasConsumers(true)
-            .efficiency(0f, 0f, 0f).blockEfficiencyScale(Float.NaN)
+            .support(SupportLevel.full)
+            .efficiency(0f, 0f).blockEfficiencyScale(Float.NaN)
             .input(item("Sand", 0f))
             .input(power(0.5f))
             .build();
@@ -131,8 +131,8 @@ class FactoryAnalyzerTest{
     @Test
     void simultaneousShortagesOfDifferentKindsAreAllRetained(){
         FactorySnapshot snapshot = FactorySnapshot.builder("Phase Weaver")
-            .support(SupportLevel.full).hasConsumers(true)
-            .efficiency(0f, 0f, 0f).blockEfficiencyScale(Float.NaN)
+            .support(SupportLevel.full)
+            .efficiency(0f, 0f).blockEfficiencyScale(Float.NaN)
             .input(item("Thorium", 0f))
             .input(liquid("Cryofluid", 0f))
             .input(power(0f))
@@ -150,7 +150,7 @@ class FactoryAnalyzerTest{
         FactorySnapshot snapshot = healthySmelter()
             .shouldConsume(false)
             .outputBufferFull(true)
-            .efficiency(0f, 0f, 0f)
+            .efficiency(0f, 0f)
             .blockEfficiencyScale(Float.NaN)
             .output(silicon(true))
             .build();
@@ -166,16 +166,16 @@ class FactoryAnalyzerTest{
     void refusalToConsumeIsNotCalledOutputBlockedOnUnmodelledBlocks(){
         //shouldConsume() only has verified output semantics for GenericCrafter
         FactorySnapshot snapshot = FactorySnapshot.builder("Some Modded Reactor")
-            .support(SupportLevel.basic).hasConsumers(true)
+            .support(SupportLevel.basic)
             .shouldConsume(false)
-            .efficiency(0f, 0f, 0f).blockEfficiencyScale(Float.NaN)
+            .efficiency(0f, 0f).blockEfficiencyScale(Float.NaN)
             .input(item("Thorium", 1f))
             .build();
 
         DiagnosticResult result = FactoryAnalyzer.analyze(snapshot);
 
-        assertEquals(DiagnosticReason.haltedUnknownCause, result.reason());
-        assertFalse(result.primary.certain, "an unverified cause must not be stated as fact");
+        assertEquals(DiagnosticReason.notConsuming, result.reason(),
+            "the block declined to consume, but only a crafter can be said to be output-blocked");
     }
 
     @Test
@@ -192,8 +192,8 @@ class FactoryAnalyzerTest{
     @Test
     void unknownConsumerIsBlamedButOnlyAsAPossibility(){
         FactorySnapshot snapshot = FactorySnapshot.builder("Modded Crafter")
-            .support(SupportLevel.full).hasConsumers(true)
-            .efficiency(0f, 0f, 0f).blockEfficiencyScale(Float.NaN)
+            .support(SupportLevel.full)
+            .efficiency(0f, 0f).blockEfficiencyScale(Float.NaN)
             .input(item("Copper", 1f))
             .input(unknownConsumer("ConsumeSomethingExotic", 0f, true))
             .build();
@@ -208,8 +208,8 @@ class FactoryAnalyzerTest{
     @Test
     void unknownConsumerReadWhileRunningIsStatedWithConfidence(){
         FactorySnapshot snapshot = FactorySnapshot.builder("Modded Crafter")
-            .support(SupportLevel.full).hasConsumers(true)
-            .efficiency(0.25f, 0.25f, 0.25f).blockEfficiencyScale(1f)
+            .support(SupportLevel.full)
+            .efficiency(0.25f, 0.25f).blockEfficiencyScale(1f)
             .input(item("Copper", 1f))
             .input(unknownConsumer("ConsumeSomethingExotic", 0.25f, false))
             .build();
@@ -225,8 +225,7 @@ class FactoryAnalyzerTest{
     void unsupportedBuildingFallsBackToLimitedDiagnostics(){
         FactorySnapshot snapshot = FactorySnapshot.builder("Copper Wall")
             .support(SupportLevel.minimal)
-            .hasConsumers(false)
-            .efficiency(1f, 1f, 1f)
+            .efficiency(1f, 1f)
             .build();
 
         DiagnosticResult result = FactoryAnalyzer.analyze(snapshot);
@@ -239,7 +238,7 @@ class FactoryAnalyzerTest{
     void blockConditionIsReportedWhenNoInputExplainsTheShortfall(){
         //a heat-starved crafter: every consumer is satisfied but efficiencyScale() halves the result
         FactorySnapshot snapshot = healthySmelter()
-            .efficiency(0.5f, 1f, 0.5f)
+            .efficiency(0.5f, 1f)
             .blockEfficiencyScale(0.5f)
             .build();
 
@@ -250,9 +249,20 @@ class FactoryAnalyzerTest{
     }
 
     @Test
+    void aBlockMultiplierAboveOneIsABoostAndNotAFault(){
+        //an overheated heat crafter runs above nominal; that is not something to report as a problem
+        DiagnosticResult result = FactoryAnalyzer.analyze(healthySmelter()
+            .efficiency(1f, 1f)
+            .blockEfficiencyScale(2f)
+            .build());
+
+        assertEquals(DiagnosticReason.active, result.reason());
+    }
+
+    @Test
     void unexplainedShortfallIsAdmittedRatherThanGuessed(){
         FactorySnapshot snapshot = healthySmelter()
-            .efficiency(0.3f, 0.3f, 0.3f)
+            .efficiency(0.3f, 0.3f)
             .blockEfficiencyScale(1f)
             .build();
 
@@ -282,7 +292,7 @@ class FactoryAnalyzerTest{
             .consumersBypassed(true)
             .shouldConsume(false)
             .outputBufferFull(true)
-            .efficiency(0f, 0f, 0f)
+            .efficiency(0f, 0f)
             .blockEfficiencyScale(Float.NaN)
             .output(silicon(true))
             .build();
@@ -292,8 +302,8 @@ class FactoryAnalyzerTest{
 
     private static FactorySnapshot smelterMissing(ResourceState missing){
         return FactorySnapshot.builder(SILICON_SMELTER)
-            .support(SupportLevel.full).hasConsumers(true)
-            .efficiency(0f, 0f, 0f).blockEfficiencyScale(Float.NaN)
+            .support(SupportLevel.full)
+            .efficiency(0f, 0f).blockEfficiencyScale(Float.NaN)
             .input(item("Coal", 1f))
             .input(missing)
             .build();

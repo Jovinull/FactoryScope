@@ -38,7 +38,7 @@ public final class Diagnostics{
             case outputBlocked -> BlockStatus.noOutput.color;
             case missingItemInput, missingLiquidInput, insufficientPower,
                  otherConsumerLimited, blockConditionLimited -> BlockStatus.noInput.color;
-            case haltedUnknownCause, limitedSupport -> BlockStatus.inactive.color;
+            case notConsuming, haltedUnknownCause, limitedSupport -> BlockStatus.inactive.color;
         };
     }
 

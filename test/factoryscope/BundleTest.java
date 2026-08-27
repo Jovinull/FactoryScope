@@ -141,7 +141,7 @@ class BundleTest{
     private static boolean reachable(DiagnosticReason reason, Severity severity){
         return switch(reason){
             case active, limitedSupport -> severity == Severity.normal;
-            case disabled, inoperableHere, outputBlocked -> severity == Severity.stopped;
+            case disabled, inoperableHere, outputBlocked, notConsuming -> severity == Severity.stopped;
             default -> severity != Severity.normal;
         };
     }
