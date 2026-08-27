@@ -233,14 +233,14 @@ public final class FactoryScopePanel extends BaseDialog{
     }
 
     private void buildNotes(FactorySnapshot snapshot){
-        if(snapshot.support == SupportLevel.full && !snapshot.infiniteResources) return;
+        if(snapshot.support == SupportLevel.full && !snapshot.consumersBypassed) return;
 
         panel(table -> {
             if(snapshot.support != SupportLevel.full){
                 table.labelWrap(FsBundle.get("panel.limited-support")).color(Pal.lightOrange).growX().row();
             }
-            if(snapshot.infiniteResources){
-                table.labelWrap(FsBundle.get("panel.infinite-resources")).color(Pal.accent).growX().padTop(4f).row();
+            if(snapshot.consumersBypassed){
+                table.labelWrap(FsBundle.get("panel.consumers-bypassed")).color(Pal.accent).growX().padTop(4f).row();
             }
         });
     }

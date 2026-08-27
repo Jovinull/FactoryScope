@@ -29,8 +29,12 @@ public final class FactorySnapshot{
     public final boolean productionValid;
     /** {@code Building.timeScale()} - overdrive multiplier; 1 when not boosted. */
     public final float timeScale;
-    /** True when infinite resources are active; consumers are then bypassed by the game itself. */
-    public final boolean infiniteResources;
+    /**
+     * True when the team rule {@code cheat} is on ("blocks do not require power or resources").
+     * {@code updateConsumption()} then short-circuits every consumer, so no input can be a cause.
+     * Note this is <em>not</em> the sandbox gamemode: sandbox only makes construction free.
+     */
+    public final boolean consumersBypassed;
     public final boolean hasConsumers;
 
     /**
@@ -67,7 +71,7 @@ public final class FactorySnapshot{
         this.shouldConsume = b.shouldConsume;
         this.productionValid = b.productionValid;
         this.timeScale = b.timeScale;
-        this.infiniteResources = b.infiniteResources;
+        this.consumersBypassed = b.consumersBypassed;
         this.hasConsumers = b.hasConsumers;
         this.blockEfficiencyScale = b.blockEfficiencyScale;
         this.craftSpeedMultiplier = b.craftSpeedMultiplier;
@@ -114,7 +118,7 @@ public final class FactorySnapshot{
         private boolean shouldConsume = true;
         private boolean productionValid = true;
         private float timeScale = 1f;
-        private boolean infiniteResources;
+        private boolean consumersBypassed;
         private boolean hasConsumers;
         private float blockEfficiencyScale = Float.NaN;
         private float craftSpeedMultiplier = Float.NaN;
@@ -166,8 +170,8 @@ public final class FactorySnapshot{
             return this;
         }
 
-        public Builder infiniteResources(boolean infiniteResources){
-            this.infiniteResources = infiniteResources;
+        public Builder consumersBypassed(boolean consumersBypassed){
+            this.consumersBypassed = consumersBypassed;
             return this;
         }
 

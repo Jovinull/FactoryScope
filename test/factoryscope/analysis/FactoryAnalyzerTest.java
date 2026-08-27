@@ -249,10 +249,10 @@ class FactoryAnalyzerTest{
     }
 
     @Test
-    void infiniteResourcesSuppressInputBlame(){
-        //the game bypasses consumers entirely in sandbox, so an empty input is not a shortage
+    void bypassedConsumersSuppressInputBlame(){
+        //with the team cheat rule the game bypasses consumers, so an empty input is not a shortage
         FactorySnapshot snapshot = healthySmelter()
-            .infiniteResources(true)
+            .consumersBypassed(true)
             .input(item("Sand", 0f))
             .build();
 
@@ -262,9 +262,9 @@ class FactoryAnalyzerTest{
     }
 
     @Test
-    void infiniteResourcesStillReportBlockedOutput(){
+    void bypassedConsumersStillReportBlockedOutput(){
         FactorySnapshot snapshot = healthySmelter()
-            .infiniteResources(true)
+            .consumersBypassed(true)
             .shouldConsume(false)
             .outputBufferFull(true)
             .efficiency(0f, 0f, 0f)

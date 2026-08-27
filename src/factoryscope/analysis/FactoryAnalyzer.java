@@ -67,11 +67,11 @@ public final class FactoryAnalyzer{
     /**
      * Attributes a shortfall to the consumers that are actually limiting.
      *
-     * <p>Skipped entirely under infinite resources: the game short-circuits every consumer in that
-     * mode, so reporting a shortage would contradict the efficiency the player can see.
+     * <p>Skipped entirely when the team rules bypass consumers: the game short-circuits every consumer
+     * in that case, so reporting a shortage would contradict the efficiency the player can see.
      */
     private static void addInputFindings(FactorySnapshot s, List<Finding> findings){
-        if(s.infiniteResources) return;
+        if(s.consumersBypassed) return;
 
         List<ResourceState> mandatory = s.mandatoryInputs();
         if(mandatory.isEmpty()) return;

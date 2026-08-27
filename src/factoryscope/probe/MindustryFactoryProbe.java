@@ -57,7 +57,7 @@ public final class MindustryFactoryProbe{
             .shouldConsume(build.shouldConsume())
             .productionValid(build.productionValid())
             .timeScale(timeScale)
-            .infiniteResources(build.cheating())
+            .consumersBypassed(build.cheating())
             .hasConsumers(block.hasConsumers)
             .blockEfficiencyScale(ProductionRates.blockEfficiencyScale(
                 build.efficiency, build.potentialEfficiency, gateOpen));
