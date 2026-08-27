@@ -189,21 +189,33 @@ public final class MindustryFactoryProbe{
         float neededThisFrame = amountPerTick * frameTicks * timeScale * scale;
 
         float satisfaction = neededThisFrame <= 0f ? 1f : Math.min(stored / neededThisFrame, 1f);
-        return ResourceState.of(ResourceKind.liquid, liquid.localizedName)
+        var builder = ResourceState.of(ResourceKind.liquid, liquid.localizedName)
             .contentId(liquid.name)
             .optional(optional)
-            .satisfaction(satisfaction)
-            .amounts(stored, ProductionRates.perTickToPerSecond(amountPerTick, timeScale), RateUnit.perSecond)
-            .build();
+            .satisfaction(satisfaction);
+        return amounts(builder, stored,
+            ProductionRates.perTickToPerSecond(amountPerTick, timeScale), RateUnit.perSecond).build();
+    }
+
+    /**
+     * Drops a requirement that cannot be stated as a number.
+     *
+     * <p>The sandbox power void asks for {@code Float.MAX_VALUE} per tick, which overflows to infinity
+     * per second; the game hides that figure from its own stats for the same reason.
+     */
+    private static ResourceState.Builder amounts(ResourceState.Builder builder, float stored,
+                                                 float required, RateUnit unit){
+        boolean printable = !Float.isNaN(required) && !Float.isInfinite(required);
+        return printable ? builder.amounts(stored, required, unit) : builder.amounts(stored, -1f, RateUnit.none);
     }
 
     private static ResourceState powerInput(Building build, ConsumePower power, boolean optional){
         float status = build.power == null ? 0f : build.power.status;
-        return ResourceState.of(ResourceKind.power, FsBundle.get("input.power"))
+        var builder = ResourceState.of(ResourceKind.power, FsBundle.get("input.power"))
             .optional(optional)
-            .satisfaction(status)
-            .amounts(-1f, ProductionRates.perTickToPerSecond(power.usage, build.timeScale()), RateUnit.perSecond)
-            .build();
+            .satisfaction(status);
+        return amounts(builder, -1f,
+            ProductionRates.perTickToPerSecond(power.usage, build.timeScale()), RateUnit.perSecond).build();
     }
 
     /**

@@ -44,6 +44,8 @@ final class HeadlessGame{
                 Vars.init();
                 world = new World();
                 content.createBaseContent();
+                //stand-ins for common mod shapes, registered exactly where a real mod would register them
+                ModdedBlocks.create();
                 content.init();
 
                 add(logic = new Logic());
