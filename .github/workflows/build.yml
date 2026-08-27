@@ -9,9 +9,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up PATH
-        run: ls -d "$ANDROID_HOME"/build-tools/* | tail -1 >> $GITHUB_PATH
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -19,18 +16,46 @@ jobs:
           java-version: 17
           cache: gradle
 
-      - name: Build and test
+      # d8 turns the desktop classes into Android-compatible dex; without it only the desktop jar builds
+      - name: Put the Android build tools on PATH
+        run: |
+          if [ -z "$ANDROID_HOME" ] || [ ! -d "$ANDROID_HOME/build-tools" ]; then
+            echo "ANDROID_HOME is not usable on this runner" >&2
+            exit 1
+          fi
+          tools=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          echo "using $tools"
+          echo "${tools%/}" >> "$GITHUB_PATH"
+
+      - name: Test
         run: |
           chmod +x ./gradlew
-          ./gradlew test deploy
+          ./gradlew test
 
-      - name: Upload mod jar
+      # the universal jar is the release artifact; the desktop jar alone will not load on Android
+      - name: Build the universal jar
+        run: ./gradlew deploy
+
+      - name: Check the jar contents
+        run: |
+          set -e
+          jar=build/libs/FactoryScope.jar
+          unzip -l "$jar"
+          unzip -l "$jar" | grep -q 'mod.hjson'
+          unzip -l "$jar" | grep -q 'bundles/bundle.properties'
+          unzip -l "$jar" | grep -q 'classes.dex'
+          if unzip -l "$jar" | grep -qE ' (mindustry|arc)/'; then
+            echo "the jar bundles game classes" >&2
+            exit 1
+          fi
+
+      - name: Upload the universal jar
         uses: actions/upload-artifact@v4
         with:
           name: FactoryScope
           path: build/libs/FactoryScope.jar
 
-      - name: Upload test report
+      - name: Upload the test report
         if: failure()
         uses: actions/upload-artifact@v4
         with:

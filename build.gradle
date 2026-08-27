@@ -102,18 +102,23 @@ tasks.register("jarAndroid"){
         def dependencies = (configurations.compileClasspath.asList() + configurations.runtimeClasspath.asList() + [new File(platformRoot, "android.jar")]).collect{ "--classpath $it.path" }.join(" ")
         def d8 = isWindows ? "d8.bat" : "d8"
 
-        "$d8 $dependencies --min-api 21 --output ${projectName}Android.jar ${projectName}Desktop.jar"
-            .execute(null, new File("build/libs")).waitForProcessOutput(System.out, System.err)
+        def dexing = "$d8 $dependencies --min-api 21 --output ${projectName}Android.jar ${projectName}Desktop.jar"
+            .execute(null, new File("build/libs"))
+        dexing.waitForProcessOutput(System.out, System.err)
+        //the template ignores this, which turns a dexing failure into a confusing error in deploy
+        if(dexing.exitValue() != 0) throw new GradleException("d8 failed with exit code ${dexing.exitValue()}")
     }
 }
 
-//universal desktop + android artifact, matching the layout the Mod Browser expects
+//universal desktop + android artifact; this, not the desktop jar, is what gets released
 tasks.register("deploy", Jar){
     def projectName = project.name
     dependsOn "jarAndroid"
     dependsOn "jar"
     archiveFileName = "${projectName}.jar"
 
+    //both jars carry mod.hjson and the bundles; the desktop copy wins
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from{ [zipTree("build/libs/${projectName}Desktop.jar"), zipTree("build/libs/${projectName}Android.jar")] }
 
     doLast{

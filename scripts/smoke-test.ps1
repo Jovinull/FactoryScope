@@ -21,6 +21,7 @@ param(
     [string]$MindustryPath,
     [switch]$SkipBuild,
     [switch]$Install,
+    [switch]$KeepSandbox,
     [int]$TimeoutSeconds = 240
 )
 
@@ -50,9 +51,25 @@ if(-not $SkipBuild){
 }
 
 if(-not (Test-Path -LiteralPath $builtJar)){ throw "expected jar not found: $builtJar" }
-Write-Host "    jar: $builtJar ($([math]::Round((Get-Item $builtJar).Length / 1KB)) KB)"
+
+$jarInfo = Get-Item $builtJar
+$declaredVersion = (Select-String -LiteralPath (Join-Path $projectRoot 'mod.hjson') -Pattern '^\s*version:\s*"([^"]+)"').Matches[0].Groups[1].Value
+
+# a jar older than the sources it is built from would make the whole run meaningless
+$newestSource = Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src'), (Join-Path $projectRoot 'assets') -Recurse -File |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if($newestSource -and $newestSource.LastWriteTime -gt $jarInfo.LastWriteTime){
+    throw "the jar is older than $($newestSource.Name); rebuild before running with -SkipBuild"
+}
+
+Write-Host "    jar: $builtJar ($([math]::Round($jarInfo.Length / 1KB)) KB, version $declaredVersion)"
 
 # --------------------------------------------------------------------------- discover
+
+$running = @(Get-Process -Name 'Mindustry' -ErrorAction SilentlyContinue)
+if($running.Count -gt 0){
+    throw "Mindustry is already running (pid $($running[0].Id)); close it so the smoke test cannot be confused by it."
+}
 
 Write-Step 'Locating Mindustry'
 $gamePath = Find-MindustryInstall -Hint $MindustryPath
@@ -92,19 +109,21 @@ Set-Content -LiteralPath (Join-Path $sandbox 'steam_appid.txt') -Value '1127400'
 $logFile = Join-Path $sandboxData 'last_log.txt'
 Write-Step "Starting Mindustry in sandbox $sandbox"
 
+$started = Get-Date
 $process = Start-Process -FilePath $launcher.Path -ArgumentList $launcher.Arguments `
     -WorkingDirectory $sandbox -PassThru -WindowStyle Minimized
 
 # --------------------------------------------------------------------------- watch the log
 
-$readySignal = 'FactoryScope] inspector ready'
+# bound to the version being tested: a log left by any other build cannot satisfy it
+$readySignal = "[FactoryScope] $declaredVersion inspector ready"
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 $ready = $false
 
 try{
     while((Get-Date) -lt $deadline){
         if($process.HasExited){
-            Write-Fail "The game exited early with code $($process.ExitCode)."
+            Write-Fail "The game exited after $([int]((Get-Date) - $started).TotalSeconds)s with code $($process.ExitCode)."
             break
         }
         if(Test-Path -LiteralPath $logFile){
@@ -165,7 +184,13 @@ if($success){
 }
 
 Write-Host ''
-Write-Host "Full log: $logFile"
-Write-Host 'The sandbox is left in place for inspection; delete it when you are done.'
+if($success -and -not $KeepSandbox){
+    Copy-Item -LiteralPath $logFile -Destination (Join-Path $projectRoot 'build\smoke-test.log') -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Log kept at $(Join-Path $projectRoot 'build\smoke-test.log'); sandbox removed."
+}else{
+    Write-Host "Full log: $logFile"
+    Write-Host 'The sandbox has been left in place for inspection.'
+}
 
 exit ([int](-not $success))
