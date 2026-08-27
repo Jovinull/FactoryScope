@@ -24,6 +24,16 @@ repositories{
         metadataSources{ artifact() }
         content{ includeVersion("Anuken", "Mindustry", mindustryVersion) }
     }
+
+    //the same release also ships the game assets; the headless integration tests need them to boot
+    ivy{
+        url = "https://github.com/"
+        patternLayout{
+            artifact("/Anuken/Mindustry/releases/download/[revision]/assets.jar")
+        }
+        metadataSources{ artifact() }
+        content{ includeModule("Anuken", "MindustryAssets") }
+    }
 }
 
 java{
@@ -31,16 +41,35 @@ java{
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+configurations{
+    //game assets, needed only by the headless integration tests
+    mindustryAssets
+}
+
 dependencies{
     //compileOnly: the game already provides Mindustry and Arc at runtime, they must never be bundled into the mod jar
     compileOnly "Anuken:Mindustry:$mindustryVersion"
 
     testImplementation "Anuken:Mindustry:$mindustryVersion"
+    mindustryAssets "Anuken:MindustryAssets:$mindustryVersion"
     testImplementation "org.junit.jupiter:junit-jupiter:$junitVersion"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
+//Mindustry resolves its internal files from the classpath root, but the release archive nests them under
+//"assets/", so the archive is unpacked and that inner folder is what goes on the test classpath.
+def mindustryAssetsDir = layout.buildDirectory.dir("mindustry-assets")
+
+tasks.register("extractMindustryAssets", Copy){
+    from{ zipTree(configurations.mindustryAssets.singleFile) }
+    into mindustryAssetsDir
+    //sprites, sounds and music are never touched in headless mode and make up most of the archive
+    exclude "assets/sprites/**", "assets/sounds/**", "assets/music/**"
+}
+
 tasks.named("test"){
+    dependsOn "extractMindustryAssets"
+    classpath += files(mindustryAssetsDir.map{ it.dir("assets") })
     useJUnitPlatform()
     testLogging{
         events = ["failed"]
