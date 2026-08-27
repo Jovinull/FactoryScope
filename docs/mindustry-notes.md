@@ -38,6 +38,24 @@ flag**: it only makes construction free, and crafters in a sandbox game still ne
 Only the team `cheat` rule short-circuits `updateConsumption`, so that is the only case where
 FactoryScope suppresses input blame.
 
+## Stage coordinates are not screen coordinates
+
+Arc reports mouse and touch positions with the origin at the **bottom left**, and `Camera.unproject`
+expects them that way. `Scene.stageToScreenCoordinates` does not produce them: it projects through the
+viewport and then flips Y for the benefit of platform input APIs, so feeding its result back into
+`Core.input.mouseWorld` mirrors every position about the middle of the screen.
+
+The inverse of `Scene.screenToStageCoordinates` is `viewport.project(...)` with no flip, which is what the
+picker uses:
+
+```java
+Core.scene.getViewport().project(vec.set(stageX, stageY));
+Core.camera.unproject(vec);
+```
+
+The acceptance harness catches a regression here by placing two crafters the same distance above and
+below the camera: a mirrored Y resolves each click to the other one.
+
 ## `enabled` is not always the player
 
 `Building.checkAllowUpdate()` sets `enabled = false` whenever `allowUpdate()` is false, which happens when
@@ -49,6 +67,21 @@ game the moment it appears.
 Reporting that as "a player or a logic processor turned this off" sends the player looking for a switch
 that does not exist, so FactoryScope reads `allowUpdate()` alongside `enabled` and reports the two
 separately.
+
+## Some buildings are never updated at all
+
+`Tile.setBlock` creates the building with
+`entityprov.get().init(this, team, block.update && !state.isEditor(), rotation)`. The third argument
+decides whether the entity joins the update group, so a block with `update = false` - every plain wall -
+never runs `updateConsumption()`, and its `efficiency` stays at the zero it was constructed with. The
+same is true of everything in the map editor.
+
+Reading that zero as "stopped" produces a confident, wrong diagnosis on a copper wall. FactoryScope
+records `block.update && !state.isEditor()` as `efficiencyTracked` and refuses to draw conclusions from
+an efficiency the engine does not maintain.
+
+Note for tests: forcing `updateConsumption()` on such a building in a fixture hides this entirely, which
+is how it survived 0.1.0.
 
 ## `shouldConsume()` and blocked output
 
@@ -130,3 +163,27 @@ data directory without touching the player's.
 
 Non-Steam builds honour the `MINDUSTRY_DATA_DIR` environment variable and the `mindustry.data.dir`
 system property (`ClientLauncher.setup`).
+
+## Consumers satisfied by a trigger
+
+`ConsumeItems.efficiency()` is satisfied by `build.consumeTriggerValid() || items.has(...)`. The first
+half is how a generator reports the item it is currently burning: its buffer is empty, but the consumer
+is met. Checking only the buffer shows a running generator as starved the instant it swallows its last
+unit of fuel. The same applies to `ConsumeItemFilter`.
+
+## Requirements that cannot be printed
+
+The sandbox power void declares `consumePower(Float.MAX_VALUE)`, which overflows to infinity once
+converted to a per-second figure. Mindustry removes `Stat.powerUse` from that block's stats for exactly
+this reason; FactoryScope drops the number and shows the consumer without a rate rather than printing
+something meaningless.
+
+## Notes towards area diagnostics
+
+Two things found during the 0.1.1 audit matter for the next milestone:
+
+- Any area walk has to skip buildings where `efficiencyTracked` is false, or a wall-heavy base will fill
+  the results with blocks that have no efficiency to report.
+- `PowerGraph` exposes cached totals (`getLastPowerProduced`, `getLastScaledPowerIn`, `getLastCapacity`)
+  that cost nothing to read. A power-network view can be built on those without traversing the graph,
+  which is the only reason per-frame power inspection is affordable.
