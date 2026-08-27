@@ -5,55 +5,75 @@ A factory diagnostics utility for Mindustry v8.
 FactoryScope answers one question: **why is this factory not running at full capacity?**
 
 Select a production block and it tells you what the building is doing, what it is waiting for, and which
-of its inputs or outputs is responsible. It adds no blocks, no items, no units and no balance changes,
-and it never modifies the game state it inspects.
+input or output is responsible. It adds no blocks, no items, no units and no balance changes, and it
+never modifies the state it inspects.
 
-## Features
+## What 0.1.x supports
 
-- **A verdict, not a dump.** Every inspection ends in a single primary diagnosis: running, disabled,
+- **A single verdict per building.** Every inspection ends in one primary diagnosis: running, disabled,
   cannot operate here, output blocked, item shortage, liquid shortage, power limited, block condition, or
-  an explicit admission that the cause could not be determined. A building the game itself switched off,
+  an explicit statement that the cause could not be determined. A building the game itself switched off,
   such as one outside the playable area, is told apart from one a player or a logic processor turned off.
+  Secondary findings are kept and shown underneath.
 - **Efficiency in context.** Current efficiency, the efficiency the building would reach if it were
-  unblocked, and any time scale or block-specific multiplier that is in play.
-- **Production rates.** For crafting blocks: theoretical output at full efficiency versus what the
+  unblocked, plus any overdrive or block-specific multiplier in play.
+- **Production rates for crafting blocks.** Theoretical output at full efficiency against what the
   building is producing right now, in items or liquid units per second.
-- **Input detail.** Every mandatory input with the amount held and the amount required, plus power
-  satisfaction and the state of the grid it is attached to. Optional and boost inputs are listed
-  separately and never counted as shortages.
-- **Output buffers.** What is sitting in the block's own buffer and whether it is what stopped the line.
-- **Works with modded blocks.** Analysis is driven by the consumers a block declares, not by a list of
-  known blocks, so any crafter built on Mindustry's standard consumers is understood. Unrecognised
-  consumer types are reported honestly rather than ignored or guessed at.
+- **Inputs in detail.** Every mandatory input with the amount held and the amount required, power
+  satisfaction, and the state of the grid the building is attached to. Optional and boost inputs are
+  listed separately and are never counted as shortages.
+- **Output buffers**, including which one stopped the line.
+- **Modded blocks.** Analysis is driven by the consumers a block declares rather than by a list of known
+  blocks, so any crafter built on Mindustry's standard consumers is understood. Unrecognised consumer
+  types are reported as unrecognised instead of being guessed at or ignored.
+- **English and Brazilian Portuguese.**
 
-## Supported version
+## What it does not support
 
-Built and tested against **Mindustry v8 build 159.7**. The dependency is pinned to that release.
+- **Anything beyond the selected building.** No conveyor tracing, no area or sector analysis, no
+  bottleneck search. FactoryScope will not tell you which upstream machine starved this one.
+- **Full production modelling outside `GenericCrafter`.** That covers the conventional crafting blocks on
+  both planets. Drills, pumps, generators, unit factories and the rest are inspected — inputs, power,
+  efficiency, verdict — but get no production rates, and the panel says so.
+- **Measured throughput.** Every rate is derived from the current game state at the instant you look. It
+  is labelled as such and never presented as an observed average.
+- **History, alerts, or recommendations.**
 
-The mod is marked as client-side only in `mod.hjson`, so it does not affect multiplayer compatibility.
+Fog of war is respected: a building the local player cannot legitimately see cannot be inspected.
 
-## Installation
+## Requirements
 
-1. Download `FactoryScope.jar` (or build it yourself, see below).
-2. Put it in your Mindustry mods folder:
-   - **Steam / Windows**: `<Steam library>\steamapps\common\Mindustry\saves\mods\`
-   - **Other desktop builds**: `%APPDATA%\Mindustry\mods\` on Windows,
-     `~/.local/share/Mindustry/mods/` on Linux, `~/Library/Application Support/Mindustry/mods/` on macOS
-   - **Android**: use the in-game *Mods → Import mod* button
-3. Restart Mindustry.
+**Mindustry v8, build 159.7.** The dependency is pinned to that release and the mod declares
+`minGameVersion: 159.7`.
 
-You can also use *Mods → Import mod* on desktop and pick the jar.
+The mod is marked client-side only, so it takes no part in the multiplayer mod handshake: you can join a
+vanilla server with FactoryScope installed, and the server does not need to have it.
+
+## Installing
+
+Download `FactoryScope.jar` from the [releases page](https://github.com/Jovinull/FactoryScope/releases),
+then either use *Mods → Import mod* in game, or drop it in your mods folder:
+
+| Platform | Folder |
+| --- | --- |
+| Steam (any OS) | `<install directory>/saves/mods/` |
+| Windows | `%APPDATA%\Mindustry\mods\` |
+| Linux | `~/.local/share/Mindustry/mods/` |
+| macOS | `~/Library/Application Support/Mindustry/mods/` |
+| Android | *Mods → Import mod* |
+
+Restart Mindustry afterwards.
 
 ## Using the inspector
 
 1. Enter any game.
 2. Press the FactoryScope button in the bottom-left corner of the HUD.
 3. Select a production block. Selecting anywhere else cancels.
-4. Read the diagnosis. The panel refreshes while it is open.
-5. Close it with the close button or the usual back/escape gesture.
+4. Read the diagnosis. The panel keeps refreshing while it is open.
+5. Close it with the close button or the usual back gesture.
 
-Selection is a single tap or click, so the same flow works on desktop and on touch devices. There is no
-keyboard shortcut to memorise and nothing stays active once the panel is closed.
+Selection is a single tap or click, so the same flow works with a mouse and with touch. Nothing is
+required from the keyboard, and nothing of FactoryScope stays in the input path once the panel is closed.
 
 ## Building from source
 
@@ -64,41 +84,43 @@ gradlew.bat clean test jar     # Windows
 ./gradlew clean test jar       # Linux and macOS
 ```
 
-The desktop mod is written to `build/libs/FactoryScopeDesktop.jar`.
+### Which artifact is which
 
-`gradlew deploy` produces the combined desktop + Android artifact, and needs the Android SDK build tools
-(`d8`) on the path. Continuous integration builds that artifact on every push.
+| Artifact | Task | Runs on |
+| --- | --- | --- |
+| `build/libs/FactoryScopeDesktop.jar` | `jar` | Desktop only |
+| `build/libs/FactoryScope.jar` | `deploy` | Desktop **and** Android |
+
+`deploy` runs `d8` from the Android SDK build tools to produce the dexed classes Android needs, so it
+requires `ANDROID_HOME` and `d8` on the path. Continuous integration builds it on every push. The desktop
+jar is for quick local testing and is not a substitute for a release.
 
 ### Tests
 
-`gradlew test` runs two layers:
+`gradlew test` runs three layers:
 
-- unit tests for the diagnostic engine and the rate arithmetic, which need nothing but a JVM;
-- integration tests that boot a headless Mindustry with real content, place real blocks, and check the
-  diagnosis and the derived rates against the values the game itself computes.
+- unit tests for the diagnostic engine, the rate arithmetic and the number formatting, which need nothing
+  but a JVM;
+- integration tests that boot a headless Mindustry with real content, place real blocks and check the
+  diagnosis and derived rates against the values the game itself computes;
+- sweeps over every placeable vanilla block, and over stand-ins for the block shapes other mods ship,
+  asserting that nothing throws, no rate is unprintable, no cause is asserted without evidence, and that
+  inspection never alters game state.
 
-`scripts/smoke-test.ps1` goes one step further on Windows: it builds the mod, finds the local Mindustry
-installation, launches it in a throwaway sandbox directory and reports whether the mod initialised
-cleanly. It never reads or writes your saves, settings or installed mods. Add `-Install` to also copy the
-jar into your real mods folder.
+`scripts/smoke-test.ps1` goes further on Windows: it builds the mod, finds the local Mindustry
+installation, launches it with its working directory in a throwaway sandbox, and checks the log for this
+version initialising cleanly. Your saves, settings and installed mods are never read or written. Add
+`-Install` to also copy the jar into your real mods folder.
 
-## Current limitations
+## Reporting bugs
 
-- Full production analysis covers `GenericCrafter` and its subclasses, which is the conventional crafting
-  block in Mindustry. Other buildings are inspected too, but without a production model: they show their
-  inputs, power and efficiency, and are labelled as limited diagnostics.
-- Rates are derived from the current game state, not measured over time. They are labelled as such and
-  are never presented as observed throughput.
-- Analysis covers the selected building only. FactoryScope does not trace conveyors and will not tell you
-  which upstream machine starved it.
-- Consumer types added by other mods are handled generically. When such a consumer is limiting production
-  and the building is already stopped, the reading cannot be fully trusted and the panel says so instead
-  of asserting a cause.
-- Fog of war is respected: a building the local player cannot legitimately see cannot be inspected.
+Open an issue at <https://github.com/Jovinull/FactoryScope/issues>. A useful report includes the
+Mindustry build, the block you inspected, what FactoryScope said, what you expected instead, and the
+relevant part of `last_log.txt` from your Mindustry data folder.
 
 ## Roadmap
 
-None of the following is implemented yet.
+None of the following is implemented.
 
 - v0.2 — area diagnostics: analyse a selected region rather than a single block
 - v0.3 — conveyor throughput
@@ -110,5 +132,10 @@ None of the following is implemented yet.
 ## Notes for contributors
 
 `docs/mindustry-notes.md` records the parts of the v159.7 source the diagnosis depends on, including the
-exact order in which the game decides efficiency and why some formulas are reimplemented rather than
-called. Read it before changing anything in `analysis/` or `probe/`.
+order in which the game decides efficiency and why a couple of formulas are reimplemented rather than
+called. Read it before changing anything under `analysis/` or `probe/`. `docs/releasing.md` covers what a
+release needs.
+
+## License
+
+GPL-3.0, matching Mindustry itself. See [LICENSE](LICENSE).
