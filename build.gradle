@@ -3,6 +3,16 @@ apply plugin: "java"
 sourceSets.main.java.srcDirs = ["src"]
 sourceSets.test.java.srcDirs = ["test"]
 
+//The acceptance harness is a second Mindustry mod that drives the inspector inside a real client.
+//Keeping it in its own source set is what guarantees it can never reach the release artifact, which is
+//built from sourceSets.main alone.
+sourceSets{
+    acceptance{
+        java.srcDirs = ["acceptance/src"]
+        compileClasspath += sourceSets.main.output
+    }
+}
+
 ext{
     //pinned stable Mindustry release; the game API is not stable across major builds, so avoid "latest"/"be" here
     mindustryVersion = "v159.7"
@@ -50,6 +60,8 @@ dependencies{
     //compileOnly: the game already provides Mindustry and Arc at runtime, they must never be bundled into the mod jar
     compileOnly "Anuken:Mindustry:$mindustryVersion"
 
+    acceptanceCompileOnly "Anuken:Mindustry:$mindustryVersion"
+
     testImplementation "Anuken:Mindustry:$mindustryVersion"
     mindustryAssets "Anuken:MindustryAssets:$mindustryVersion"
     testImplementation "org.junit.jupiter:junit-jupiter:$junitVersion"
@@ -75,6 +87,75 @@ tasks.named("test"){
         events = ["failed"]
         exceptionFormat = "full"
     }
+}
+
+//built alongside FactoryScope and loaded next to it; never released
+tasks.register("acceptanceJar", Jar){
+    archiveFileName = "FactoryScopeAcceptance.jar"
+    from sourceSets.acceptance.output
+    from("acceptance"){
+        include "mod.hjson"
+    }
+}
+
+//The acceptance harness lives in this repository, so "no test code in the release" has to be checked
+//rather than assumed. Runs over whichever artifacts have been built.
+tasks.register("verifyArtifacts"){
+    group = "verification"
+    description = "Checks the built jars carry only production code and the expected metadata."
+    dependsOn "jar"
+
+    def projectName = project.name
+    def libs = layout.buildDirectory.dir("libs")
+
+    doLast{
+        def required = ["mod.hjson", "bundles/bundle.properties", "bundles/bundle_pt_BR.properties"]
+        def forbidden = ~/^(mindustry|arc|org|com|kotlin|javax)\/|acceptance|Test|fixture|harness|scratch/
+
+        ["${projectName}Desktop.jar", "${projectName}.jar"].each{ name ->
+            def jar = libs.get().file(name).asFile
+            if(!jar.exists()) return
+
+            def entries = new java.util.zip.ZipFile(jar).withCloseable{ zip ->
+                zip.entries().collect{ it.name }
+            }
+
+            required.each{ entry ->
+                if(!entries.contains(entry)) throw new GradleException("$name is missing $entry")
+            }
+
+            def duplicates = entries.countBy{ it }.findAll{ it.value > 1 }.keySet()
+            if(duplicates) throw new GradleException("$name has duplicate entries: $duplicates")
+
+            def offenders = entries.findAll{ (it.endsWith(".class") || it.endsWith(".dex")) && it =~ forbidden }
+            if(offenders) throw new GradleException("$name carries non-production code: $offenders")
+
+            def strays = entries.findAll{ it.endsWith(".class") && !it.startsWith("factoryscope/") }
+            if(strays) throw new GradleException("$name carries classes outside factoryscope/: $strays")
+
+            if(name == "${projectName}.jar" && !entries.contains("classes.dex")){
+                throw new GradleException("$name is the universal artifact but has no classes.dex")
+            }
+
+            logger.lifecycle("verified $name (${entries.size()} entries)")
+        }
+    }
+}
+
+tasks.register("acceptanceTest", Exec){
+    group = "verification"
+    description = "Runs the inspector acceptance suite in a real Mindustry client."
+    dependsOn "jar", "acceptanceJar"
+
+    doFirst{
+        if(!isWindows){
+            throw new GradleException("The acceptance suite launches a locally installed Mindustry and is "
+                + "currently scripted for Windows only. See docs/testing.md.")
+        }
+    }
+
+    commandLine "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", file("scripts/acceptance-test.ps1").absolutePath, "-SkipBuild"
 }
 
 jar{

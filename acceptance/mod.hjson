@@ -1,0 +1,10 @@
+name: "factory-scope-acceptance"
+displayName: "FactoryScope Acceptance Harness"
+author: "Jovinull"
+description: "Development-only harness that drives the FactoryScope inspector through the real input path and reports results to the game log."
+version: "0.1.1"
+main: "factoryscope.acceptance.AcceptanceHarness"
+minGameVersion: 159.7
+java: true
+hidden: true
+dependencies: ["factory-scope"]
