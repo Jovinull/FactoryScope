@@ -20,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class BundleTest{
     private static final Path SOURCE_ROOT = Path.of("src");
-    private static final Path BUNDLE = Path.of("assets", "bundles", "bundle.properties");
+    private static final Path BUNDLES = Path.of("assets", "bundles");
+    private static final Path BUNDLE = BUNDLES.resolve("bundle.properties");
     //only whole-literal keys; keys assembled from an enum are covered by the dedicated tests below
     private static final Pattern LOOKUP = Pattern.compile("FsBundle\\.(?:get|format|ref)\\(\"([^\"]+)\"\\s*[),]");
 
@@ -28,10 +29,7 @@ class BundleTest{
 
     @BeforeAll
     static void loadBundle() throws IOException{
-        bundle = new Properties();
-        try(Reader reader = Files.newBufferedReader(BUNDLE, StandardCharsets.UTF_8)){
-            bundle.load(reader);
-        }
+        bundle = read(BUNDLE);
     }
 
     @Test
@@ -72,6 +70,65 @@ class BundleTest{
         }
 
         assertEquals(List.of(), missing, "reachable diagnoses with no sentence to show");
+    }
+
+    @Test
+    void everyTranslationCoversExactlyTheDefaultBundle() throws IOException{
+        List<String> problems = new ArrayList<>();
+
+        try(Stream<Path> files = Files.list(BUNDLES)){
+            for(Path file : files.filter(BundleTest::isTranslation).toList()){
+                Properties translation = read(file);
+                String name = file.getFileName().toString();
+
+                for(String key : bundle.stringPropertyNames()){
+                    if(!translation.containsKey(key)) problems.add(name + " is missing " + key);
+                }
+                for(String key : translation.stringPropertyNames()){
+                    if(!bundle.containsKey(key)) problems.add(name + " has an unknown key " + key);
+                }
+                for(String key : translation.stringPropertyNames()){
+                    if(!bundle.containsKey(key)) continue;
+                    if(placeholders(bundle.getProperty(key)) != placeholders(translation.getProperty(key))){
+                        problems.add(name + " changes the placeholder count of " + key);
+                    }
+                }
+            }
+        }
+
+        assertEquals(List.of(), problems, "translations that have drifted from the default bundle");
+    }
+
+    @Test
+    void translationsAreReadableAsUtf8() throws IOException{
+        //Fi.reader() decodes mod bundles as UTF-8, so anything else would reach players as mojibake
+        try(Stream<Path> files = Files.list(BUNDLES)){
+            for(Path file : files.filter(BundleTest::isTranslation).toList()){
+                String text = Files.readString(file, StandardCharsets.UTF_8);
+                assertFalse(text.contains("�"), file.getFileName() + " is not valid UTF-8");
+            }
+        }
+    }
+
+    private static boolean isTranslation(Path file){
+        String name = file.getFileName().toString();
+        return name.startsWith("bundle_") && name.endsWith(".properties");
+    }
+
+    private static Properties read(Path file) throws IOException{
+        Properties properties = new Properties();
+        try(Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)){
+            properties.load(reader);
+        }
+        return properties;
+    }
+
+    /** Highest {N} index used, so a translation cannot silently drop an argument. */
+    private static int placeholders(String text){
+        int highest = -1;
+        Matcher matcher = Pattern.compile("\\{(\\d+)}").matcher(text);
+        while(matcher.find()) highest = Math.max(highest, Integer.parseInt(matcher.group(1)));
+        return highest;
     }
 
     @Test
