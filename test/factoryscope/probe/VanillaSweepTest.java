@@ -5,6 +5,7 @@ import factoryscope.analysis.*;
 import factoryscope.model.*;
 import factoryscope.ui.*;
 import mindustry.ctype.*;
+import mindustry.type.*;
 import mindustry.game.*;
 import mindustry.gen.*;
 import mindustry.world.*;
@@ -62,6 +63,49 @@ class VanillaSweepTest{
 
         assertTrue(inspected > 150, "only " + inspected + " blocks could be placed");
         assertEquals(List.of(), problems, "blocks FactoryScope could not handle");
+    }
+
+    @Test
+    void inspectingNeverChangesTheGameState(){
+        //the whole mod is observational; this is the guard that keeps it that way across all content
+        List<String> problems = new ArrayList<>();
+
+        for(Block block : placeable){
+            Building build = tryPlace(block, problems);
+            if(build == null) continue;
+
+            String before = mutableState(build);
+            for(int i = 0; i < 3; i++){
+                MindustryFactoryProbe.probe(build);
+            }
+            String after = mutableState(build);
+
+            if(!before.equals(after)){
+                problems.add(block.name + ": state changed from [" + before + "] to [" + after + "]");
+            }
+        }
+
+        assertEquals(List.of(), problems, "blocks whose state FactoryScope disturbed");
+    }
+
+    /** Everything an observational tool must leave alone, rendered as text so a diff is readable. */
+    private static String mutableState(Building build){
+        StringBuilder text = new StringBuilder();
+        text.append("enabled=").append(build.enabled)
+            .append(" efficiency=").append(build.efficiency)
+            .append(" progress=").append(build.progress())
+            .append(" totalProgress=").append(build.totalProgress())
+            .append(" health=").append(build.health);
+        if(build.items != null){
+            for(Item item : content.items()) text.append(' ').append(item.name).append('=').append(build.items.get(item));
+        }
+        if(build.liquids != null){
+            for(Liquid liquid : content.liquids()) text.append(' ').append(liquid.name).append('=').append(build.liquids.get(liquid));
+        }
+        if(build.power != null){
+            text.append(" power=").append(build.power.status).append(" links=").append(build.power.links.size);
+        }
+        return text.toString();
     }
 
     @Test
