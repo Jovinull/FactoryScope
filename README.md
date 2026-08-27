@@ -97,20 +97,16 @@ jar is for quick local testing and is not a substitute for a release.
 
 ### Tests
 
-`gradlew test` runs three layers:
+```
+gradlew test              # unit + headless-Mindustry integration tests, needs only a JDK
+gradlew acceptanceTest    # drives the inspector in a real Mindustry client, needs a local install
+gradlew verifyArtifacts   # checks the built jars carry only production code
+```
 
-- unit tests for the diagnostic engine, the rate arithmetic and the number formatting, which need nothing
-  but a JVM;
-- integration tests that boot a headless Mindustry with real content, place real blocks and check the
-  diagnosis and derived rates against the values the game itself computes;
-- sweeps over every placeable vanilla block, and over stand-ins for the block shapes other mods ship,
-  asserting that nothing throws, no rate is unprintable, no cause is asserted without evidence, and that
-  inspection never alters game state.
+`scripts/smoke-test.ps1` builds, installs into a throwaway sandbox and confirms this version loads in the
+real client without errors. Your saves, settings and installed mods are never touched.
 
-`scripts/smoke-test.ps1` goes further on Windows: it builds the mod, finds the local Mindustry
-installation, launches it with its working directory in a throwaway sandbox, and checks the log for this
-version initialising cleanly. Your saves, settings and installed mods are never read or written. Add
-`-Install` to also copy the jar into your real mods folder.
+[docs/testing.md](docs/testing.md) explains what each layer covers and why the acceptance suite exists.
 
 ## Reporting bugs
 
@@ -131,10 +127,11 @@ None of the following is implemented.
 
 ## Notes for contributors
 
-`docs/mindustry-notes.md` records the parts of the v159.7 source the diagnosis depends on, including the
-order in which the game decides efficiency and why a couple of formulas are reimplemented rather than
-called. Read it before changing anything under `analysis/` or `probe/`. `docs/releasing.md` covers what a
-release needs.
+- [docs/mindustry-notes.md](docs/mindustry-notes.md) — the parts of the v159.7 source the diagnosis
+  depends on, including the order in which the game decides efficiency and why a couple of formulas are
+  reimplemented rather than called. Read it before changing anything under `analysis/` or `probe/`.
+- [docs/testing.md](docs/testing.md) — the three test layers and how to run them.
+- [docs/releasing.md](docs/releasing.md) — what a release needs.
 
 ## License
 
