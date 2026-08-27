@@ -28,7 +28,9 @@ public final class FsBundle{
     public static String format(String key, Object... args){
         String full = PREFIX + key;
         try{
-            if(Core.bundle == null) return full;
+            //I18NBundle.format() resolves through get(key), which renders a missing key as "???key???";
+            //checking first keeps that out of the panel
+            if(Core.bundle == null || !Core.bundle.has(full)) return full;
             return Core.bundle.format(full, args);
         }catch(RuntimeException e){
             return full;

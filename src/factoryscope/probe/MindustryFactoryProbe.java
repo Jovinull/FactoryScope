@@ -4,6 +4,7 @@ import arc.util.*;
 import factoryscope.*;
 import factoryscope.analysis.*;
 import factoryscope.model.*;
+import mindustry.*;
 import mindustry.gen.*;
 import mindustry.type.*;
 import mindustry.world.*;
@@ -54,6 +55,8 @@ public final class MindustryFactoryProbe{
             .support(crafter ? SupportLevel.full : block.hasConsumers ? SupportLevel.basic : SupportLevel.minimal)
             .enabled(build.enabled)
             .updateAllowed(build.allowUpdate())
+            //Tile.setBlock only registers a building for updates when the block updates and we are not in the editor
+            .efficiencyTracked(block.update && !Vars.state.isEditor())
             .efficiency(build.efficiency, build.potentialEfficiency, build.optionalEfficiency)
             .shouldConsume(build.shouldConsume())
             .productionValid(build.productionValid())
@@ -70,22 +73,28 @@ public final class MindustryFactoryProbe{
         return snapshot.build();
     }
 
+    /** Identifies a building in a log line: block name plus tile coordinates. */
+    public static String describe(Building build){
+        return build.block.name + " at " + build.tile.x + "," + build.tile.y;
+    }
+
     // ------------------------------------------------------------------ inputs
 
     private static void addInputs(Building build, Block block, FactorySnapshot.Builder snapshot,
                                   float frameTicks, float timeScale){
         for(Consume consume : block.consumers){
+            //ignore() consumers are excluded from the game's own efficiency calculation, so they can
+            //never be the cause of a shortage; buffered power is the vanilla case.
+            boolean optional = consume.optional || consume.ignore();
             try{
-                //ignore() consumers are excluded from the game's own efficiency calculation, so they can
-                //never be the cause of a shortage; buffered power is the vanilla case.
-                boolean optional = consume.optional || consume.ignore();
                 readConsumer(build, consume, optional, snapshot, frameTicks, timeScale);
             }catch(Exception e){
                 FsLog.warnOnce("consumer:" + consume.getClass().getName(),
                     "failed to read consumer " + consume.getClass().getSimpleName()
-                        + " on block " + block.name, e);
+                        + " on " + describe(build), e);
+                //satisfied, so an unreadable consumer can never invent a shortage, but still listed
                 snapshot.input(ResourceState.of(ResourceKind.other, consume.getClass().getSimpleName())
-                    .optional(true).recognised(false).provisional(true).satisfaction(1f).build());
+                    .optional(optional).recognised(false).provisional(true).satisfaction(1f).build());
             }
         }
     }
@@ -129,13 +138,19 @@ public final class MindustryFactoryProbe{
         }
     }
 
+    /**
+     * {@code ConsumeItems.efficiency()} is satisfied either by the buffer or by
+     * {@code consumeTriggerValid()}, which is how a generator reports the item it is still burning.
+     * Leaving that out would show a running generator as starved the moment it swallows its last coal.
+     */
     private static ResourceState itemInput(Building build, Item item, int required, boolean optional){
         ItemModule module = build.items;
         int stored = module == null ? 0 : module.get(item);
+        boolean satisfied = required <= 0 || stored >= required || build.consumeTriggerValid();
         return ResourceState.of(ResourceKind.item, item.localizedName)
             .contentId(item.name)
             .optional(optional)
-            .satisfaction(required <= 0 || stored >= required ? 1f : 0f)
+            .satisfaction(satisfied ? 1f : 0f)
             .amounts(stored, required, RateUnit.perCraft)
             .build();
     }
@@ -146,7 +161,7 @@ public final class MindustryFactoryProbe{
         return ResourceState.of(ResourceKind.item, name)
             .contentId(consumed != null ? consumed.name : null)
             .optional(optional)
-            .satisfaction(consumed != null ? 1f : 0f)
+            .satisfaction(consumed != null || build.consumeTriggerValid() ? 1f : 0f)
             .amounts(consumed != null && build.items != null ? build.items.get(consumed) : -1f, -1f, RateUnit.none)
             .build();
     }

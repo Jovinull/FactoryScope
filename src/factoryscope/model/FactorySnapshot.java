@@ -23,6 +23,14 @@ public final class FactorySnapshot{
      * only way to avoid telling a player that a block outside the playable area was switched off by hand.
      */
     public final boolean updateAllowed;
+    /**
+     * Whether the engine keeps this building's efficiency up to date at all.
+     *
+     * <p>{@code Tile.setBlock} only adds a building to the update group when {@code Block.update} is
+     * true, so a wall or any other static block never runs {@code updateConsumption()} and its
+     * efficiency stays at the zero it was born with. Reading that as "stopped" would be nonsense.
+     */
+    public final boolean efficiencyTracked;
     /** {@code Building.efficiency} - the value that actually scales production this tick. */
     public final float efficiency;
     /** {@code Building.potentialEfficiency} - efficiency ignoring the shouldConsume()/productionValid() gate. */
@@ -72,6 +80,7 @@ public final class FactorySnapshot{
         this.support = b.support;
         this.enabled = b.enabled;
         this.updateAllowed = b.updateAllowed;
+        this.efficiencyTracked = b.efficiencyTracked;
         this.efficiency = b.efficiency;
         this.potentialEfficiency = b.potentialEfficiency;
         this.optionalEfficiency = b.optionalEfficiency;
@@ -120,6 +129,7 @@ public final class FactorySnapshot{
         private SupportLevel support = SupportLevel.minimal;
         private boolean enabled = true;
         private boolean updateAllowed = true;
+        private boolean efficiencyTracked = true;
         private float efficiency;
         private float potentialEfficiency;
         private float optionalEfficiency;
@@ -158,6 +168,11 @@ public final class FactorySnapshot{
 
         public Builder updateAllowed(boolean updateAllowed){
             this.updateAllowed = updateAllowed;
+            return this;
+        }
+
+        public Builder efficiencyTracked(boolean efficiencyTracked){
+            this.efficiencyTracked = efficiencyTracked;
             return this;
         }
 

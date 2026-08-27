@@ -104,6 +104,7 @@ public final class FactoryAnalyzer{
 
     /** A multiplier such as heat or terrain attributes holding the building below full speed. */
     private static void addBlockConditionFinding(FactorySnapshot s, List<Finding> findings){
+        if(!s.efficiencyTracked) return;
         float scale = s.blockEfficiencyScale;
         if(Float.isNaN(scale) || scale >= FULL) return;
 
@@ -122,6 +123,7 @@ public final class FactoryAnalyzer{
      * it understands. Saying so is the whole point - guessing here would be worse than admitting it.
      */
     private static void addFallbackFinding(FactorySnapshot s, List<Finding> findings){
+        if(!s.efficiencyTracked) return;
         if(hasSeverity(findings, Severity.stopped) || hasSeverity(findings, Severity.reduced)) return;
         if(s.efficiency >= FULL) return;
 

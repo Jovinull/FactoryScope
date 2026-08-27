@@ -18,26 +18,34 @@ import mindustry.ui.*;
 /**
  * Everything that puts FactoryScope on screen: the HUD toggle and the one-shot building picker.
  *
- * <h2>Why a picker overlay instead of TapEvent</h2>
- * A transparent element added to the HUD swallows the tap before the world sees it, so selecting a
- * factory never also opens that block's own configuration window. It works identically for a mouse
- * click and a touch, and it disappears the instant a choice is made - nothing of FactoryScope stays in
- * the input path while the mod is idle.
+ * <h2>Why a picker overlay rather than TapEvent</h2>
+ * Mindustry fires {@code TapEvent} only after the world has already handled the tap, so a configurable
+ * block would open its own dialog underneath the diagnostic panel, and the event travels through
+ * {@code Call.tileTap}, a networked remote. A transparent element in the HUD instead swallows the tap
+ * before the world sees it - {@code Core.scene.hasMouse()} is what gates world input - which gives
+ * one-shot selection with no double UI and no packets. It is removed the moment a choice is made, so
+ * nothing of FactoryScope remains in the input path while the mod is idle.
  */
 public final class FactoryScopeUI{
     private static final float BUTTON_SIZE = 48f;
     /** Clears the HUD's own bottom-left furniture (chat, saving indicator). */
     private static final float BUTTON_BOTTOM_PAD = 70f;
 
+    private static final Vec2 scratch = new Vec2();
+
     private static FactoryScopePanel panel;
     private static Element picker;
     private static Table hint;
+    private static boolean initialized;
 
     private FactoryScopeUI(){
     }
 
     /** Called once from {@code ClientLoadEvent}, when {@code Vars.ui} is guaranteed to exist. */
     public static void init(){
+        if(initialized) return;
+        initialized = true;
+
         panel = new FactoryScopePanel();
         buildToggle();
 
@@ -75,6 +83,7 @@ public final class FactoryScopeUI{
         if(picking() || !Vars.state.isGame()) return;
 
         Element overlay = new Element();
+        overlay.name = "factoryscope-picker";
         overlay.setFillParent(true);
         overlay.touchable = Touchable.enabled;
         overlay.addListener(new InputListener(){
@@ -111,6 +120,7 @@ public final class FactoryScopeUI{
 
     private static void showHint(){
         Table root = new Table();
+        root.name = "factoryscope-hint";
         root.setFillParent(true);
         root.top();
         root.touchable = Touchable.disabled;
@@ -123,13 +133,24 @@ public final class FactoryScopeUI{
         Vars.ui.hudGroup.addChild(root);
     }
 
-    /** Resolves a tap in scene coordinates to a building and hands it to the panel. */
+    /**
+     * Resolves a tap in scene coordinates to a building and hands it to the panel.
+     *
+     * <p>The scene viewport projects stage coordinates back to Arc screen coordinates, which have their
+     * origin at the bottom left, and the world camera unprojects those. {@code Scene.stageToScreenCoordinates}
+     * looks like the obvious choice and is not: it flips Y to a top-left origin for the sake of platform
+     * input APIs, which would mirror every selection about the middle of the screen.
+     */
+    static Building buildingAt(float stageX, float stageY){
+        Core.scene.getViewport().project(scratch.set(stageX, stageY));
+        Core.camera.unproject(scratch);
+        return Vars.world.buildWorld(scratch.x, scratch.y);
+    }
+
     private static void pick(float stageX, float stageY){
         stopPicking();
 
-        Vec2 screen = Core.scene.stageToScreenCoordinates(Tmp.v1.set(stageX, stageY));
-        Vec2 world = Core.input.mouseWorld(screen.x, screen.y);
-        Building build = Vars.world.buildWorld(world.x, world.y);
+        Building build = buildingAt(stageX, stageY);
 
         //tapping empty ground is how the player cancels, so it is not an error worth reporting
         if(build == null) return;
@@ -152,6 +173,11 @@ public final class FactoryScopeUI{
 
         panel.inspect(build);
         return true;
+    }
+
+    /** The building the diagnostic panel is currently showing, or null. */
+    public static Building inspected(){
+        return panel == null ? null : panel.inspected();
     }
 
     /** Drops every transient reference; safe to call at any time. */

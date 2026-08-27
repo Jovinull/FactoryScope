@@ -311,8 +311,19 @@ class MindustryFactoryProbeTest{
         tile.setBlock(block, Team.sharded, 0);
         Building build = tile.build;
         assertNotNull(build, "failed to place " + block.name);
-        build.updateConsumption();
+        settle(build);
         return build;
+    }
+
+    /**
+     * Brings the building to the state the engine would have left it in.
+     *
+     * <p>Deliberately mirrors {@code Tile.setBlock}, which only registers a building for updates when
+     * {@code Block.update} is set: forcing {@code updateConsumption()} on a wall would give it an
+     * efficiency the real game never computes, and hide the very case the analyser has to handle.
+     */
+    private static void settle(Building build){
+        if(build.block.update) build.updateConsumption();
     }
 
     /**
@@ -330,7 +341,7 @@ class MindustryFactoryProbeTest{
             }
         }
         if(build.power != null) build.power.status = 1f;
-        build.updateConsumption();
+        settle(build);
         return build;
     }
 }

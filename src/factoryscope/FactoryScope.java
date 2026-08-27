@@ -21,7 +21,7 @@ public class FactoryScope extends Mod{
         Events.on(ClientLoadEvent.class, event -> {
             try{
                 FactoryScopeUI.init();
-                FsLog.info("inspector ready");
+                FsLog.info(version() + " inspector ready");
             }catch(Exception e){
                 //a broken interface must not take the game down with it
                 FsLog.warnOnce("init", "failed to initialise the inspector interface", e);
@@ -34,5 +34,11 @@ public class FactoryScope extends Mod{
         if(Vars.headless){
             FsLog.info("headless mode detected, the inspector interface stays disabled");
         }
+    }
+
+    /** Reads the version straight from mod.hjson so there is only ever one place to change it. */
+    public static String version(){
+        var mod = Vars.mods == null ? null : Vars.mods.getMod(FactoryScope.class);
+        return mod == null || mod.meta == null || mod.meta.version == null ? "dev" : mod.meta.version;
     }
 }

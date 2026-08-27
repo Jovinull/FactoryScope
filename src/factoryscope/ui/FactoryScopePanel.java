@@ -40,8 +40,10 @@ public final class FactoryScopePanel extends BaseDialog{
         //the dialog must not keep a dead building alive, nor keep polling one that was removed
         update(() -> {
             if(target == null) return;
-            if(!target.isValid() || target.tile == null || target.tile.build != target){
-                hide();
+            if(targetLost()){
+                //the building went away under the panel; say so rather than vanishing
+                target = null;
+                showTargetLost();
                 return;
             }
             if(timer.get(REFRESH_TICKS)) rebuild();
@@ -55,6 +57,21 @@ public final class FactoryScopePanel extends BaseDialog{
         timer.reset(0, 0f);
         rebuild();
         show();
+    }
+
+    /** The building on screen right now, or null when the panel is closed or its target is gone. */
+    public Building inspected(){
+        return isShown() ? target : null;
+    }
+
+    private boolean targetLost(){
+        return !target.isValid() || target.tile == null || target.tile.build != target;
+    }
+
+    private void showTargetLost(){
+        body.clear();
+        body.top().defaults().growX().left();
+        body.labelWrap(FsBundle.get("panel.target-lost")).color(Pal.lightOrange).growX().padTop(8f);
     }
 
     private void rebuild(){
@@ -75,7 +92,7 @@ public final class FactoryScopePanel extends BaseDialog{
         }
 
         buildVerdict(snapshot, result);
-        buildEfficiency(snapshot);
+        if(snapshot.efficiencyTracked) buildEfficiency(snapshot);
         if(snapshot.hasKnownProduction()) buildProduction(snapshot);
         if(!snapshot.inputs.isEmpty()) buildInputs(snapshot);
         if(!snapshot.outputs.isEmpty()) buildBuffers(snapshot);
@@ -143,7 +160,7 @@ public final class FactoryScopePanel extends BaseDialog{
             for(OutputState output : snapshot.outputs){
                 table.table(row -> {
                     icon(row, output.kind, output.contentId);
-                    row.add(output.name).growX().left();
+                    name(row, output.name);
                     row.add(FsBundle.format("value.rate",
                             Numbers.rate(output.expectedPerSecond), Numbers.rate(output.theoreticalPerSecond)))
                         .color(rateColor(output)).right();
@@ -177,12 +194,12 @@ public final class FactoryScopePanel extends BaseDialog{
     private void inputRow(Table table, ResourceState input){
         table.table(row -> {
             icon(row, input.kind, input.contentId);
-            row.add(input.name).growX().left();
+            name(row, input.name);
 
             if(input.hasAmounts()){
                 row.add(amountText(input)).color(Pal.lightishGray).right().padRight(8f);
             }
-            row.add(satisfactionText(input)).color(satisfactionColor(input)).right().width(72f);
+            row.add(satisfactionText(input)).color(satisfactionColor(input)).right();
         }).growX().padBottom(2f).row();
 
         if(!input.recognised){
@@ -191,18 +208,20 @@ public final class FactoryScopePanel extends BaseDialog{
     }
 
     private void buildBuffers(FactorySnapshot snapshot){
+        if(snapshot.outputs.stream().noneMatch(OutputState::hasBuffer)) return;
+
         section("section.buffers");
         panel(table -> {
             for(OutputState output : snapshot.outputs){
                 if(!output.hasBuffer()) continue;
                 table.table(row -> {
                     icon(row, output.kind, output.contentId);
-                    row.add(output.name).growX().left();
+                    name(row, output.name);
                     row.add(FsBundle.format("value.of",
                             Numbers.amount(output.stored), Numbers.amount(output.capacity)))
                         .color(Pal.lightishGray).right().padRight(8f);
                     row.add(output.bufferFull ? FsBundle.get("value.full") : FsBundle.get("value.ok"))
-                        .color(output.bufferFull ? Pal.remove : BlockStatus.active.color).right().width(72f);
+                        .color(output.bufferFull ? Pal.remove : BlockStatus.active.color).right();
                 }).growX().padBottom(2f).row();
             }
         });
@@ -253,7 +272,8 @@ public final class FactoryScopePanel extends BaseDialog{
 
     private void section(String key){
         body.add(FsBundle.get(key)).color(Pal.accent).padTop(10f).padBottom(2f).left().row();
-        body.image().height(3f).color(Pal.accent).growX().padBottom(4f).row();
+        //Image.draw() skips a null drawable entirely, so the rule needs a real one
+        body.image(Tex.whiteui).height(3f).color(Pal.accent).growX().padBottom(4f).row();
     }
 
     private void panel(Cons<Table> builder){
@@ -265,9 +285,14 @@ public final class FactoryScopePanel extends BaseDialog{
 
     private void value(Table table, String label, String value, Color color){
         table.table(row -> {
-            row.add(label).growX().left();
+            name(row, label);
             row.add(value).color(color).right();
         }).growX().padBottom(2f).row();
+    }
+
+    /** A label that yields space instead of stretching the dialog when the content name is long. */
+    private void name(Table table, String text){
+        table.add(text).growX().left().ellipsis(true).minWidth(0f);
     }
 
     private void icon(Table table, ResourceKind kind, String contentId){
