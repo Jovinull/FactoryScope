@@ -7,10 +7,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -32,32 +32,29 @@ jobs:
           chmod +x ./gradlew
           ./gradlew test
 
+      # the acceptance harness cannot run here (it needs a real client), but it must still compile
+      - name: Compile the acceptance harness
+        run: ./gradlew acceptanceJar
+
       # the universal jar is the release artifact; the desktop jar alone will not load on Android
       - name: Build the universal jar
         run: ./gradlew deploy
 
-      - name: Check the jar contents
-        run: |
-          set -e
-          jar=build/libs/FactoryScope.jar
-          unzip -l "$jar"
-          unzip -l "$jar" | grep -q 'mod.hjson'
-          unzip -l "$jar" | grep -q 'bundles/bundle.properties'
-          unzip -l "$jar" | grep -q 'classes.dex'
-          if unzip -l "$jar" | grep -qE ' (mindustry|arc)/'; then
-            echo "the jar bundles game classes" >&2
-            exit 1
-          fi
+      - name: Verify the artifacts
+        run: ./gradlew verifyArtifacts
+
+      - name: Report the artifact contents
+        run: unzip -l build/libs/FactoryScope.jar
 
       - name: Upload the universal jar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: FactoryScope
           path: build/libs/FactoryScope.jar
 
       - name: Upload the test report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-report
           path: build/reports/tests/test
