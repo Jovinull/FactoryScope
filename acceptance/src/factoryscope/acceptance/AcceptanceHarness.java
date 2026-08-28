@@ -317,6 +317,7 @@ public class AcceptanceHarness extends Mod{
         buildingDetailKeepsTheReport();
         secondaryButtonCancels();
         dragThresholdTracksUiScale();
+        singleTileDragIsAClick();
         wallsOnlyArea();
         showMore();
         zoomLevels();
@@ -1105,6 +1106,43 @@ public class AcceptanceHarness extends Mod{
                         + " inspected " + describe(FactoryScopeUI.inspected()));
             }
         });
+    }
+
+    /**
+     * A movement past the threshold that never leaves one tile.
+     *
+     * <p>At the zoom players actually use, one tile is thirty-two pixels, so a twenty-four pixel
+     * wobble clears the drag threshold without ever pointing at a second tile. Reporting a one-tile
+     * "area" there would be an odd answer to what was plainly a click, so the gesture falls back to
+     * single-building inspection - and that fallback needs a test, because at the zoomed-out scale the
+     * other scenarios run at, it is never reached.
+     */
+    void singleTileDragIsAClick(){
+        scenario("a drag that never leaves one tile inspects that tile");
+        queue(this::closeAnyDialog);
+        queue(this::restoreLayout);
+        queue(() -> {
+            clearRegion();
+            //one tile is 32 px at this zoom, so a tile spans 16 px either side of its centre
+            renderer.targetscale = renderer.camerascale = 4f;
+            target = placeAt(Blocks.surgeSmelter, rx() + 6, ry() + 6);
+        });
+        queue(this::armPicker);
+        queue(() -> {
+            Vec2 screen = Core.camera.project(new Vec2(target.x, target.y));
+            int sx = Mathf.round(screen.x) - 12, sy = Mathf.round(screen.y);
+            Core.scene.touchDown(sx, sy, 0, KeyCode.mouseLeft);
+            for(int i = 1; i <= 4; i++) Core.scene.touchDragged(sx + 6 * i, sy, 0);
+            Core.scene.touchUp(sx + 24, sy, 0, KeyCode.mouseLeft);
+            Log.info(TAG + " moved 24 px inside one 32 px tile, threshold @ px", Scl.scl(16f));
+        });
+        queue(() -> {
+            check("a 24 px move inside one tile opened the building panel",
+                FactoryScopeUI.inspected() == target, describe(FactoryScopeUI.inspected()));
+            check("it did not open a one-tile area report", FactoryScopeUI.areaBounds() == null,
+                String.valueOf(FactoryScopeUI.areaBounds()));
+        });
+        queue(() -> renderer.targetscale = renderer.camerascale = 1.5f);
     }
 
     /** An area of walls has no problems in the same sense that it has no production. */
