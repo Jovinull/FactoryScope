@@ -22,6 +22,8 @@ param(
     # BCP 47 language tag, e.g. "en-US" or "pt-BR". A fresh sandbox has no language setting, so
     # Mindustry falls back to the JVM default locale and this is enough to steer it.
     [string]$Locale,
+    # Writes a PNG of key screens into <sandbox>/saves/shots. Implies -KeepSandbox so they survive.
+    [switch]$Capture,
     [int]$TimeoutSeconds = 300
 )
 
@@ -78,6 +80,13 @@ if(-not $launcher){ throw "No launcher found under $gamePath" }
 Write-Host "    install: $gamePath"
 
 $arguments = @($launcher.Arguments)
+if($Capture){
+    if($launcher.Kind -ne 'java'){
+        throw "-Capture needs the bundled JRE launcher; none was found under $gamePath"
+    }
+    $arguments = @('-Dfactoryscope.capture=true') + $arguments
+    $KeepSandbox = $true
+}
 if($Locale){
     if($launcher.Kind -ne 'java'){
         throw "-Locale needs the bundled JRE launcher; none was found under $gamePath"

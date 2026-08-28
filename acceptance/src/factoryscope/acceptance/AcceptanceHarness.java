@@ -1,6 +1,8 @@
 package factoryscope.acceptance;
 
 import arc.*;
+import arc.files.*;
+import arc.graphics.*;
 import arc.input.*;
 import arc.math.*;
 import arc.math.geom.*;
@@ -326,6 +328,8 @@ public class AcceptanceHarness extends Mod{
         areaLayout(1920, 1080, 1f);
         areaLayout(2560, 1440, 1.5f);
         crowdedReport(1280, 720, 2f);
+        crowdedAtUiScale(1f);
+        crowdedAtUiScale(2f);
         queue(this::restoreLayout);
         queue(this::checkAreaLocalization);
         repeatedAreaUse(6);
@@ -541,6 +545,7 @@ public class AcceptanceHarness extends Mod{
                     report.issues.get(i).buildingCount() <= report.issues.get(i - 1).buildingCount());
             }
         });
+        queue(() -> capture("mixed-area"));
     }
 
     void healthyArea(){
@@ -567,6 +572,7 @@ public class AcceptanceHarness extends Mod{
             check("no problems were reported", report.healthy(), report.summary.toString());
             check("no issue groups were invented", report.issues.isEmpty(), report.issues.toString());
         });
+        queue(() -> capture("healthy-area"));
     }
 
     void emptyArea(){
@@ -585,6 +591,7 @@ public class AcceptanceHarness extends Mod{
                 report.summary.toString());
             check("an empty area is not called healthy", !report.healthy());
         });
+        queue(() -> capture("empty-area"));
     }
 
     /** Dragging over blocks that have their own tap behaviour must not trigger any of it. */
@@ -893,6 +900,7 @@ public class AcceptanceHarness extends Mod{
             Core.scene.resize(width, height);
         });
         queue(() -> checkFits("crowded " + width + "x" + height + " @ " + scale + "x"));
+        queue(() -> capture("crowded-" + width + "x" + height + "-scale" + scale));
     }
 
     /** Every string the area report can show has to resolve in whatever language the game is in. */
@@ -957,6 +965,7 @@ public class AcceptanceHarness extends Mod{
             check("the locate bar is on screen", FactoryScopeUI.locating());
             check("exactly one locate bar exists", countNamed("factoryscope-locate") == 1);
         });
+        queue(() -> capture("locate-highlight"));
         queue(() -> clickNamed("factoryscope-locate-return"));
         queue(() -> {
             check("the same report came back", FactoryScopeUI.areaReport() != null);
@@ -1145,6 +1154,42 @@ public class AcceptanceHarness extends Mod{
         queue(() -> renderer.targetscale = renderer.camerascale = 1.5f);
     }
 
+    /**
+     * The crowded report at a real UI scale, in the real window.
+     *
+     * <p>{@link #crowdedReport} resizes the scene, which is what a bounds assertion needs but makes a
+     * screenshot lie: the scene believes it is one size while the framebuffer is another, and the
+     * clipping no longer matches what a player would see. Moving only the UI scale is what actually
+     * happens when the slider moves, so this is the version worth looking at.
+     */
+    void crowdedAtUiScale(float scale){
+        int x1 = rx(), y1 = ry(), x2 = rx() + 16, y2 = ry() + 11;
+
+        scenario("a crowded report renders at " + scale + "x UI scale in the real window");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            placeAt(Blocks.siliconSmelter, rx() + 2, ry() + 2);
+            placeAt(Blocks.kiln, rx() + 7, ry() + 2);
+            placeAt(Blocks.surgeSmelter, rx() + 12, ry() + 2);
+            placeAt(Blocks.graphitePress, rx() + 2, ry() + 7);
+            supply(placeAt(Blocks.graphitePress, rx() + 7, ry() + 7), Items.graphite, 10);
+            placeAt(Blocks.titaniumWall, rx() + 12, ry() + 7);
+            //only the scale moves; the window and the scene stay exactly as the player has them
+            Scl.setProduct(scale);
+            Core.scene.resize(Core.graphics.getWidth(), Core.graphics.getHeight());
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> {
+            check(scale + "x: a crowded report opened", FactoryScopeUI.areaReport() != null);
+            checkFits("crowded at " + scale + "x in a " + Core.graphics.getWidth()
+                + "x" + Core.graphics.getHeight() + " window");
+        });
+        queue(() -> capture("crowded-uiscale" + scale));
+        queue(this::restoreLayout);
+    }
+
     /** An area of walls has no problems in the same sense that it has no production. */
     void wallsOnlyArea(){
         int x1 = rx(), y1 = ry(), x2 = rx() + 10, y2 = ry() + 6;
@@ -1171,6 +1216,7 @@ public class AcceptanceHarness extends Mod{
             check("it does not claim a clean bill of health",
                 !dialogShows(FsBundle.get("area.no-problems")));
         });
+        queue(() -> capture("walls-only-area"));
     }
 
     /** A group larger than one page must say how much is hidden and be able to show the rest. */
@@ -1211,6 +1257,7 @@ public class AcceptanceHarness extends Mod{
                 "rows " + countNamed("factoryscope-area-building"));
             check("nothing is left to show", Core.scene.find("factoryscope-area-more") == null);
         });
+        queue(() -> capture("expanded-issue-group"));
     }
 
 
@@ -1231,6 +1278,28 @@ public class AcceptanceHarness extends Mod{
         }
         pane.setScrollPercentY(1f);
         pane.updateVisualScroll();
+    }
+
+    /**
+     * Writes the last rendered frame to {@code saves/shots} so a human can look at the interface
+     * rather than at assertions about its bounds.
+     *
+     * <p>Actions run during the game update, before this frame is drawn, so what is grabbed is the
+     * frame that was on screen a tick ago - which is exactly the state the previous action left, since
+     * every action is a tick apart.
+     */
+    void capture(String name){
+        if(System.getProperty("factoryscope.capture") == null) return;
+        try{
+            Pixmap pixmap = ScreenUtils.getFrameBufferPixmap(0, 0, Core.graphics.getWidth(), Core.graphics.getHeight(), true);
+            Fi file = Core.settings.getDataDirectory().child("shots").child(name + ".png");
+            file.parent().mkdirs();
+            PixmapIO.writePng(file, pixmap);
+            pixmap.dispose();
+            Log.info(TAG + " captured @", file.absolutePath());
+        }catch(Throwable t){
+            Log.err(TAG + " could not capture " + name, t);
+        }
     }
 
     void touchButton(int screenX, int screenY, KeyCode button){
