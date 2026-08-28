@@ -9,14 +9,15 @@ import factoryscope.*;
 import factoryscope.area.*;
 import factoryscope.probe.*;
 import mindustry.*;
+import mindustry.game.*;
 import mindustry.game.EventType.*;
 import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.ui.*;
 
 /**
- * Everything that puts FactoryScope on screen: the HUD toggle, the selection overlay, and the two
- * reports it can open.
+ * Everything that puts FactoryScope on screen: the HUD toggle, the selection overlay, and the reports
+ * it can open.
  *
  * <h2>One entry point, two gestures</h2>
  * The HUD button arms a single overlay. A click on it inspects one building, exactly as in 0.1.x; a
@@ -24,6 +25,11 @@ import mindustry.ui.*;
  * second gesture would have made the simpler of the two harder to find, and the overlay already owns
  * the pointer, so the gesture is where the distinction belongs. {@link InspectionOverlay} holds the
  * rules for telling one from the other.
+ *
+ * <h2>Navigation</h2>
+ * At most two things are open at once, in one shape only: an area report, with either a building panel
+ * stacked over it or a locate marker standing in its place. There is no history stack, and everything
+ * transient is dropped when the world changes.
  */
 public final class FactoryScopeUI{
     private static final float BUTTON_SIZE = 48f;
@@ -33,6 +39,7 @@ public final class FactoryScopeUI{
     private static FactoryScopePanel panel;
     private static AreaDiagnosticsDialog areaDialog;
     private static InspectionOverlay picker;
+    private static LocateOverlay locate;
     private static Table hint;
     private static boolean initialized;
 
@@ -45,12 +52,13 @@ public final class FactoryScopeUI{
         initialized = true;
 
         panel = new FactoryScopePanel();
-        areaDialog = new AreaDiagnosticsDialog(FactoryScopeUI::startPicking, FactoryScopeUI::inspect);
+        areaDialog = new AreaDiagnosticsDialog(
+            FactoryScopeUI::startPicking, FactoryScopeUI::inspect, FactoryScopeUI::startLocating);
         buildToggle();
 
-        //the selection rectangle belongs to the world, not to the scene, so it is drawn from the world
-        //render pass; registered once, and inert whenever nothing is being dragged
-        Events.run(Trigger.drawOver, FactoryScopeUI::drawSelection);
+        //the selection rectangle and the locate marker belong to the world, not to the scene, so they
+        //are drawn from the world render pass; registered once, and inert when nothing needs drawing
+        Events.run(Trigger.drawOver, FactoryScopeUI::drawWorld);
 
         //a world change invalidates any pending selection, and leaves nothing behind to leak
         Events.on(WorldLoadEvent.class, event -> reset());
@@ -84,14 +92,16 @@ public final class FactoryScopeUI{
 
     private static void startPicking(){
         if(picking() || !Vars.state.isGame()) return;
+        //a new selection replaces whatever the player was looking at; nothing stacks
+        stopLocating();
 
         InspectionOverlay overlay = new InspectionOverlay(
             FactoryScopeUI::pickPoint, FactoryScopeUI::pickArea, FactoryScopeUI::stopPicking);
-        //the overlay is meaningless outside a running game, and the player must always have a way out
+        //the overlay is meaningless outside a running game, and the player must always have a way out.
+        //Escape and the Android back key also open the pause menu, as they do everywhere in Mindustry;
+        //cancelling as well is what leaves a sane state behind once that menu is closed again.
         overlay.update(() -> {
-            if(!Vars.state.isGame()){
-                stopPicking();
-            }else if(Core.input.keyTap(KeyCode.escape) || Core.input.keyTap(KeyCode.back)){
+            if(!Vars.state.isGame() || Core.input.keyTap(KeyCode.escape) || Core.input.keyTap(KeyCode.back)){
                 stopPicking();
             }
         });
@@ -127,9 +137,12 @@ public final class FactoryScopeUI{
         Vars.ui.hudGroup.addChild(root);
     }
 
-    private static void drawSelection(){
+    private static void drawWorld(){
         if(picker != null) picker.drawWorld();
+        if(locate != null) locate.drawWorld();
     }
+
+    // ------------------------------------------------------------------ selection
 
     private static void pickPoint(Vec2 world){
         stopPicking();
@@ -145,6 +158,7 @@ public final class FactoryScopeUI{
 
     private static void pickArea(AreaSelection selection){
         stopPicking();
+        stopLocating();
         if(areaDialog == null || !Vars.state.isGame()) return;
 
         //a drag that ran off the edge of the map reports the part of it that exists, rather than
@@ -160,9 +174,45 @@ public final class FactoryScopeUI{
         }
     }
 
-    private static mindustry.game.Team viewerTeam(){
+    private static Team viewerTeam(){
         return Vars.player == null ? null : Vars.player.team();
     }
+
+    // ------------------------------------------------------------------ locating
+
+    /** Uncovers the world and marks one building the area report pointed at. */
+    private static void startLocating(BuildingRef ref){
+        stopLocating();
+
+        Building build = AreaProbe.resolve(ref);
+        if(build == null){
+            //it went away between the report being drawn and the button being pressed
+            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+            returnToReport();
+            return;
+        }
+
+        locate = new LocateOverlay(ref, build, FactoryScopeUI::returnToReport, FactoryScopeUI::stopLocating);
+    }
+
+    private static void stopLocating(){
+        if(locate != null){
+            locate.remove();
+            locate = null;
+        }
+    }
+
+    private static void returnToReport(){
+        stopLocating();
+        if(areaDialog != null) areaDialog.reopen();
+    }
+
+    /** True while the world is uncovered with a located building marked. */
+    public static boolean locating(){
+        return locate != null;
+    }
+
+    // ------------------------------------------------------------------ reports
 
     /**
      * Opens the diagnostic panel for a building.
@@ -172,9 +222,7 @@ public final class FactoryScopeUI{
      */
     public static boolean inspect(Building build){
         if(panel == null || build == null) return false;
-        if(!MindustryFactoryProbe.canInspect(build, viewerTeam())){
-            return false;
-        }
+        if(!MindustryFactoryProbe.canInspect(build, viewerTeam())) return false;
 
         panel.inspect(build);
         return true;
@@ -190,6 +238,11 @@ public final class FactoryScopeUI{
         return areaDialog == null ? null : areaDialog.result();
     }
 
+    /** True when a report is being held for the player to come back to, whether on screen or not. */
+    public static boolean areaReportHeld(){
+        return areaDialog != null && areaDialog.hasReport();
+    }
+
     /** The bounds the area report on screen was taken from, or null. */
     public static AreaSelection areaBounds(){
         return areaDialog == null || !areaDialog.showing() ? null : areaDialog.selection();
@@ -203,6 +256,7 @@ public final class FactoryScopeUI{
     /** Drops every transient reference; safe to call at any time. */
     public static void reset(){
         stopPicking();
+        stopLocating();
         if(panel != null && panel.isShown()) panel.hide();
         if(areaDialog != null) areaDialog.clear();
         FsLog.reset();

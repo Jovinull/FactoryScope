@@ -2,7 +2,6 @@ package factoryscope.ui;
 
 import arc.func.*;
 import arc.graphics.*;
-import arc.math.geom.*;
 import arc.scene.ui.layout.*;
 import factoryscope.*;
 import factoryscope.area.*;
@@ -30,20 +29,22 @@ import mindustry.world.meta.*;
  * buildings" is as far as the evidence goes.
  */
 public final class AreaDiagnosticsDialog extends BaseDialog{
-    /** Enough to see the shape of a problem; beyond this the list is a wall rather than information. */
-    private static final int MAX_LISTED_BUILDINGS = 40;
+    /** Enough rows to see the shape of a problem; the rest are one button away. */
+    private static final int PAGE = 40;
 
     private final Runnable onSelectAnother;
     private final Cons<Building> onInspect;
+    private final Cons<BuildingRef> onLocate;
 
     private Table body;
     private AreaSelection selection;
     private AreaDiagnosticResult result;
 
-    public AreaDiagnosticsDialog(Runnable onSelectAnother, Cons<Building> onInspect){
+    public AreaDiagnosticsDialog(Runnable onSelectAnother, Cons<Building> onInspect, Cons<BuildingRef> onLocate){
         super("");
         this.onSelectAnother = onSelectAnother;
         this.onInspect = onInspect;
+        this.onLocate = onLocate;
 
         title.setText(FsBundle.get("area.title"));
         cont.pane(table -> body = table).grow().with(pane -> pane.setScrollingDisabled(true, false));
@@ -66,6 +67,21 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     /** True while a report is on screen. */
     public boolean showing(){
         return isShown() && result != null;
+    }
+
+    /**
+     * True when a report is being held for the player to come back to, whether it is on screen or
+     * temporarily out of the way while they look at the world.
+     */
+    public boolean hasReport(){
+        return result != null && selection != null;
+    }
+
+    /** Puts a held report back on screen, exactly as it was. Nothing is re-scanned. */
+    public void reopen(){
+        if(!hasReport() || isShown()) return;
+        rebuild();
+        show();
     }
 
     /** The report on screen right now, or null when the dialog is closed or was cleared. */
@@ -135,7 +151,9 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         section("area.section.summary");
         panel(table -> {
             value(table, FsBundle.get("area.selected"), Integer.toString(summary.selected), Pal.accent);
-            value(table, FsBundle.get("area.production"), Integer.toString(summary.production), Pal.lightishGray);
+            //deliberately not "production buildings": this counts the ones FactoryScope can put a rate
+            //on, which is narrower than what a player would call a production building
+            value(table, FsBundle.get("area.with-rates"), Integer.toString(summary.production), Pal.lightishGray);
             value(table, FsBundle.get("area.size"),
                 FsBundle.format("area.size-value", selection.width(), selection.height()), Pal.lightishGray);
             if(summary.skipped() > 0){
@@ -161,10 +179,11 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         section("area.section.issues");
 
         if(result.issues.isEmpty()){
-            //the honest wording: nothing in the area reports a problem, which is not the same as the
-            //production network being sound - FactoryScope cannot see the network at all
-            panel(table -> table.labelWrap(FsBundle.get("area.no-problems"))
-                .color(BlockStatus.active.color).growX());
+            //an area of walls has no problems in the same sense that it has no production; saying
+            //"nothing is wrong" there would read as a clean bill of health for something never examined
+            boolean nothingDiagnosable = onlyLimitedSupport();
+            panel(table -> table.labelWrap(FsBundle.get(nothingDiagnosable ? "area.only-limited" : "area.no-problems"))
+                .color(nothingDiagnosable ? Pal.lightishGray : BlockStatus.active.color).growX());
             return;
         }
 
@@ -174,13 +193,24 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         });
     }
 
+    /** Every analysed building is one FactoryScope has no production model for. */
+    private boolean onlyLimitedSupport(){
+        Integer limited = result.summary.byStatus.get(AreaStatus.limitedDiagnostics);
+        return result.summary.analyzed > 0 && limited != null && limited == result.summary.analyzed;
+    }
+
     /**
      * One collapsible issue group. The affected-building rows are built the first time the group is
-     * expanded: a large selection can produce hundreds of them, and none are worth constructing until
-     * somebody asks to see them.
+     * expanded, and then a page at a time: a large selection can produce hundreds of them, and none are
+     * worth constructing until somebody asks to see them.
      */
     private void issueRow(Table table, AreaIssueGroup group){
         Table listing = new Table();
+        Table rows = new Table();
+        Table footer = new Table();
+        listing.add(rows).growX().row();
+        listing.add(footer).growX().row();
+
         Collapser collapser = new Collapser(listing, true);
         collapser.setDuration(0.15f);
         boolean[] filled = {false};
@@ -194,7 +224,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
                 .color(Pal.lightishGray).right().padLeft(8f);
         }, Styles.flatt, () -> {
             if(!filled[0]){
-                fillBuildings(listing, group);
+                fillBuildings(rows, footer, group, 0);
                 filled[0] = true;
             }
             collapser.setCollapsed(!collapser.isCollapsed());
@@ -203,13 +233,13 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         table.add(collapser).growX().padLeft(12f).row();
     }
 
-    private void fillBuildings(Table listing, AreaIssueGroup group){
-        listing.left().defaults().growX().left();
-        int shown = Math.min(group.buildingCount(), MAX_LISTED_BUILDINGS);
+    private void fillBuildings(Table rows, Table footer, AreaIssueGroup group, int from){
+        rows.left().defaults().growX().left();
+        int to = Math.min(group.buildingCount(), from + PAGE);
 
-        for(int i = 0; i < shown; i++){
+        for(int i = from; i < to; i++){
             BuildingRef ref = group.buildings.get(i);
-            listing.table(row -> {
+            rows.table(row -> {
                 row.button(inner -> {
                     inner.left().margin(2f);
                     inner.add(ref.blockName).growX().left().ellipsis(true).minWidth(0f);
@@ -222,11 +252,15 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
             }).growX().padBottom(2f).row();
         }
 
-        if(shown < group.buildingCount()){
-            //truncation is stated, never silent
-            listing.add(FsBundle.format("area.listing-truncated", shown, group.buildingCount()))
-                .color(Pal.lightOrange).padTop(4f).left().row();
-        }
+        footer.clear();
+        if(to >= group.buildingCount()) return;
+
+        //how much is hidden is stated, and getting the rest is one button rather than a smaller selection
+        footer.add(FsBundle.format("area.listing-shown", to, group.buildingCount()))
+            .color(Pal.lightOrange).left().padTop(4f);
+        footer.button(FsBundle.ref("area.show-more"), Icon.downOpen, Styles.flatt,
+                () -> fillBuildings(rows, footer, group, to))
+            .height(36f).padLeft(8f).name("factoryscope-area-more");
     }
 
     // ------------------------------------------------------------------ navigation
@@ -241,17 +275,17 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         onInspect.get(build);
     }
 
+    /**
+     * Steps out of the way so the world can be seen. The report is kept, not discarded: the bar that
+     * appears over the world is what brings it back.
+     */
     private void locate(BuildingRef ref){
-        Building build = AreaProbe.resolve(ref);
-        if(build == null){
+        if(AreaProbe.resolve(ref) == null){
             Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
             return;
         }
-        //panCamera is the game's own way of moving the view; no unit is moved and no state is written
         hide();
-        if(Vars.control != null && Vars.control.input != null){
-            Vars.control.input.panCamera(new Vec2(build.x, build.y));
-        }
+        onLocate.get(ref);
     }
 
     // ------------------------------------------------------------------ small helpers
