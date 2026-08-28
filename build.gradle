@@ -82,11 +82,29 @@ tasks.register("extractMindustryAssets", Copy){
 tasks.named("test"){
     dependsOn "extractMindustryAssets"
     classpath += files(mindustryAssetsDir.map{ it.dir("assets") })
-    useJUnitPlatform()
+    //the benchmark is a measurement, not a check; it would only make an ordinary test run slower
+    useJUnitPlatform{ excludeTags "benchmark" }
     testLogging{
         events = ["failed"]
         exceptionFormat = "full"
     }
+}
+
+//prints what an area analysis costs at several sizes; see docs/testing.md
+tasks.register("areaBenchmark", Test){
+    group = "verification"
+    description = "Measures the cost of area analysis at 50, 250, 1000 and 4000 buildings."
+    dependsOn "extractMindustryAssets"
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath + files(mindustryAssetsDir.map{ it.dir("assets") })
+    useJUnitPlatform{ includeTags "benchmark" }
+    //the measurements are the whole point of the task, so they go to the console rather than a report
+    testLogging{
+        showStandardStreams = true
+        events = ["failed", "standard_out"]
+        exceptionFormat = "full"
+    }
+    outputs.upToDateWhen{ false }
 }
 
 //built alongside FactoryScope and loaded next to it; never released
