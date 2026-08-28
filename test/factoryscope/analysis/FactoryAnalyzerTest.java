@@ -56,7 +56,7 @@ class FactoryAnalyzerTest{
 
         assertEquals(DiagnosticReason.missingItemInput, result.reason());
         assertEquals(Severity.stopped, result.severity());
-        assertEquals(List.of("Sand"), result.primary.resources);
+        assertEquals(List.of("Sand"), result.primary.resourceNames());
         assertTrue(result.primary.certain);
     }
 
@@ -72,7 +72,7 @@ class FactoryAnalyzerTest{
         DiagnosticResult result = FactoryAnalyzer.analyze(snapshot);
 
         assertEquals(DiagnosticReason.missingItemInput, result.reason());
-        assertEquals(List.of("Sand", "Coal"), result.primary.resources);
+        assertEquals(List.of("Sand", "Coal"), result.primary.resourceNames());
     }
 
     @Test
@@ -80,7 +80,7 @@ class FactoryAnalyzerTest{
         DiagnosticResult result = FactoryAnalyzer.analyze(smelterMissing(liquid("Water", 0f)));
 
         assertEquals(DiagnosticReason.missingLiquidInput, result.reason());
-        assertEquals(List.of("Water"), result.primary.resources);
+        assertEquals(List.of("Water"), result.primary.resourceNames());
     }
 
     @Test
@@ -159,7 +159,7 @@ class FactoryAnalyzerTest{
 
         assertEquals(DiagnosticReason.outputBlocked, result.reason());
         assertEquals(Severity.stopped, result.severity());
-        assertTrue(result.primary.resources.contains("Silicon"));
+        assertTrue(result.primary.resourceNames().contains("Silicon"));
     }
 
     @Test
@@ -202,7 +202,7 @@ class FactoryAnalyzerTest{
 
         assertEquals(DiagnosticReason.otherConsumerLimited, result.reason());
         assertFalse(result.primary.certain);
-        assertEquals(List.of("ConsumeSomethingExotic"), result.primary.resources);
+        assertEquals(List.of("ConsumeSomethingExotic"), result.primary.resourceNames());
     }
 
     @Test

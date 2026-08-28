@@ -54,7 +54,7 @@ public final class FactoryAnalyzer{
 
         if(!s.shouldConsume){
             if(s.support == SupportLevel.full && s.outputBufferFull){
-                findings.add(Finding.of(DiagnosticReason.outputBlocked, Severity.stopped, blockedOutputNames(s)));
+                findings.add(Finding.of(DiagnosticReason.outputBlocked, Severity.stopped, blockedOutputs(s)));
             }else{
                 //only GenericCrafter has verified semantics for why a building declines to consume
                 findings.add(Finding.of(DiagnosticReason.notConsuming, Severity.stopped));
@@ -88,18 +88,18 @@ public final class FactoryAnalyzer{
         Severity severity = min <= EPSILON ? Severity.stopped : Severity.reduced;
 
         //efficiency is a minimum, so everything sitting at the minimum is equally responsible
-        Map<DiagnosticReason, List<String>> grouped = new LinkedHashMap<>();
+        Map<DiagnosticReason, List<ResourceRef>> grouped = new LinkedHashMap<>();
         Set<DiagnosticReason> uncertain = new HashSet<>();
         for(ResourceState input : mandatory){
             if(input.satisfaction > min + EPSILON) continue;
             DiagnosticReason reason = reasonFor(input.kind);
-            grouped.computeIfAbsent(reason, k -> new ArrayList<>()).add(input.name);
+            grouped.computeIfAbsent(reason, k -> new ArrayList<>()).add(input.ref());
             //an unnamed consumer can still be blamed with confidence; only a distorted reading cannot
             if(input.provisional) uncertain.add(reason);
         }
 
-        grouped.forEach((reason, names) ->
-            findings.add(new Finding(reason, severity, names, !uncertain.contains(reason))));
+        grouped.forEach((reason, refs) ->
+            findings.add(new Finding(reason, severity, refs, !uncertain.contains(reason))));
     }
 
     /** A multiplier such as heat or terrain attributes holding the building below full speed. */
@@ -147,11 +147,11 @@ public final class FactoryAnalyzer{
         };
     }
 
-    private static List<String> blockedOutputNames(FactorySnapshot s){
-        List<String> names = new ArrayList<>();
+    private static List<ResourceRef> blockedOutputs(FactorySnapshot s){
+        List<ResourceRef> refs = new ArrayList<>();
         for(OutputState output : s.outputs){
-            if(output.bufferFull) names.add(output.name);
+            if(output.bufferFull) refs.add(output.ref());
         }
-        return names;
+        return refs;
     }
 }

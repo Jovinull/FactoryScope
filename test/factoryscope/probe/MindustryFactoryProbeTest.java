@@ -43,8 +43,8 @@ class MindustryFactoryProbeTest{
         assertEquals(SupportLevel.full, snapshot.support);
         assertEquals(DiagnosticReason.missingItemInput, result.reason());
         assertEquals(Severity.stopped, result.severity());
-        assertTrue(result.primary.resources.contains(Items.sand.localizedName));
-        assertTrue(result.primary.resources.contains(Items.coal.localizedName));
+        assertTrue(result.primary.resourceNames().contains(Items.sand.localizedName));
+        assertTrue(result.primary.resourceNames().contains(Items.coal.localizedName));
     }
 
     @Test
@@ -85,7 +85,7 @@ class MindustryFactoryProbeTest{
         assertFalse(smelter.shouldConsume(), "the game itself must consider the crafter blocked");
         assertTrue(snapshot.outputBufferFull);
         assertEquals(DiagnosticReason.outputBlocked, result.reason());
-        assertTrue(result.primary.resources.contains(Items.silicon.localizedName));
+        assertTrue(result.primary.resourceNames().contains(Items.silicon.localizedName));
     }
 
     @Test

@@ -45,6 +45,11 @@ public final class ResourceState{
         this.unit = builder.unit;
     }
 
+    /** Stable identity plus display name, for findings that need to name this input. */
+    public ResourceRef ref(){
+        return new ResourceRef(kind, contentId, name);
+    }
+
     public boolean satisfied(){
         return satisfaction >= 1f - EPSILON;
     }

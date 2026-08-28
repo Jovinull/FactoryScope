@@ -34,6 +34,11 @@ public final class OutputState{
         this.bufferFull = bufferFull;
     }
 
+    /** Stable identity plus display name, for findings that need to name this product. */
+    public ResourceRef ref(){
+        return new ResourceRef(kind, contentId, name);
+    }
+
     public boolean hasBuffer(){
         return stored >= 0f && capacity > 0f;
     }

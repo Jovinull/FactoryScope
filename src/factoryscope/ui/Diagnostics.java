@@ -27,7 +27,7 @@ public final class Diagnostics{
         String key = "diagnosis." + finding.reason.slug() + "." + finding.severity.name();
         String text = finding.resources.isEmpty()
             ? FsBundle.get(key)
-            : FsBundle.format(key, join(finding.resources));
+            : FsBundle.format(key, join(finding.resourceNames()));
         return finding.certain ? text : FsBundle.format("diagnosis.uncertain", text);
     }
 
