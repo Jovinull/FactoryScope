@@ -4,7 +4,6 @@ import arc.graphics.*;
 import factoryscope.*;
 import factoryscope.analysis.*;
 import factoryscope.area.*;
-import mindustry.graphics.*;
 import mindustry.world.meta.*;
 
 /**
@@ -37,7 +36,7 @@ public final class AreaText{
      * <p>Only the reasons that are genuinely about a resource take its name; "power limited" reads
      * worse, not better, with the word "Power" spliced into it.
      */
-    public static String issue(AreaIssue issue){
+    private static String issue(AreaIssue issue){
         String key = "area.issue." + issue.reason.slug();
         return issue.resource != null && namesResource(issue.reason)
             ? FsBundle.format(key + ".resource", issue.resource.name)

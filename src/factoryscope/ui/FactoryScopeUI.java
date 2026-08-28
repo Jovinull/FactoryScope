@@ -30,8 +30,6 @@ public final class FactoryScopeUI{
     /** Clears the HUD's own bottom-left furniture (chat, saving indicator). */
     private static final float BUTTON_BOTTOM_PAD = 70f;
 
-    private static final Vec2 scratch = new Vec2();
-
     private static FactoryScopePanel panel;
     private static AreaDiagnosticsDialog areaDialog;
     private static InspectionOverlay picker;
@@ -133,12 +131,6 @@ public final class FactoryScopeUI{
         if(picker != null) picker.drawWorld();
     }
 
-    /** Resolves a position in scene coordinates to a building. */
-    static Building buildingAt(float stageX, float stageY){
-        WorldCoords.fromStage(stageX, stageY, scratch);
-        return Vars.world.buildWorld(scratch.x, scratch.y);
-    }
-
     private static void pickPoint(Vec2 world){
         stopPicking();
 
@@ -155,8 +147,13 @@ public final class FactoryScopeUI{
         stopPicking();
         if(areaDialog == null || !Vars.state.isGame()) return;
 
+        //a drag that ran off the edge of the map reports the part of it that exists, rather than
+        //claiming an area larger than the world; a drag entirely outside it simply finds nothing
+        AreaSelection bounded = selection.clampedTo(Vars.world.width(), Vars.world.height());
+        AreaSelection area = bounded == null ? selection : bounded;
+
         try{
-            areaDialog.show(selection, AreaProbe.scan(selection, viewerTeam()));
+            areaDialog.show(area, AreaProbe.scan(area, viewerTeam()));
         }catch(Exception e){
             FsLog.warnOnce("area-scan", "could not analyse the selected area", e);
             Vars.ui.showInfoToast(FsBundle.get("area.scan-failed"), 3f);

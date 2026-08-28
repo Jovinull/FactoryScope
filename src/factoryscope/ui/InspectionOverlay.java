@@ -2,14 +2,15 @@ package factoryscope.ui;
 
 import arc.*;
 import arc.func.*;
+import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.input.*;
 import arc.math.geom.*;
 import arc.scene.*;
 import arc.scene.event.*;
+import factoryscope.area.*;
 import mindustry.*;
 import mindustry.graphics.*;
-import factoryscope.area.*;
 import mindustry.ui.*;
 
 /**
@@ -171,7 +172,7 @@ final class InspectionOverlay extends Element{
         font.draw(selection.width() + "x" + selection.height() + " (" + selection.tileCount() + ")",
             x + offset / 2f, y + offset / 2f);
 
-        font.setColor(arc.graphics.Color.white);
+        font.setColor(Color.white);
         font.getData().setScale(1f);
         font.setUseIntegerPositions(integers);
     }

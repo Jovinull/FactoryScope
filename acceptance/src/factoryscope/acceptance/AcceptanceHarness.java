@@ -313,6 +313,8 @@ public class AcceptanceHarness extends Mod{
         configurableBlocks();
         refreshAfterAChange();
         drillDown();
+        zoomLevels();
+        offWorldDrag();
         areaLayout(1280, 720, 1f);
         areaLayout(1920, 1080, 1f);
         areaLayout(2560, 1440, 1.5f);
@@ -365,7 +367,7 @@ public class AcceptanceHarness extends Mod{
     void dragDirection(String label, int fromX, int fromY, int toX, int toY){
         scenario("dragging " + label + " selects the intended tiles");
         queue(this::closeAnyDialog);
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(fromX, fromY, toX, toY));
         queue(() -> {
             AreaSelection expected = AreaSelection.of(fromX, fromY, toX, toY);
@@ -397,7 +399,7 @@ public class AcceptanceHarness extends Mod{
             //3x3, so it covers bx-1 .. bx+1
             target = placeAt(Blocks.surgeSmelter, bx, by);
         });
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(rx() + 2, by - 1, bx - 1, by + 1));
         queue(() -> {
             AreaDiagnosticResult report = FactoryScopeUI.areaReport();
@@ -412,7 +414,7 @@ public class AcceptanceHarness extends Mod{
 
         scenario("a selection that stops one tile short of a footprint excludes it");
         queue(this::closeAnyDialog);
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(rx() + 2, by - 1, bx - 2, by + 1));
         queue(() -> {
             AreaDiagnosticResult report = FactoryScopeUI.areaReport();
@@ -429,7 +431,7 @@ public class AcceptanceHarness extends Mod{
             clearRegion();
             target = placeAt(Blocks.siliconSmelter, rx() + 4, ry() + 4);
         });
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> clickBuilding(target));
         queue(() -> {
             check("the single-building panel opened", FactoryScopeUI.inspected() == target);
@@ -441,7 +443,7 @@ public class AcceptanceHarness extends Mod{
     void tinyDragIsAClick(){
         scenario("a drag shorter than the threshold is treated as a click");
         queue(this::closeAnyDialog);
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> {
             Vec2 screen = Core.camera.project(new Vec2(target.x, target.y));
             int sx = Mathf.round(screen.x), sy = Mathf.round(screen.y);
@@ -485,7 +487,7 @@ public class AcceptanceHarness extends Mod{
             patch.add(placeAt(Blocks.titaniumWall, rx() + 12, ry() + 7));
         });
         queue(() -> check("the mixed patch was built", standing(patch) == 6, "standing " + standing(patch)));
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> {
             AreaDiagnosticResult report = FactoryScopeUI.areaReport();
@@ -545,7 +547,7 @@ public class AcceptanceHarness extends Mod{
             }
         });
         queue(() -> check("the healthy patch was built", standing(patch) == 3, "standing " + standing(patch)));
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> {
             AreaDiagnosticResult report = FactoryScopeUI.areaReport();
@@ -564,7 +566,7 @@ public class AcceptanceHarness extends Mod{
         scenario("an area with nothing in it opens a report that says so");
         queue(this::closeAnyDialog);
         queue(this::clearRegion);
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> {
             AreaDiagnosticResult report = FactoryScopeUI.areaReport();
@@ -589,7 +591,7 @@ public class AcceptanceHarness extends Mod{
             placeAt(Blocks.duo, rx() + 10, ry() + 2);
             if(control.input.config.isShown()) control.input.config.hideConfig();
         });
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> {
             check("no block configuration was opened", !control.input.config.isShown());
@@ -610,7 +612,7 @@ public class AcceptanceHarness extends Mod{
             for(int i = 0; i < 3; i++) patch.add(placeAt(Blocks.graphitePress, rx() + 2 + i * 5, ry() + 2));
         });
         queue(() -> check("the refresh patch was built", standing(patch) == 3, "standing " + standing(patch)));
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> check("three buildings before the change",
             FactoryScopeUI.areaReport() != null && FactoryScopeUI.areaReport().summary.analyzed == 3,
@@ -645,7 +647,7 @@ public class AcceptanceHarness extends Mod{
             placeAt(Blocks.graphitePress, rx() + 2, ry() + 2);
             placeAt(Blocks.graphitePress, rx() + 7, ry() + 2);
         });
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> {
             AreaDiagnosticResult report = FactoryScopeUI.areaReport();
@@ -687,7 +689,7 @@ public class AcceptanceHarness extends Mod{
             placeAt(Blocks.graphitePress, rx() + 8, ry() + 3);
             placeAt(Blocks.titaniumWall, rx() + 3, ry() + 6);
         });
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> check(width + "x" + height + " @ " + scale + "x: a report opened",
             FactoryScopeUI.areaReport() != null));
@@ -712,7 +714,7 @@ public class AcceptanceHarness extends Mod{
         });
 
         for(int i = 0; i < cycles; i++){
-            queue(this::clickToggleButton);
+            queue(this::armPicker);
             queue(() -> dragTiles(x1, y1, x2, y2));
             queue(this::closeAnyDialog);
         }
@@ -737,7 +739,7 @@ public class AcceptanceHarness extends Mod{
             clearRegion();
             placeAt(Blocks.graphitePress, rx() + 3, ry() + 3);
         });
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> check("a report is open before the world change", FactoryScopeUI.areaReport() != null));
         queue(() -> Events.fire(new WorldLoadEvent()));
@@ -748,10 +750,102 @@ public class AcceptanceHarness extends Mod{
         });
 
         scenario("a world change during a selection cancels it");
-        queue(this::clickToggleButton);
+        queue(this::armPicker);
         queue(() -> check("the picker is armed", FactoryScopeUI.picking()));
         queue(() -> Events.fire(new WorldLoadEvent()));
         queue(() -> check("the armed picker was cancelled", !FactoryScopeUI.picking()));
+    }
+
+    /**
+     * The same rectangle selected at two very different zoom levels.
+     *
+     * <p>Zoom changes how many world units a screen pixel covers, so a conversion that folded the camera
+     * scale in at the wrong point - or not at all - gives two different rectangles here while looking
+     * perfectly correct at whatever zoom it was written against.
+     */
+    void zoomLevels(){
+        int x1 = rx() + 1, y1 = ry() + 1, x2 = rx() + 9, y2 = ry() + 6;
+
+        queue(() -> {
+            clearRegion();
+            patch.clear();
+            patch.add(placeAt(Blocks.graphitePress, rx() + 3, ry() + 3));
+            patch.add(placeAt(Blocks.graphitePress, rx() + 8, ry() + 5));
+            //just outside, so a selection that grows with zoom is caught
+            placeAt(Blocks.graphitePress, rx() + 12, ry() + 3);
+            bounds.clear();
+        });
+
+        zoomLevel("zoomed out", 1f, x1, y1, x2, y2);
+        zoomLevel("zoomed in", 4f, x1, y1, x2, y2);
+
+        queue(() -> {
+            check("both zoom levels selected the same tiles",
+                bounds.size == 2 && bounds.first().equals(bounds.peek()), bounds.toString());
+            renderer.targetscale = renderer.camerascale = 1.5f;
+        });
+    }
+
+    void zoomLevel(String label, float scale, int x1, int y1, int x2, int y2){
+        scenario("selecting an area " + label + " gives the same tiles");
+        queue(this::closeAnyDialog);
+        queue(() -> renderer.targetscale = renderer.camerascale = scale);
+        queue(() -> check(label + ": both corners are on screen at " + scale + "x",
+            onScreen(x1, y1) && onScreen(x2, y2),
+            "camera " + (int)Core.camera.width + "x" + (int)Core.camera.height));
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> {
+            AreaSelection got = FactoryScopeUI.areaBounds();
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            check(label + ": the reported tiles are the tiles that were dragged",
+                AreaSelection.of(x1, y1, x2, y2).equals(got), String.valueOf(got));
+            check(label + ": the two buildings inside were selected, and only those",
+                report != null && report.summary.analyzed == 2,
+                report == null ? "no report" : "analysed " + report.summary.analyzed);
+            if(got != null) bounds.add(got);
+        });
+    }
+
+    /**
+     * A drag that runs off the edge of the map reports the part of the world that exists.
+     *
+     * <p>The view is moved to the corner of the map first, because the only place a player can point at
+     * a tile that does not exist is next to an edge. It is put back afterwards.
+     */
+    void offWorldDrag(){
+        scenario("a drag that runs off the map is clamped to the world");
+        queue(this::closeAnyDialog);
+        queue(this::ensurePickerOff);
+        queue(() -> control.input.panCamera(new Vec2(6 * tilesize, 6 * tilesize)));
+        queue(() -> check("the map corner is in view", onScreen(2, 2) && onScreen(-20, -20),
+            "camera at " + (int)Core.camera.position.x + "," + (int)Core.camera.position.y));
+        queue(this::armPicker);
+        queue(() -> dragTiles(3, 3, -20, -20));
+        queue(() -> {
+            AreaSelection got = FactoryScopeUI.areaBounds();
+            check("a report still opened", got != null && FactoryScopeUI.areaReport() != null);
+            if(got != null){
+                check("the reported area lies inside the world",
+                    got.minX >= 0 && got.minY >= 0 && got.maxX < world.width() && got.maxY < world.height(),
+                    got.toString());
+            }
+        });
+        queue(this::closeAnyDialog);
+        queue(this::restoreCamera);
+        queue(() -> check("the view returned to the player",
+            player != null && Core.camera.position.dst(player.x, player.y) < 200f,
+            "camera at " + (int)Core.camera.position.x + "," + (int)Core.camera.position.y));
+    }
+
+    /** Arms the overlay through the real HUD button; harmless if a previous scenario left it armed. */
+    void armPicker(){
+        if(!FactoryScopeUI.picking()) clickToggleButton();
+    }
+
+    /** Puts the view back on the player after a scenario moved it. */
+    void restoreCamera(){
+        if(player != null) control.input.panCamera(new Vec2(player.x, player.y));
     }
 
     // ------------------------------------------------------------------ area helpers

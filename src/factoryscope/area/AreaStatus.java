@@ -58,8 +58,16 @@ public enum AreaStatus{
         };
     }
 
-    /** Bundle-key fragment, e.g. {@code item-shortage}. */
+    /** {@code itemShortage} becomes {@code item-shortage}, so bundle keys stay readable. */
     public String slug(){
-        return name().replaceAll("([a-z])([A-Z])", "$1-$2").toLowerCase(java.util.Locale.ROOT);
+        StringBuilder result = new StringBuilder(name().length() + 4);
+        for(char c : name().toCharArray()){
+            if(Character.isUpperCase(c)){
+                result.append('-').append(Character.toLowerCase(c));
+            }else{
+                result.append(c);
+            }
+        }
+        return result.toString();
     }
 }
