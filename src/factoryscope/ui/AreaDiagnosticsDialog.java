@@ -48,8 +48,10 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         title.setText(FsBundle.get("area.title"));
         cont.pane(table -> body = table).grow().with(pane -> pane.setScrollingDisabled(true, false));
 
-        buttons.button(FsBundle.ref("area.refresh"), Icon.refresh, this::refresh).size(190f, 64f);
-        buttons.button(FsBundle.ref("area.select-another"), Icon.grid, this::selectAnother).size(230f, 64f);
+        buttons.button(FsBundle.ref("area.refresh"), Icon.refresh, this::refresh)
+            .size(190f, 64f).name("factoryscope-area-refresh");
+        buttons.button(FsBundle.ref("area.select-another"), Icon.grid, this::selectAnother)
+            .size(230f, 64f).name("factoryscope-area-select");
         addCloseButton();
     }
 
@@ -196,7 +198,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
                 filled[0] = true;
             }
             collapser.setCollapsed(!collapser.isCollapsed());
-        }).growX().pad(2f).row();
+        }).growX().pad(2f).name("factoryscope-area-issue").row();
 
         table.add(collapser).growX().padLeft(12f).row();
     }
@@ -213,7 +215,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
                     inner.add(ref.blockName).growX().left().ellipsis(true).minWidth(0f);
                     inner.add(FsBundle.format("area.coordinates", ref.tileX, ref.tileY))
                         .color(Pal.gray).right().padLeft(8f);
-                }, Styles.flatt, () -> inspect(ref)).growX();
+                }, Styles.flatt, () -> inspect(ref)).growX().name("factoryscope-area-building");
 
                 row.button(Icon.zoomSmall, Styles.emptyi, () -> locate(ref)).size(34f).padLeft(4f)
                     .tooltip(FsBundle.ref("area.locate"));

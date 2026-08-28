@@ -193,6 +193,16 @@ public final class FactoryScopeUI{
         return areaDialog == null ? null : areaDialog.result();
     }
 
+    /** The bounds the area report on screen was taken from, or null. */
+    public static AreaSelection areaBounds(){
+        return areaDialog == null || !areaDialog.showing() ? null : areaDialog.selection();
+    }
+
+    /** Re-runs the area report over the same bounds; the Refresh button does exactly this. */
+    public static void refreshArea(){
+        if(areaDialog != null && areaDialog.showing()) areaDialog.refresh();
+    }
+
     /** Drops every transient reference; safe to call at any time. */
     public static void reset(){
         stopPicking();
