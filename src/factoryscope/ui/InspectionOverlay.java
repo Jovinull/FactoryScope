@@ -8,6 +8,7 @@ import arc.input.*;
 import arc.math.geom.*;
 import arc.scene.*;
 import arc.scene.event.*;
+import arc.scene.ui.layout.*;
 import factoryscope.area.*;
 import mindustry.*;
 import mindustry.graphics.*;
@@ -25,14 +26,20 @@ import mindustry.ui.*;
  * the whole gesture and normal play resumes the moment it is removed.
  *
  * <h2>Click or drag</h2>
- * A press that never travels {@value #DRAG_THRESHOLD} scene units, or that never leaves its starting
- * tile, is a click and selects one building, exactly as it did before area selection existed. Anything
- * else is an area. The threshold is in scene units, which are design pixels: it therefore means the
- * same physical distance whatever the resolution and UI scale.
+ * A press that never travels {@link #dragThreshold()} pixels, or that never leaves its starting tile,
+ * is a click and selects one building, exactly as it did before area selection existed. Anything else
+ * is an area.
  */
 final class InspectionOverlay extends Element{
-    /** Far enough that a shaky click is still a click, short enough that a deliberate drag is instant. */
-    static final float DRAG_THRESHOLD = 16f;
+    /**
+     * Drag threshold in design pixels, scaled by the UI scale like every other hit target in the game.
+     *
+     * <p>Arc's scene viewport is a plain {@code ScreenViewport}: one scene unit is one screen pixel,
+     * and {@code Scl} is applied per widget rather than by the viewport. A raw constant here would
+     * therefore shrink physically as a display gets denser - which is exactly when a player raises the
+     * UI scale and needs it to grow.
+     */
+    private static final float DRAG_THRESHOLD = 16f;
 
     private final Vec2 scratch = new Vec2();
     private final Vec2 pressed = new Vec2();
@@ -58,11 +65,8 @@ final class InspectionOverlay extends Element{
             public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
                 //only the first pointer selects; a second finger must not start a rival gesture
                 if(pointer != 0) return false;
-                if(button == KeyCode.mouseRight){
-                    reset();
-                    onCancel.run();
-                    return false;
-                }
+                //the secondary button cancels, but not until it is released: see cancelOnRelease()
+                if(button == KeyCode.mouseRight) return true;
                 begin(event.stageX, event.stageY);
                 return true;
             }
@@ -76,9 +80,32 @@ final class InspectionOverlay extends Element{
             @Override
             public void touchUp(InputEvent event, float x, float y, int pointer, KeyCode button){
                 if(pointer != 0) return;
+                if(button == KeyCode.mouseRight){
+                    cancelOnRelease();
+                    return;
+                }
                 release(event.stageX, event.stageY);
             }
         });
+    }
+
+    static float dragThreshold(){
+        return Scl.scl(DRAG_THRESHOLD);
+    }
+
+    /**
+     * Cancels on the release of the secondary button rather than on its press.
+     *
+     * <p>{@code Binding.breakBlock} is also the right mouse button, and {@code DesktopInput.update()}
+     * enters block-breaking mode on {@code keyTap(breakBlock) && !Core.scene.hasMouse()}. Input events
+     * are dispatched before the game modules update, so removing this overlay during {@code touchDown}
+     * would clear {@code hasMouse()} while the tap is still fresh and hand the same click to the world
+     * as the start of a demolition. Waiting for the release keeps the overlay in the way for the whole
+     * frame that carries the tap; by the frame the button comes back up, {@code keyTap} is false.
+     */
+    private void cancelOnRelease(){
+        reset();
+        onCancel.run();
     }
 
     private void begin(float stageX, float stageY){
@@ -95,14 +122,12 @@ final class InspectionOverlay extends Element{
         WorldCoords.fromStage(stageX, stageY, scratch);
         currentTileX = WorldCoords.tileX(scratch);
         currentTileY = WorldCoords.tileY(scratch);
-        if(!dragging && pressed.dst(stageX, stageY) >= DRAG_THRESHOLD) dragging = true;
+        if(!dragging && pressed.dst(stageX, stageY) >= dragThreshold()) dragging = true;
     }
 
     private void release(float stageX, float stageY){
-        if(!pressing){
-            //the press was consumed elsewhere; treat the release as nothing rather than as a selection
-            return;
-        }
+        //the press was consumed elsewhere; treat the release as nothing rather than as a selection
+        if(!pressing) return;
         extend(stageX, stageY);
 
         boolean wasDragging = dragging;
