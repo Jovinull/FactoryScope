@@ -313,6 +313,12 @@ public class AcceptanceHarness extends Mod{
         configurableBlocks();
         refreshAfterAChange();
         drillDown();
+        locateAndReturn();
+        buildingDetailKeepsTheReport();
+        secondaryButtonCancels();
+        dragThresholdTracksUiScale();
+        wallsOnlyArea();
+        showMore();
         zoomLevels();
         offWorldDrag();
         areaLayout(1280, 720, 1f);
@@ -892,9 +898,10 @@ public class AcceptanceHarness extends Mod{
     void checkAreaLocalization(){
         scenarioNow("every area string resolves in the active locale");
         Seq<String> keys = Seq.with("area.title", "area.section.summary", "area.section.status",
-            "area.section.issues", "area.selected", "area.production", "area.size", "area.skipped",
+            "area.section.issues", "area.selected", "area.with-rates", "area.size", "area.skipped",
             "area.none", "area.no-problems", "area.issue-note", "area.building-gone", "area.scan-failed",
-            "area.refresh", "area.select-another", "area.locate");
+            "area.refresh", "area.select-another", "area.locate", "area.return", "area.show-more",
+            "area.only-limited");
         for(AreaStatus status : AreaStatus.values()) keys.add("area.status." + status.slug());
         for(DiagnosticReason reason : DiagnosticReason.values()){
             if(reason == DiagnosticReason.active || reason == DiagnosticReason.limitedSupport) continue;
@@ -909,7 +916,7 @@ public class AcceptanceHarness extends Mod{
         //the formatted ones go through a different path, and an absent key there renders as ???key???
         String[][] formatted = {
             {"area.size-value", "12", "9"}, {"area.affected", "8"}, {"area.coordinates", "123", "61"},
-            {"area.listing-truncated", "40", "120"}, {"area.issue.missing-item-input.resource", "Sand"},
+            {"area.listing-shown", "40", "120"}, {"area.issue.missing-item-input.resource", "Sand"},
             {"area.issue.missing-liquid-input.resource", "Water"},
             {"area.issue.output-blocked.resource", "Silicon"},
             {"area.issue.other-consumer-limited.resource", "Heat"}};
@@ -924,7 +931,291 @@ public class AcceptanceHarness extends Mod{
     }
 
 
+    /**
+     * The reason Locate exists: the world has to become visible, the target has to be findable, and the
+     * report has to still be there afterwards.
+     */
+    void locateAndReturn(){
+        int x1 = rx(), y1 = ry(), x2 = rx() + 12, y2 = ry() + 6;
+
+        scenario("locating a building uncovers the world and offers the way back");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            placeAt(Blocks.graphitePress, rx() + 2, ry() + 2);
+            placeAt(Blocks.graphitePress, rx() + 7, ry() + 2);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> clickNamed("factoryscope-area-issue"));
+        queue(() -> clickNamed("factoryscope-area-locate"));
+        queue(() -> {
+            check("the report stepped out of the way", Core.scene.getDialog() == null);
+            check("the world is no longer covered by a report", FactoryScopeUI.areaReport() == null);
+            check("the report is still being held for the player", FactoryScopeUI.areaReportHeld());
+            check("the locate bar is on screen", FactoryScopeUI.locating());
+            check("exactly one locate bar exists", countNamed("factoryscope-locate") == 1);
+        });
+        queue(() -> clickNamed("factoryscope-locate-return"));
+        queue(() -> {
+            check("the same report came back", FactoryScopeUI.areaReport() != null);
+            check("with the same bounds",
+                AreaSelection.of(x1, y1, x2, y2).equals(FactoryScopeUI.areaBounds()),
+                String.valueOf(FactoryScopeUI.areaBounds()));
+            check("the locate bar was cleared", !FactoryScopeUI.locating());
+            check("no leftover locate bar", countNamed("factoryscope-locate") == 0);
+        });
+
+        scenario("dismissing the locate bar leaves the game alone");
+        queue(() -> clickNamed("factoryscope-area-issue"));
+        queue(() -> clickNamed("factoryscope-area-locate"));
+        queue(() -> check("locating again", FactoryScopeUI.locating()));
+        queue(() -> clickNamed("factoryscope-locate-dismiss"));
+        queue(() -> {
+            check("the bar is gone", !FactoryScopeUI.locating());
+            check("no report was forced back on screen", FactoryScopeUI.areaReport() == null);
+            check("nothing of FactoryScope is left in the way",
+                countNamed("factoryscope-locate") == 0 && countNamed("factoryscope-picker") == 0);
+        });
+        queue(this::closeAnyDialog);
+
+        scenario("a world change during locate clears it");
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> clickNamed("factoryscope-area-issue"));
+        queue(() -> clickNamed("factoryscope-area-locate"));
+        queue(() -> check("locating before the world change", FactoryScopeUI.locating()));
+        queue(() -> Events.fire(new WorldLoadEvent()));
+        queue(() -> {
+            check("the locate bar was cleared on world load", !FactoryScopeUI.locating());
+            check("no locate bar survived", countNamed("factoryscope-locate") == 0);
+            check("the held report was dropped too", !FactoryScopeUI.areaReportHeld());
+        });
+    }
+
+    /** Inspecting one building from the report must not cost the player the report. */
+    void buildingDetailKeepsTheReport(){
+        int x1 = rx(), y1 = ry(), x2 = rx() + 12, y2 = ry() + 6;
+
+        scenario("opening a building from the report and closing it comes back to the same report");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            placeAt(Blocks.graphitePress, rx() + 2, ry() + 2);
+            placeAt(Blocks.graphitePress, rx() + 7, ry() + 2);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> clickNamed("factoryscope-area-issue"));
+        queue(() -> clickNamed("factoryscope-area-building"));
+        queue(() -> {
+            check("the building panel opened", FactoryScopeUI.inspected() != null);
+            check("the report is still held underneath", FactoryScopeUI.areaReportHeld());
+        });
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            check("the report is back on screen", FactoryScopeUI.areaReport() != null);
+            check("with the same bounds",
+                AreaSelection.of(x1, y1, x2, y2).equals(FactoryScopeUI.areaBounds()));
+            check("the building panel is closed", FactoryScopeUI.inspected() == null);
+        });
+    }
+
+    /**
+     * The right mouse button is also {@code Binding.breakBlock}. Cancelling on the press would clear
+     * {@code Core.scene.hasMouse()} while the tap was still fresh and hand the same click to the world
+     * as the start of a demolition, so it is cancelled on the release instead.
+     */
+    void secondaryButtonCancels(){
+        scenario("the secondary button cancels without starting to demolish anything");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            target = placeAt(Blocks.graphitePress, rx() + 4, ry() + 4);
+            control.input.block = null;
+        });
+        queue(this::armPicker);
+        queue(() -> {
+            Vec2 screen = Core.camera.project(new Vec2(target.x, target.y));
+            touchButton(Mathf.round(screen.x), Mathf.round(screen.y), KeyCode.mouseRight);
+        });
+        queue(() -> {
+            check("the selection was cancelled", !FactoryScopeUI.picking());
+            check("no report was opened", FactoryScopeUI.areaReport() == null);
+            check("no building panel was opened", FactoryScopeUI.inspected() == null);
+            check("the game did not enter block-breaking mode", !breakingBlocks(),
+                "input mode " + control.input);
+            check("the target survived", target.isValid() && target.tile.build == target);
+        });
+    }
+
+    /**
+     * The same movement, in the same pixels, judged at two UI scales.
+     *
+     * <p>Arc's scene viewport is one unit per screen pixel, so a raw threshold would mean a smaller and
+     * smaller physical distance as displays get denser - exactly when a player raises the UI scale and
+     * needs it to grow. Twenty pixels must therefore be a deliberate drag at 1x and still a click at
+     * 2x. Both presses land on one five-tile block, so the click has somewhere honest to resolve to.
+     */
+    void dragThresholdTracksUiScale(){
+        scenario("the gesture threshold tracks the UI scale");
+        queue(this::closeAnyDialog);
+        queue(this::restoreLayout);
+        queue(() -> {
+            clearRegion();
+            //at this zoom one tile is ten pixels, so twenty pixels crosses two tiles: enough to be an
+            //area if it counts as a drag, and still inside a 5x5 footprint if it counts as a click
+            renderer.targetscale = renderer.camerascale = 1.25f;
+            target = placeAt(Blocks.eruptionDrill, rx() + 8, ry() + 7);
+        });
+        queue(() -> check("the test block is five tiles across", target != null && target.block.size == 5,
+            target == null ? "not placed" : "size " + target.block.size));
+
+        thresholdCase("1.0x", 1f, 20, false);
+        thresholdCase("2.0x", 2f, 20, true);
+
+        queue(() -> {
+            restoreLayout();
+            renderer.targetscale = renderer.camerascale = 1.5f;
+        });
+    }
+
+    void thresholdCase(String label, float uiScale, int travel, boolean expectClick){
+        queue(this::closeAnyDialog);
+        queue(() -> Scl.setProduct(uiScale));
+        queue(this::armPicker);
+        queue(() -> {
+            Vec2 screen = Core.camera.project(new Vec2(target.x, target.y));
+            int sx = Mathf.round(screen.x), sy = Mathf.round(screen.y);
+            Core.scene.touchDown(sx, sy, 0, KeyCode.mouseLeft);
+            for(int i = 1; i <= 4; i++) Core.scene.touchDragged(sx + travel * i / 4, sy, 0);
+            Core.scene.touchUp(sx + travel, sy, 0, KeyCode.mouseLeft);
+            Log.info(TAG + " @ threshold @ px, moved @ px", label, Scl.scl(16f), travel);
+        });
+        queue(() -> {
+            if(expectClick){
+                check(label + ": " + travel + " px stays a click when the UI is scaled up",
+                    FactoryScopeUI.inspected() == target && FactoryScopeUI.areaBounds() == null,
+                    "inspected " + describe(FactoryScopeUI.inspected())
+                        + " area " + FactoryScopeUI.areaBounds());
+            }else{
+                check(label + ": " + travel + " px is a deliberate drag at normal UI scale",
+                    FactoryScopeUI.areaBounds() != null && FactoryScopeUI.inspected() == null,
+                    "area " + FactoryScopeUI.areaBounds()
+                        + " inspected " + describe(FactoryScopeUI.inspected()));
+            }
+        });
+    }
+
+    /** An area of walls has no problems in the same sense that it has no production. */
+    void wallsOnlyArea(){
+        int x1 = rx(), y1 = ry(), x2 = rx() + 10, y2 = ry() + 6;
+
+        scenario("an area of walls says so rather than claiming a clean bill of health");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            for(int i = 0; i < 4; i++) placeAt(Blocks.titaniumWall, rx() + 2 + i * 2, ry() + 3);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            check("a report opened for the walls", report != null);
+            if(report == null) return;
+            check("four walls were analysed", report.summary.analyzed == 4,
+                "analysed " + report.summary.analyzed);
+            check("none of them has production rates", report.summary.production == 0);
+            check("no problems were invented", report.issues.isEmpty() && report.summary.problems == 0);
+            check("the wording used is the limited-diagnostics one",
+                dialogShows(FsBundle.get("area.only-limited")),
+                "expected '" + FsBundle.get("area.only-limited") + "'");
+            check("it does not claim a clean bill of health",
+                !dialogShows(FsBundle.get("area.no-problems")));
+        });
+    }
+
+    /** A group larger than one page must say how much is hidden and be able to show the rest. */
+    void showMore(){
+        int x1 = rx(), y1 = ry(), x2 = rx() + REGION_WIDTH, y2 = ry() + 13;
+
+        scenario("a long affected-building list pages rather than truncating silently");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            //more than one page of starved presses, every one of them inside the rectangle below
+            int placed = 0;
+            for(int row = 0; row < 6; row++){
+                for(int col = 0; col < 8; col++){
+                    if(placeAt(Blocks.graphitePress, rx() + 1 + col * 2, ry() + 1 + row * 2) != null) placed++;
+                }
+            }
+            Log.info(TAG + " placed @ presses for the paging check", placed);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            check("more than one page of buildings share the shortage",
+                report != null && !report.issues.isEmpty() && report.issues.get(0).buildingCount() > 40,
+                report == null ? "no report" : report.issues.toString());
+        });
+        queue(() -> clickNamed("factoryscope-area-issue"));
+        queue(() -> {
+            check("only the first page was built", countNamed("factoryscope-area-building") == 40,
+                "rows " + countNamed("factoryscope-area-building"));
+            check("a show-more button is offered", Core.scene.find("factoryscope-area-more") != null);
+        });
+        queue(this::scrollReportToBottom);
+        queue(() -> clickNamed("factoryscope-area-more"));
+        queue(() -> {
+            check("the rest of the list appeared", countNamed("factoryscope-area-building") > 40,
+                "rows " + countNamed("factoryscope-area-building"));
+            check("nothing is left to show", Core.scene.find("factoryscope-area-more") == null);
+        });
+    }
+
+
     // ------------------------------------------------------------------ area helpers
+
+    /**
+     * Scrolls the report to the bottom.
+     *
+     * <p>A synthetic click lands wherever its stage position lands, so a button below the fold has to
+     * be brought into view first - exactly as a player would have to scroll to it.
+     */
+    void scrollReportToBottom(){
+        Dialog dialog = Core.scene.getDialog();
+        ScrollPane pane = dialog == null ? null : findPane(dialog);
+        if(pane == null){
+            check("the report has a scroll pane", false);
+            return;
+        }
+        pane.setScrollPercentY(1f);
+        pane.updateVisualScroll();
+    }
+
+    void touchButton(int screenX, int screenY, KeyCode button){
+        Core.scene.touchDown(screenX, screenY, 0, button);
+        Core.scene.touchUp(screenX, screenY, 0, button);
+    }
+
+    /** Whether the game has been put into its block-removal mode by a click FactoryScope should have eaten. */
+    boolean breakingBlocks(){
+        return control.input instanceof mindustry.input.DesktopInput desktop
+            && desktop.mode == mindustry.input.PlaceMode.breaking;
+    }
+
+    /** Whether any label in the dialog on screen carries this exact text. */
+    boolean dialogShows(String text){
+        Dialog dialog = Core.scene.getDialog();
+        if(dialog == null) return false;
+        boolean[] found = {false};
+        walk(dialog, element -> {
+            if(element instanceof Label label && text.contentEquals(label.getText())) found[0] = true;
+        });
+        return found[0];
+    }
 
     String membersOf(AreaDiagnosticResult report){
         Seq<String> names = new Seq<>();

@@ -248,7 +248,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
                 }, Styles.flatt, () -> inspect(ref)).growX().name("factoryscope-area-building");
 
                 row.button(Icon.zoomSmall, Styles.emptyi, () -> locate(ref)).size(34f).padLeft(4f)
-                    .tooltip(FsBundle.ref("area.locate"));
+                    .tooltip(FsBundle.ref("area.locate")).name("factoryscope-area-locate");
             }).growX().padBottom(2f).row();
         }
 
