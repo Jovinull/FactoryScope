@@ -8,23 +8,20 @@ Select a production block and it tells you what the building is doing, what it i
 input or output is responsible. It adds no blocks, no items, no units and no balance changes, and it
 never modifies the state it inspects.
 
-> **This branch is 0.2.0 development.** The released version is **0.1.1**, on `main`. Area diagnostics,
-> described below, is not in any release yet.
-
-## In development for 0.2
+## What it does
 
 - **Area diagnostics.** With the overlay armed, drag a rectangle instead of clicking. FactoryScope
-  analyses every one of your buildings inside it and reports how many were selected, how many have a
-  production model, a count per status, and the problems ranked by how many buildings each affects —
+  analyses every one of your buildings inside it and reports how many were selected, how many it can put
+  production rates on, a count per status, and the problems ranked by how many buildings each affects —
   *"Sand shortage — 8 buildings"* rather than eight separate lines. Expand a group to see which
-  buildings, open any of them in the ordinary panel, or move the view to one.
+  buildings, open any of them in the ordinary panel, or send the view to one and come straight back.
 - **Snapshot semantics.** An area report is taken once, when you release the drag, and re-taken when you
   press Refresh. Nothing is polled in the background.
 
 It counts observations. It does not trace production between buildings, so it will not tell you which
 machine caused a shortage — see [what it does not support](#what-it-does-not-support).
 
-## What 0.1.x supports
+## Single-building diagnostics
 
 - **A single verdict per building.** Every inspection ends in one primary diagnosis: running, disabled,
   cannot operate here, output blocked, item shortage, liquid shortage, power limited, block condition, or
@@ -57,7 +54,12 @@ machine caused a shortage — see [what it does not support](#what-it-does-not-s
   is labelled as such and never presented as an observed average.
 - **History, alerts, or recommendations.**
 
-Fog of war is respected: a building the local player cannot legitimately see cannot be inspected.
+Fog of war is respected, and an area selection queries only your own team's index, so it can never
+report a building you could not already see.
+
+**Platforms.** Desktop is validated end to end. The release jar carries the dexed classes Android needs
+and loads, but nothing has yet run it on a device — touch behaviour in particular is unverified. Reports
+from Android players are welcome on the issue tracker.
 
 ## Requirements
 
@@ -94,9 +96,11 @@ Restart Mindustry afterwards.
 5. Close it with the close button or the usual back gesture.
 
 A press that never travels far, or never leaves its starting tile, is a click — a shaky hand will not
-turn a click into an area. To cancel without selecting anything: press the FactoryScope button again,
-click empty ground, right-click, or press Escape. Everything works with a mouse and with touch, and
-nothing of FactoryScope stays in the input path once the overlay is gone.
+turn a click into an area, and the threshold grows with your UI scale. To cancel without selecting
+anything: press the FactoryScope button again, tap empty ground, or right-click. Escape and the Android
+back key cancel too, though they open the pause menu as they do everywhere else in the game. Everything
+works with a mouse and with touch, and nothing of FactoryScope stays in the input path once the overlay
+is gone.
 
 ## Building from source
 
@@ -140,12 +144,11 @@ relevant part of `last_log.txt` from your Mindustry data folder.
 
 ## Roadmap
 
-- v0.2 — area diagnostics: one report for a selected region *(in development on `develop`)*
 - v0.3 — production network graph: follow what actually feeds what
 - v0.4 — throughput monitoring: measure movement over time instead of deriving it
 - v0.5 — bottleneck and root-cause analysis, which the three above are prerequisites for
 
-Nothing past v0.2 is implemented, and v0.2 is not released.
+None of it is implemented.
 
 ## Notes for contributors
 

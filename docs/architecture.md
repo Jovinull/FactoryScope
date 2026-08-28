@@ -85,6 +85,18 @@ The quadtree answers with block hitboxes, so the exact tile-footprint test is ap
 than trusted from the query rectangle. A building belongs to an area when its footprint shares at least
 one tile with it, and it appears exactly once however many of its tiles are inside.
 
+## Navigation
+
+Two things can be open at once and only in one shape: an area report, with either a building panel
+stacked over it or a locate marker standing in its place. There is no history stack to unwind, and a
+world change drops all of it.
+
+Locate is the reason the report is *held* rather than discarded when it closes. Panning the camera
+behind a full-screen dialog helps nobody, so the dialog steps aside, `Drawf.selected` marks the target
+with the brackets the game already uses for a selected block, and a bar on the HUD is the way back. The
+marker resolves its `BuildingRef` every frame rather than holding the building, so it stops pointing at
+a destroyed target and never starts pointing at whatever replaces it.
+
 ## Coordinates
 
 Every conversion from a pointer position to the world goes through `WorldCoords.fromStage`. There is one
@@ -96,6 +108,16 @@ in 0.1.0.
 `AreaSelection` holds **tile** coordinates and says so. World coordinates only appear at the edges: in
 the overlay that reads the pointer, in the rectangle that gets drawn, and in the rectangle handed to the
 spatial query.
+
+The click-or-drag threshold lives in the same place and is measured in *screen* pixels, because Arc's
+scene viewport is a plain `ScreenViewport` - one scene unit is one screen pixel, and `Scl` is applied
+per widget rather than by the viewport. It is therefore scaled with `Scl.scl` by hand, the way every
+other hit target in the game is, so it does not shrink on a dense display.
+
+The overlay also cancels on the *release* of the secondary button rather than its press.
+`Binding.breakBlock` is the same button, and `DesktopInput` enters block-breaking mode on
+`keyTap(breakBlock) && !Core.scene.hasMouse()`; input is dispatched before the game modules update, so
+removing the overlay any earlier would hand the same click to the world as the start of a demolition.
 
 ## Identity, not references
 

@@ -1,14 +1,39 @@
 # Releasing FactoryScope
 
+## How the game finds a release
+
+Checked against the current sources rather than assumed, because getting it wrong strands players on a
+version they cannot install.
+
+**The Mod Browser index reads the default branch.** `Anuken/MindustryMods`
+(`src/modupdater/ModUpdater.java`) searches for `mindustry-mod in:topics archived:false template:false`,
+reads `default_branch` from the repository metadata, then fetches `mod.hjson` (or `mod.json`, from the
+root or from `assets/`) **on that branch** and publishes its `version` field into `mods.json`. It skips
+a repository only on `hideBrowser`; our `hidden: true` is the multiplayer flag and is not read here.
+
+**The update prompt compares that indexed version.** `ModsDialog.refreshModUpdates` marks a mod as
+updatable when `Strings.checkNewerSemver(entry.version, mod.meta.version)` - the browser listing against
+what the player has installed. Nothing else is consulted.
+
+**Installing a Java mod fetches the latest non-prerelease.** `ModsDialog.githubImportJavaMod` calls
+`GET /repos/{repo}/releases/latest`, which GitHub defines as excluding drafts **and pre-releases**. From
+the assets it takes the first whose name starts with `dexed` and ends in `.jar`, otherwise the first
+`.jar` of any name - so `FactoryScope.jar` is found, and no rename is needed.
+
+Three consequences, and the rule that follows from them:
+
+- A version on the default branch with no matching release advertises an update nobody can install.
+- A release marked **pre-release** is invisible to the installer. Publishing only a pre-release leaves
+  the mod listed in the browser and impossible to install from it.
+- Therefore: **the default branch may only ever name a version that has a published, non-prerelease
+  release carrying a jar.** Caveats about a release belong in its notes, not in the pre-release flag.
+
 ## Branches
 
-`main` is the released version and nothing else. Mindustry's mod updater reads the `version` in
-`mod.hjson` on the repository's default branch, so an unreleased version sitting there advertises an
-update that does not exist. Feature work happens on `develop`, which may carry the next version number;
-it reaches `main` only as part of releasing it.
-
-Releasing means, in order: the checks below pass on `develop`, `develop` is merged into `main`, the tag
-is cut from `main`, and the release is published from the artifact CI built for that commit.
+`main` is the released version and nothing else; `develop` carries the next one. Releasing means, in
+order: the checks below pass on `develop`, the release is published from the artifact CI built for that
+commit, and only then does `main` move to it - so the branch never names a version the release does not
+yet provide.
 
 ## Before tagging
 

@@ -1,8 +1,6 @@
 # Changelog
 
-## 0.2.0 — unreleased
-
-In development on the `develop` branch. `main` still carries the released 0.1.1.
+## 0.2.0 — 2026-08-28
 
 ### Added
 
@@ -16,6 +14,8 @@ In development on the `develop` branch. `main` still carries the released 0.1.1.
   single-building panel without losing the report behind it, or move the view to one.
 - **Refresh** re-runs the whole analysis over the same bounds, including the spatial query, so buildings
   built or destroyed since are picked up.
+- **Locate** uncovers the world, marks the building with the game's own selection brackets, and leaves a
+  small bar offering the way back to the report.
 - `gradlew areaBenchmark` prints what an area analysis costs at 50, 250, 1000 and 4000 buildings.
 
 ### Changed
@@ -24,6 +24,16 @@ In development on the `develop` branch. `main` still carries the released 0.1.1.
   before; a drag selects an area. Nothing was added to the HUD.
 - Findings carry resource identity as well as a display name, so aggregation can group on something
   stable. No change to what a single-building diagnosis says.
+
+### Fixed
+
+- Cancelling a selection with the right mouse button no longer hands the same click to the game as the
+  start of a block demolition.
+- The click-or-drag threshold now scales with the UI scale, so it means the same physical distance on a
+  dense display as on an ordinary one.
+- An affected-building list longer than one page can be expanded rather than only saying how much is
+  hidden.
+- An area containing nothing FactoryScope can diagnose says so, instead of reporting no problems.
 
 ### Not in this release
 
