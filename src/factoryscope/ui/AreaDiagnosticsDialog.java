@@ -1,5 +1,6 @@
 package factoryscope.ui;
 
+import arc.*;
 import arc.func.*;
 import arc.graphics.*;
 import arc.scene.ui.layout.*;
@@ -31,12 +32,15 @@ import mindustry.world.meta.*;
 public final class AreaDiagnosticsDialog extends BaseDialog{
     /** Enough rows to see the shape of a problem; the rest are one button away. */
     private static final int PAGE = 40;
+    /** Widest the report reads comfortably; wider windows get margins instead of stretched rows. */
+    private static final float COLUMN_WIDTH = 620f;
 
     private final Runnable onSelectAnother;
     private final Cons<Building> onInspect;
     private final Cons<BuildingRef> onLocate;
 
     private Table body;
+    private Cell<Table> bodyCell;
     private AreaSelection selection;
     private AreaDiagnosticResult result;
 
@@ -47,12 +51,17 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         this.onLocate = onLocate;
 
         title.setText(FsBundle.get("area.title"));
-        cont.pane(table -> body = table).grow().with(pane -> pane.setScrollingDisabled(true, false));
+        //a column rather than the full width of the window: a count pinned to the far edge of a 4K
+        //display is a long way from the label it belongs to
+        cont.pane(outer -> {
+            outer.top();
+            bodyCell = outer.add(body = new Table()).top();
+        }).grow().with(pane -> pane.setScrollingDisabled(true, false));
 
         buttons.button(FsBundle.ref("area.refresh"), Icon.refresh, this::refresh)
             .size(190f, 64f).name("factoryscope-area-refresh");
         buttons.button(FsBundle.ref("area.select-another"), Icon.grid, this::selectAnother)
-            .size(230f, 64f).name("factoryscope-area-select");
+            .size(250f, 64f).name("factoryscope-area-select");
         addCloseButton();
     }
 
@@ -135,6 +144,10 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         if(body == null) return;
         body.clear();
         body.top().defaults().growX().left();
+        //Cell.width is in design units and scales itself, so the room available has to be measured in
+        //the same units rather than in raw pixels
+        float available = Core.scene.getWidth() / Scl.scl() - 40f;
+        bodyCell.width(Math.min(available, COLUMN_WIDTH));
         if(result == null || selection == null) return;
 
         buildSummary();
@@ -193,6 +206,13 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         });
     }
 
+    /** "1 building", not "1 buildings": the count is read far more often than it is skimmed. */
+    private static String affected(int count){
+        return count == 1
+            ? FsBundle.get("area.affected-one")
+            : FsBundle.format("area.affected", count);
+    }
+
     /** Every analysed building is one FactoryScope has no production model for. */
     private boolean onlyLimitedSupport(){
         Integer limited = result.summary.byStatus.get(AreaStatus.limitedDiagnostics);
@@ -220,8 +240,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
             ContentIcons.add(row, kindOf(group), idOf(group), 22f);
             row.add(AreaText.issueTitle(group)).color(AreaText.color(group.severity))
                 .growX().left().ellipsis(true).minWidth(0f);
-            row.add(FsBundle.format("area.affected", group.buildingCount()))
-                .color(Pal.lightishGray).right().padLeft(8f);
+            row.add(affected(group.buildingCount())).color(Pal.lightishGray).right().padLeft(8f);
         }, Styles.flatt, () -> {
             if(!filled[0]){
                 fillBuildings(rows, footer, group, 0);

@@ -56,8 +56,9 @@ final class LocateOverlay{
             inner.image(Icon.zoomSmall).size(24f).padRight(6f);
             inner.add(build.block.localizedName).color(Pal.accent).padRight(4f);
             inner.add(FsBundle.format("area.coordinates", ref.tileX, ref.tileY)).color(Pal.gray).padRight(12f);
+            //sized rather than left to shrink: an unsized icon-and-text button squeezes the two together
             inner.button(FsBundle.ref("area.return"), Icon.left, Styles.flatt, onReturn::run)
-                .height(40f).padRight(4f).name("factoryscope-locate-return");
+                .size(210f, 44f).padRight(4f).name("factoryscope-locate-return");
             inner.button(Icon.cancelSmall, Styles.emptyi, onDismiss::run).size(36f)
                 .name("factoryscope-locate-dismiss");
         }).padTop(90f);
