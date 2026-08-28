@@ -124,8 +124,13 @@ removing the overlay any earlier would hand the same click to the world as the s
 An area result stores `BuildingRef` — tile position, block id, team — rather than live `Building`
 objects. A report outlives the factory it describes: the player reads it while the game runs on, and a
 block can be destroyed and rebuilt in between. Holding entities would keep dead ones reachable, and
-resolving a coordinate without re-checking identity would silently navigate to whatever was built there
-since. `AreaProbe.resolve` re-checks both, and returns nothing when the building is gone.
+resolving a coordinate without checking what stands there would navigate to something unrelated.
+
+`AreaProbe.resolve` therefore re-checks position, block and team, and returns nothing when any of them
+has changed. It does **not** distinguish entity instances, which is a decision rather than an oversight:
+the line the player clicked reads "Silicon Smelter at 123,61", and if a silicon smelter stands at
+123,61 they should get live diagnostics for it. Refusing would say "no longer exists" while they are
+looking straight at one.
 
 Resource identity works the same way. `ResourceRef` carries the internal content id as well as the
 localized name, and grouping uses the id. Grouping by display name would mean that switching the game to
