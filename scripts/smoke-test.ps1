@@ -98,20 +98,34 @@ if($Install){
 # --------------------------------------------------------------------------- sandbox
 
 $sandbox = Join-Path ([IO.Path]::GetTempPath()) ("factoryscope-smoke-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
-$sandboxData = Join-Path $sandbox 'saves'
+$sandboxData = Join-Path $sandbox 'Mindustry'
 $sandboxMods = Join-Path $sandboxData 'mods'
 New-Item -ItemType Directory -Force -Path $sandboxMods | Out-Null
 Copy-Item -LiteralPath $builtJar -Destination (Join-Path $sandboxMods $jarName) -Force
 
-# stops the Steam build from asking Steam to relaunch the game outside our sandbox
-Set-Content -LiteralPath (Join-Path $sandbox 'steam_appid.txt') -Value '1127400' -Encoding ascii
+# The Steam desktop jar enables Steam solely from this classpath resource. Running it as a Steam client
+# also imports subscribed Workshop mods, which is outside the sandbox. The release modifier keeps the
+# same client code while skipping Steam initialization and its Workshop inventory.
+Set-Content -LiteralPath (Join-Path $sandbox 'version.properties') -Value @(
+    'number=8',
+    'build=159.7',
+    'modifier=release',
+    'type=official',
+    'commitHash=unknown'
+) -Encoding ascii
 
 $logFile = Join-Path $sandboxData 'last_log.txt'
 Write-Step "Starting Mindustry in sandbox $sandbox"
 
 $started = Get-Date
-$process = Start-Process -FilePath $launcher.Path -ArgumentList $launcher.Arguments `
-    -WorkingDirectory $sandbox -PassThru -WindowStyle Minimized
+$previousAppData = $env:APPDATA
+try{
+    $env:APPDATA = $sandbox
+    $process = Start-Process -FilePath $launcher.Path -ArgumentList $launcher.Arguments `
+        -WorkingDirectory $sandbox -PassThru -WindowStyle Minimized
+}finally{
+    $env:APPDATA = $previousAppData
+}
 
 # --------------------------------------------------------------------------- watch the log
 
@@ -162,6 +176,9 @@ $problemPattern = 'NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError
 
 $problems = @($logLines | Where-Object { $_ -match $problemPattern })
 $modErrors = @($logLines | Where-Object { $_ -match 'factoryscope\.' -and $_ -match 'at |Exception|Error' })
+$externalMods = @($logLines | Where-Object {
+    $_ -match 'Loading mod:' -and $_ -notmatch 'Loading mod: factory-scope$'
+})
 
 Write-Host ''
 if(-not $ready){
@@ -175,8 +192,12 @@ if($modErrors.Count -gt 0){
     Write-Fail 'FactoryScope stack frames in the log:'
     $modErrors | ForEach-Object { Write-Host "    $_" }
 }
+if($externalMods.Count -gt 0){
+    Write-Fail 'The sandbox loaded external mods:'
+    $externalMods | ForEach-Object { Write-Host "    $_" }
+}
 
-$success = $ready -and $problems.Count -eq 0 -and $modErrors.Count -eq 0
+$success = $ready -and $problems.Count -eq 0 -and $modErrors.Count -eq 0 -and $externalMods.Count -eq 0
 if($success){
     Write-Host 'SMOKE TEST PASSED: FactoryScope loaded cleanly.' -ForegroundColor Green
 }else{

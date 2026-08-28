@@ -66,6 +66,7 @@ public class AcceptanceHarness extends Mod{
     }
 
     void start(){
+        checkOnlyHarnessModsLoaded();
         try{
             Map map = maps.loadInternalMap("serpulo/groundZero");
             Rules rules = map.applyRules(Gamemode.survival);
@@ -77,6 +78,16 @@ public class AcceptanceHarness extends Mod{
             Log.err(TAG + " could not start the map", t);
             finish();
         }
+    }
+
+    private void checkOnlyHarnessModsLoaded(){
+        Seq<String> unexpected = new Seq<>();
+        for(Mods.LoadedMod mod : mods.list()){
+            if(!mod.name.equals("factory-scope") && !mod.name.equals("factory-scope-acceptance")){
+                unexpected.add(mod.name);
+            }
+        }
+        check("the sandbox loaded no external mods", unexpected.isEmpty(), unexpected.toString(", "));
     }
 
     void plan(){

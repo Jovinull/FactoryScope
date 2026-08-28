@@ -157,9 +157,11 @@ reason.
 
 `Vars.loadSettings()` calls `settings.setDataDirectory(Core.files.local("saves/"))` when
 `Version.isSteam`, so a Steam installation stores settings, mods and `last_log.txt` in a `saves` folder
-next to the executable rather than in `%APPDATA%\Mindustry`. `scripts/smoke-test.ps1` uses this: it
-launches the game with its working directory set to a temporary folder, which gives the test its own
-data directory without touching the player's.
+next to the executable rather than in `%APPDATA%\Mindustry`. Steam also loads subscribed Workshop mods,
+which would make a test depend on player state. The smoke and acceptance launchers override the Steam
+jar's `version.properties` in their temporary working directory to run it as a release client, and pass
+that temporary directory as `APPDATA`. The resulting `%APPDATA%\Mindustry` tree contains all test data
+and only the jars copied by the script.
 
 Non-Steam builds honour the `MINDUSTRY_DATA_DIR` environment variable and the `mindustry.data.dir`
 system property (`ClientLauncher.setup`).

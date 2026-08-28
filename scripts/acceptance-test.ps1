@@ -22,7 +22,7 @@ param(
     # BCP 47 language tag, e.g. "en-US" or "pt-BR". A fresh sandbox has no language setting, so
     # Mindustry falls back to the JVM default locale and this is enough to steer it.
     [string]$Locale,
-    # Writes a PNG of key screens into <sandbox>/saves/shots. Implies -KeepSandbox so they survive.
+    # Writes a PNG of key screens into <sandbox>/Mindustry/shots. Implies -KeepSandbox so they survive.
     [switch]$Capture,
     [int]$TimeoutSeconds = 300
 )
@@ -99,20 +99,34 @@ if($Locale){
 }
 
 $sandbox = Join-Path ([IO.Path]::GetTempPath()) ("factoryscope-acceptance-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
-$sandboxData = Join-Path $sandbox 'saves'
+$sandboxData = Join-Path $sandbox 'Mindustry'
 $sandboxMods = Join-Path $sandboxData 'mods'
 New-Item -ItemType Directory -Force -Path $sandboxMods | Out-Null
 Copy-Item -LiteralPath $modJar -Destination $sandboxMods -Force
 Copy-Item -LiteralPath $harnessJar -Destination $sandboxMods -Force
 
-# stops the Steam build from asking Steam to relaunch the game outside our sandbox
-Set-Content -LiteralPath (Join-Path $sandbox 'steam_appid.txt') -Value '1127400' -Encoding ascii
+# The Steam desktop jar enables Steam solely from this classpath resource. Running it as a Steam client
+# also imports subscribed Workshop mods, which is outside the sandbox. The release modifier keeps the
+# same client code while skipping Steam initialization and its Workshop inventory.
+Set-Content -LiteralPath (Join-Path $sandbox 'version.properties') -Value @(
+    'number=8',
+    'build=159.7',
+    'modifier=release',
+    'type=official',
+    'commitHash=unknown'
+) -Encoding ascii
 
 $logFile = Join-Path $sandboxData 'last_log.txt'
 Write-Step "Running the acceptance suite in $sandbox"
 
-$process = Start-Process -FilePath $launcher.Path -ArgumentList $arguments `
-    -WorkingDirectory $sandbox -PassThru -WindowStyle Minimized
+$previousAppData = $env:APPDATA
+try{
+    $env:APPDATA = $sandbox
+    $process = Start-Process -FilePath $launcher.Path -ArgumentList $arguments `
+        -WorkingDirectory $sandbox -PassThru -WindowStyle Minimized
+}finally{
+    $env:APPDATA = $previousAppData
+}
 
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 $finished = $false
