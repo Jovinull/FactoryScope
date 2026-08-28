@@ -3,11 +3,10 @@ package factoryscope.ui;
 import arc.*;
 import arc.input.*;
 import arc.math.geom.*;
-import arc.scene.*;
 import arc.scene.event.*;
 import arc.scene.ui.layout.*;
-import arc.util.*;
 import factoryscope.*;
+import factoryscope.area.*;
 import factoryscope.probe.*;
 import mindustry.*;
 import mindustry.game.EventType.*;
@@ -16,15 +15,15 @@ import mindustry.graphics.*;
 import mindustry.ui.*;
 
 /**
- * Everything that puts FactoryScope on screen: the HUD toggle and the one-shot building picker.
+ * Everything that puts FactoryScope on screen: the HUD toggle, the selection overlay, and the two
+ * reports it can open.
  *
- * <h2>Why a picker overlay rather than TapEvent</h2>
- * Mindustry fires {@code TapEvent} only after the world has already handled the tap, so a configurable
- * block would open its own dialog underneath the diagnostic panel, and the event travels through
- * {@code Call.tileTap}, a networked remote. A transparent element in the HUD instead swallows the tap
- * before the world sees it - {@code Core.scene.hasMouse()} is what gates world input - which gives
- * one-shot selection with no double UI and no packets. It is removed the moment a choice is made, so
- * nothing of FactoryScope remains in the input path while the mod is idle.
+ * <h2>One entry point, two gestures</h2>
+ * The HUD button arms a single overlay. A click on it inspects one building, exactly as in 0.1.x; a
+ * drag selects a rectangle and reports on everything inside it. Adding a second HUD button for the
+ * second gesture would have made the simpler of the two harder to find, and the overlay already owns
+ * the pointer, so the gesture is where the distinction belongs. {@link InspectionOverlay} holds the
+ * rules for telling one from the other.
  */
 public final class FactoryScopeUI{
     private static final float BUTTON_SIZE = 48f;
@@ -34,7 +33,8 @@ public final class FactoryScopeUI{
     private static final Vec2 scratch = new Vec2();
 
     private static FactoryScopePanel panel;
-    private static Element picker;
+    private static AreaDiagnosticsDialog areaDialog;
+    private static InspectionOverlay picker;
     private static Table hint;
     private static boolean initialized;
 
@@ -47,7 +47,12 @@ public final class FactoryScopeUI{
         initialized = true;
 
         panel = new FactoryScopePanel();
+        areaDialog = new AreaDiagnosticsDialog(FactoryScopeUI::startPicking, FactoryScopeUI::inspect);
         buildToggle();
+
+        //the selection rectangle belongs to the world, not to the scene, so it is drawn from the world
+        //render pass; registered once, and inert whenever nothing is being dragged
+        Events.run(Trigger.drawOver, FactoryScopeUI::drawSelection);
 
         //a world change invalidates any pending selection, and leaves nothing behind to leak
         Events.on(WorldLoadEvent.class, event -> reset());
@@ -82,24 +87,15 @@ public final class FactoryScopeUI{
     private static void startPicking(){
         if(picking() || !Vars.state.isGame()) return;
 
-        Element overlay = new Element();
-        overlay.name = "factoryscope-picker";
-        overlay.setFillParent(true);
-        overlay.touchable = Touchable.enabled;
-        overlay.addListener(new InputListener(){
-            @Override
-            public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
-                return true;
-            }
-
-            @Override
-            public void touchUp(InputEvent event, float x, float y, int pointer, KeyCode button){
-                pick(event.stageX, event.stageY);
-            }
-        });
-        //the picker is meaningless outside a running game
+        InspectionOverlay overlay = new InspectionOverlay(
+            FactoryScopeUI::pickPoint, FactoryScopeUI::pickArea, FactoryScopeUI::stopPicking);
+        //the overlay is meaningless outside a running game, and the player must always have a way out
         overlay.update(() -> {
-            if(!Vars.state.isGame()) stopPicking();
+            if(!Vars.state.isGame()){
+                stopPicking();
+            }else if(Core.input.keyTap(KeyCode.escape) || Core.input.keyTap(KeyCode.back)){
+                stopPicking();
+            }
         });
 
         picker = overlay;
@@ -133,30 +129,42 @@ public final class FactoryScopeUI{
         Vars.ui.hudGroup.addChild(root);
     }
 
-    /**
-     * Resolves a tap in scene coordinates to a building and hands it to the panel.
-     *
-     * <p>The scene viewport projects stage coordinates back to Arc screen coordinates, which have their
-     * origin at the bottom left, and the world camera unprojects those. {@code Scene.stageToScreenCoordinates}
-     * looks like the obvious choice and is not: it flips Y to a top-left origin for the sake of platform
-     * input APIs, which would mirror every selection about the middle of the screen.
-     */
+    private static void drawSelection(){
+        if(picker != null) picker.drawWorld();
+    }
+
+    /** Resolves a position in scene coordinates to a building. */
     static Building buildingAt(float stageX, float stageY){
-        Core.scene.getViewport().project(scratch.set(stageX, stageY));
-        Core.camera.unproject(scratch);
+        WorldCoords.fromStage(stageX, stageY, scratch);
         return Vars.world.buildWorld(scratch.x, scratch.y);
     }
 
-    private static void pick(float stageX, float stageY){
+    private static void pickPoint(Vec2 world){
         stopPicking();
 
-        Building build = buildingAt(stageX, stageY);
+        Building build = Vars.world.buildWorld(world.x, world.y);
 
         //tapping empty ground is how the player cancels, so it is not an error worth reporting
         if(build == null) return;
         if(!inspect(build)){
             Vars.ui.showInfoToast(FsBundle.get("inspect.not-visible"), 2f);
         }
+    }
+
+    private static void pickArea(AreaSelection selection){
+        stopPicking();
+        if(areaDialog == null || !Vars.state.isGame()) return;
+
+        try{
+            areaDialog.show(selection, AreaProbe.scan(selection, viewerTeam()));
+        }catch(Exception e){
+            FsLog.warnOnce("area-scan", "could not analyse the selected area", e);
+            Vars.ui.showInfoToast(FsBundle.get("area.scan-failed"), 3f);
+        }
+    }
+
+    private static mindustry.game.Team viewerTeam(){
+        return Vars.player == null ? null : Vars.player.team();
     }
 
     /**
@@ -167,7 +175,7 @@ public final class FactoryScopeUI{
      */
     public static boolean inspect(Building build){
         if(panel == null || build == null) return false;
-        if(!MindustryFactoryProbe.canInspect(build, Vars.player == null ? null : Vars.player.team())){
+        if(!MindustryFactoryProbe.canInspect(build, viewerTeam())){
             return false;
         }
 
@@ -180,10 +188,16 @@ public final class FactoryScopeUI{
         return panel == null ? null : panel.inspected();
     }
 
+    /** The area report on screen right now, or null. */
+    public static AreaDiagnosticResult areaReport(){
+        return areaDialog == null ? null : areaDialog.result();
+    }
+
     /** Drops every transient reference; safe to call at any time. */
     public static void reset(){
         stopPicking();
         if(panel != null && panel.isShown()) panel.hide();
+        if(areaDialog != null) areaDialog.clear();
         FsLog.reset();
     }
 }
