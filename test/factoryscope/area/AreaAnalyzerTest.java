@@ -257,6 +257,93 @@ class AreaAnalyzerTest{
         }
     }
 
+
+    @Test
+    void changingOnlyTheDisplayNameChangesNothingAboutTheGrouping(){
+        //the same factory read in two languages: identical content ids, translated names. The domain
+        //result has to be identical, or an English player and a Portuguese player would be told
+        //different things about the same base
+        List<AreaEntry> english = List.of(
+            entry(itemShortage("sand", "Sand")),
+            entry(itemShortage("sand", "Sand")),
+            entry(liquidShortage("water", "Water")));
+        List<AreaEntry> portuguese = List.of(
+            entry(itemShortage("sand", "Areia")),
+            entry(itemShortage("sand", "Areia")),
+            entry(liquidShortage("water", "Agua")));
+
+        AreaDiagnosticResult a = AreaAnalyzer.analyze(AREA, 3, english);
+        AreaDiagnosticResult b = AreaAnalyzer.analyze(AREA, 3, portuguese);
+
+        assertEquals(keys(a), keys(b), "grouping must not depend on the language the game is in");
+        assertEquals(counts(a), counts(b));
+        assertEquals(a.summary.byStatus, b.summary.byStatus);
+    }
+
+    @Test
+    void oneBuildingShortOfTwoItemsIsOneBuildingInEachOfTwoGroups(){
+        //the analyser emits a single finding naming both items; each becomes its own group, and the
+        //building is one building in both - a count of findings would say two
+        AreaEntry entry = entry(twoItemShortage());
+        assertEquals(2, entry.result.primary.resources.size(), "the fixture must name both items");
+
+        AreaDiagnosticResult result = analyze(entry);
+
+        assertEquals(2, result.issues.size());
+        for(AreaIssueGroup group : result.issues){
+            assertEquals(1, group.buildingCount(), group.issue + " counted findings instead of buildings");
+        }
+        assertEquals(1, result.summary.problems);
+        assertEquals(1, result.summary.analyzed);
+    }
+
+    @Test
+    void orderingDoesNotDependOnTheOrderBuildingsWereCollectedIn(){
+        List<AreaEntry> entries = new ArrayList<>(List.of(
+            entry(itemShortage("sand", "Sand")),
+            entry(powerShortage()),
+            entry(itemShortage("coal", "Coal")),
+            entry(outputBlocked()),
+            entry(liquidShortage("water", "Water"))));
+
+        List<String> expected = keys(AreaAnalyzer.analyze(AREA, entries.size(), entries));
+
+        //every rotation of the same set must rank the same way; only explicit criteria may decide
+        for(int shift = 1; shift < entries.size(); shift++){
+            List<AreaEntry> rotated = new ArrayList<>(entries.subList(shift, entries.size()));
+            rotated.addAll(entries.subList(0, shift));
+            assertEquals(expected, keys(AreaAnalyzer.analyze(AREA, rotated.size(), rotated)),
+                "rotation by " + shift + " changed the ranking");
+        }
+    }
+
+    @Test
+    void aGroupsBuildingListIsInAStableOrderToo(){
+        List<AreaEntry> entries = List.of(
+            entry(itemShortage("sand", "Sand")),
+            entry(itemShortage("sand", "Sand")),
+            entry(itemShortage("sand", "Sand")));
+
+        AreaIssueGroup first = AreaAnalyzer.analyze(AREA, 3, entries).issues.get(0);
+        AreaIssueGroup again = AreaAnalyzer.analyze(AREA, 3, entries).issues.get(0);
+
+        assertEquals(first.buildings, again.buildings);
+    }
+
+    @Test
+    void aReducedShortageRanksBelowAStoppedOneEvenWhenItAffectsMore(){
+        List<AreaEntry> entries = new ArrayList<>();
+        for(int i = 0; i < 4; i++) entries.add(entry(partialItemShortage("coal", "Coal")));
+        entries.add(entry(itemShortage("sand", "Sand")));
+
+        AreaDiagnosticResult result = AreaAnalyzer.analyze(AREA, entries.size(), entries);
+
+        assertEquals(2, result.issues.size());
+        assertEquals(Severity.stopped, result.issues.get(0).severity, "a stopped factory outranks a slow one");
+        assertEquals("sand", result.issues.get(0).issue.resource.id);
+        assertEquals(4, result.issues.get(1).buildingCount());
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private static AreaDiagnosticResult analyze(AreaEntry... entries){
@@ -267,5 +354,11 @@ class AreaAnalyzerTest{
         List<String> keys = new ArrayList<>();
         for(AreaIssueGroup group : result.issues) keys.add(group.issue.key());
         return keys;
+    }
+
+    private static List<Integer> counts(AreaDiagnosticResult result){
+        List<Integer> counts = new ArrayList<>();
+        for(AreaIssueGroup group : result.issues) counts.add(group.buildingCount());
+        return counts;
     }
 }

@@ -80,6 +80,29 @@ final class Areas{
             .build();
     }
 
+    /** Two mandatory items at the same satisfaction: the analyser names both in one finding. */
+    static FactorySnapshot twoItemShortage(){
+        return crafter()
+            .efficiency(0f, 0f)
+            .blockEfficiencyScale(Float.NaN)
+            .input(item("sand", "Sand", 0f))
+            .input(item("coal", "Coal", 0f))
+            .input(power(1f))
+            .output(silicon(false))
+            .build();
+    }
+
+    /** Running, but below full speed for want of an item - a warning rather than a stoppage. */
+    static FactorySnapshot partialItemShortage(String id, String name){
+        return crafter()
+            .efficiency(0.4f, 0.4f)
+            .blockEfficiencyScale(1f)
+            .input(item(id, name, 0.4f))
+            .input(power(1f))
+            .output(silicon(false))
+            .build();
+    }
+
     static FactorySnapshot powerShortage(){
         return crafter()
             .efficiency(0f, 0f)

@@ -60,7 +60,9 @@ public final class AreaAnalyzer{
     }
 
     private static List<AreaIssueGroup> group(List<AreaEntry> entries){
-        //insertion-ordered so that groups with identical rank keep the order the area was collected in
+        //the ordering guarantee comes from the comparator below, which is total: it falls through to
+        //the issue key, and no two groups share one. The map is insertion-ordered anyway so that a
+        //debugger shows the groups in the order the area was walked
         Map<AreaIssue, Builder> builders = new LinkedHashMap<>();
 
         for(AreaEntry entry : entries){

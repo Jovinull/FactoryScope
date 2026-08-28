@@ -50,8 +50,9 @@ public final class AreaProbe{
         AreaSelection clamped = selection.clampedTo(Vars.world.width(), Vars.world.height());
         if(clamped == null) return found;
 
-        //a multiblock is reported once per query, but the same building can still be handed back by a
-        //later refresh, so identity is checked rather than assumed
+        //what keeps a 3x3 building out of the results nine times is that the quadtree holds one entry
+        //per building, not one per occupied tile. This set is insurance against that ever changing:
+        //the contract this method promises is one entry per building, whatever the index does
         ObjectSet<Building> seen = new ObjectSet<>();
         Vars.indexer.eachBlock(viewer, worldRect(clamped), build -> true, build -> {
             if(build == null || build.tile == null || !build.isValid()) return;
