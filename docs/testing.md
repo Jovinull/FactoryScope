@@ -56,7 +56,8 @@ It covers:
 - Repeated activate → select → close cycles, asserting scene element counts return to baseline.
 - A world change while the panel is open.
 - Panel layout at several scene sizes and UI scales.
-- Every user-facing string resolving in the active locale.
+- Every user-facing string resolving in the active locale, including the formatted ones, whose missing
+  keys render as `???key???` rather than as an error.
 
 Area diagnostics adds, through the same dispatch:
 
@@ -70,10 +71,15 @@ Area diagnostics adds, through the same dispatch:
   correctly excluded when the selection stops one tile short.
 - **A mixed area** — running, starved, output-blocked, disabled, multi-finding and unsupported buildings
   in one rectangle — checked against the counts, the grouping and the ranking a player reads.
+- **The same rectangle at two zoom levels**, which catches a conversion that folds the camera scale in
+  at the wrong point, and **a drag that runs off the edge of the map**, driven with the view moved to
+  the world corner.
 - Healthy and empty areas, dragging across configurable blocks without opening their own dialogs,
   refreshing after buildings were added and removed, expanding an issue group and opening one of its
-  buildings, report layout at three scene sizes, repeated use, and world changes during and after a
-  selection.
+  buildings, repeated use, and world changes during and after a selection.
+- **Layout**, at three scene sizes and UI scales, plus a deliberately crowded report — several different
+  shortages at once — on the smallest scene at the largest UI scale, which is where long labels clip
+  first.
 
 The suite drives the real overlay end to end. It does not call an internal "select this rectangle"
 method, for the same reason the single-building test does not call `inspect(building)`: that would skip

@@ -318,7 +318,9 @@ public class AcceptanceHarness extends Mod{
         areaLayout(1280, 720, 1f);
         areaLayout(1920, 1080, 1f);
         areaLayout(2560, 1440, 1.5f);
+        crowdedReport(1280, 720, 2f);
         queue(this::restoreLayout);
+        queue(this::checkAreaLocalization);
         repeatedAreaUse(6);
         areaWorldChange();
     }
@@ -847,6 +849,80 @@ public class AcceptanceHarness extends Mod{
     void restoreCamera(){
         if(player != null) control.input.panCamera(new Vec2(player.x, player.y));
     }
+
+    /**
+     * The worst case for layout: many issue groups, on the smallest scene, at the largest UI scale, in
+     * whatever language the game is running in. Long labels and a crowded list clip here first.
+     */
+    void crowdedReport(int width, int height, float scale){
+        int x1 = rx(), y1 = ry(), x2 = rx() + 16, y2 = ry() + 11;
+
+        scenario("a crowded report fits a " + width + "x" + height + " scene at " + scale + "x UI scale");
+        queue(this::closeAnyDialog);
+        queue(this::restoreLayout);
+        queue(() -> {
+            clearRegion();
+            //five different shortages plus a disabled block and an unsupported one
+            placeAt(Blocks.siliconSmelter, rx() + 2, ry() + 2);
+            placeAt(Blocks.kiln, rx() + 7, ry() + 2);
+            placeAt(Blocks.surgeSmelter, rx() + 12, ry() + 2);
+            placeAt(Blocks.graphitePress, rx() + 2, ry() + 7);
+            supply(placeAt(Blocks.graphitePress, rx() + 7, ry() + 7), Items.graphite, 10);
+            placeAt(Blocks.titaniumWall, rx() + 12, ry() + 7);
+            placeAt(Blocks.pneumaticDrill, rx() + 14, ry() + 9);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            check("the crowded area opened a report", report != null);
+            if(report != null){
+                check("it really is crowded", report.issues.size() >= 4,
+                    "groups " + report.issues.size() + " analysed " + report.summary.analyzed);
+            }
+        });
+        queue(() -> {
+            Scl.setProduct(scale);
+            Core.scene.resize(width, height);
+        });
+        queue(() -> checkFits("crowded " + width + "x" + height + " @ " + scale + "x"));
+    }
+
+    /** Every string the area report can show has to resolve in whatever language the game is in. */
+    void checkAreaLocalization(){
+        scenarioNow("every area string resolves in the active locale");
+        Seq<String> keys = Seq.with("area.title", "area.section.summary", "area.section.status",
+            "area.section.issues", "area.selected", "area.production", "area.size", "area.skipped",
+            "area.none", "area.no-problems", "area.issue-note", "area.building-gone", "area.scan-failed",
+            "area.refresh", "area.select-another", "area.locate");
+        for(AreaStatus status : AreaStatus.values()) keys.add("area.status." + status.slug());
+        for(DiagnosticReason reason : DiagnosticReason.values()){
+            if(reason == DiagnosticReason.active || reason == DiagnosticReason.limitedSupport) continue;
+            keys.add("area.issue." + reason.slug());
+        }
+
+        for(String key : keys){
+            String text = FsBundle.get(key);
+            check("'" + key + "' resolves", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
+        }
+
+        //the formatted ones go through a different path, and an absent key there renders as ???key???
+        String[][] formatted = {
+            {"area.size-value", "12", "9"}, {"area.affected", "8"}, {"area.coordinates", "123", "61"},
+            {"area.listing-truncated", "40", "120"}, {"area.issue.missing-item-input.resource", "Sand"},
+            {"area.issue.missing-liquid-input.resource", "Water"},
+            {"area.issue.output-blocked.resource", "Silicon"},
+            {"area.issue.other-consumer-limited.resource", "Heat"}};
+        for(String[] entry : formatted){
+            Object[] args = new Object[entry.length - 1];
+            System.arraycopy(entry, 1, args, 0, args.length);
+            String text = FsBundle.format(entry[0], args);
+            check("'" + entry[0] + "' formats", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
+        }
+
+        Log.info(TAG + " locale @ -> area.title = '@'", Core.bundle.getLocale(), FsBundle.get("area.title"));
+    }
+
 
     // ------------------------------------------------------------------ area helpers
 

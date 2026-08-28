@@ -19,6 +19,9 @@ param(
     [string]$MindustryPath,
     [switch]$SkipBuild,
     [switch]$KeepSandbox,
+    # BCP 47 language tag, e.g. "en-US" or "pt-BR". A fresh sandbox has no language setting, so
+    # Mindustry falls back to the JVM default locale and this is enough to steer it.
+    [string]$Locale,
     [int]$TimeoutSeconds = 300
 )
 
@@ -74,6 +77,18 @@ $launcher = Get-MindustryLauncher -InstallPath $gamePath
 if(-not $launcher){ throw "No launcher found under $gamePath" }
 Write-Host "    install: $gamePath"
 
+$arguments = @($launcher.Arguments)
+if($Locale){
+    if($launcher.Kind -ne 'java'){
+        throw "-Locale needs the bundled JRE launcher; none was found under $gamePath"
+    }
+    $parts = $Locale -split '[-_]'
+    $jvm = @("-Duser.language=$($parts[0])")
+    if($parts.Count -gt 1){ $jvm += "-Duser.country=$($parts[1])" }
+    $arguments = $jvm + $arguments
+    Write-Host "    locale:  $Locale"
+}
+
 $sandbox = Join-Path ([IO.Path]::GetTempPath()) ("factoryscope-acceptance-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $sandboxData = Join-Path $sandbox 'saves'
 $sandboxMods = Join-Path $sandboxData 'mods'
@@ -87,7 +102,7 @@ Set-Content -LiteralPath (Join-Path $sandbox 'steam_appid.txt') -Value '1127400'
 $logFile = Join-Path $sandboxData 'last_log.txt'
 Write-Step "Running the acceptance suite in $sandbox"
 
-$process = Start-Process -FilePath $launcher.Path -ArgumentList $launcher.Arguments `
+$process = Start-Process -FilePath $launcher.Path -ArgumentList $arguments `
     -WorkingDirectory $sandbox -PassThru -WindowStyle Minimized
 
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
