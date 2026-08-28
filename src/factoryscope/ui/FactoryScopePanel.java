@@ -2,7 +2,6 @@ package factoryscope.ui;
 
 import arc.graphics.*;
 import arc.func.*;
-import arc.graphics.g2d.*;
 import arc.scene.ui.layout.*;
 import arc.util.*;
 import factoryscope.*;
@@ -10,7 +9,6 @@ import factoryscope.analysis.*;
 import factoryscope.model.*;
 import factoryscope.probe.*;
 import mindustry.*;
-import mindustry.ctype.*;
 import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.ui.*;
@@ -298,25 +296,7 @@ public final class FactoryScopePanel extends BaseDialog{
     }
 
     private void icon(Table table, ResourceKind kind, String contentId){
-        TextureRegion region = regionFor(kind, contentId);
-        if(region != null){
-            table.image(region).size(ICON_SIZE).padRight(6f);
-        }else if(kind == ResourceKind.power){
-            table.image(Icon.power).size(ICON_SIZE).color(Pal.power).padRight(6f);
-        }else{
-            table.image(Icon.none).size(ICON_SIZE).color(Pal.gray).padRight(6f);
-        }
-    }
-
-    /** Resolves an icon from the content id recorded by the probe; missing content simply yields no icon. */
-    private TextureRegion regionFor(ResourceKind kind, String contentId){
-        if(contentId == null) return null;
-        UnlockableContent content = switch(kind){
-            case item -> Vars.content.item(contentId);
-            case liquid -> Vars.content.liquid(contentId);
-            default -> null;
-        };
-        return content == null ? null : content.uiIcon;
+        ContentIcons.add(table, kind, contentId, ICON_SIZE);
     }
 
     private String amountText(ResourceState input){

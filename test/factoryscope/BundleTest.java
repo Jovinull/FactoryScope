@@ -1,6 +1,7 @@
 package factoryscope;
 
 import factoryscope.analysis.*;
+import factoryscope.area.*;
 import org.junit.jupiter.api.*;
 
 import java.io.*;
@@ -73,6 +74,39 @@ class BundleTest{
     }
 
     @Test
+    void everyAreaStatusHasALabel(){
+        for(AreaStatus status : AreaStatus.values()){
+            String key = FsBundle.PREFIX + "area.status." + status.slug();
+            assertTrue(bundle.containsKey(key), "missing " + key);
+        }
+    }
+
+    /**
+     * Every reason that can reach an issue group needs a headline, and the four that name a resource
+     * need the variant that takes one. A missing key here would show a raw bundle id in the area list.
+     */
+    @Test
+    void everyIssueReasonHasAHeadline(){
+        List<String> missing = new ArrayList<>();
+
+        for(DiagnosticReason reason : DiagnosticReason.values()){
+            if(!canBecomeAnIssue(reason)) continue;
+            String key = FsBundle.PREFIX + "area.issue." + reason.slug();
+            if(!bundle.containsKey(key)) missing.add(key);
+            if(namesResource(reason) && !bundle.containsKey(key + ".resource")) missing.add(key + ".resource");
+        }
+
+        assertEquals(List.of(), missing, "issue reasons with nothing to show");
+    }
+
+    @Test
+    void areaStatusSlugsAreReadable(){
+        assertEquals("item-shortage", AreaStatus.itemShortage.slug());
+        assertEquals("operating", AreaStatus.operating.slug());
+        assertEquals("limited-diagnostics", AreaStatus.limitedDiagnostics.slug());
+    }
+
+    @Test
     void everyTranslationCoversExactlyTheDefaultBundle() throws IOException{
         List<String> problems = new ArrayList<>();
 
@@ -135,6 +169,19 @@ class BundleTest{
     void reasonSlugsAreReadable(){
         assertEquals("missing-item-input", DiagnosticReason.missingItemInput.slug());
         assertEquals("active", DiagnosticReason.active.slug());
+    }
+
+    /** An issue group only ever comes from a finding that is not {@link Severity#normal}. */
+    private static boolean canBecomeAnIssue(DiagnosticReason reason){
+        return reason != DiagnosticReason.active && reason != DiagnosticReason.limitedSupport;
+    }
+
+    /** Mirrors {@code AreaText.namesResource}. */
+    private static boolean namesResource(DiagnosticReason reason){
+        return switch(reason){
+            case missingItemInput, missingLiquidInput, outputBlocked, otherConsumerLimited -> true;
+            default -> false;
+        };
     }
 
     /** Mirrors what {@link FactoryAnalyzer} can actually emit; see the severity it assigns per reason. */
