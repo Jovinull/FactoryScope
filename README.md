@@ -8,6 +8,22 @@ Select a production block and it tells you what the building is doing, what it i
 input or output is responsible. It adds no blocks, no items, no units and no balance changes, and it
 never modifies the state it inspects.
 
+> **This branch is 0.2.0 development.** The released version is **0.1.1**, on `main`. Area diagnostics,
+> described below, is not in any release yet.
+
+## In development for 0.2
+
+- **Area diagnostics.** With the overlay armed, drag a rectangle instead of clicking. FactoryScope
+  analyses every one of your buildings inside it and reports how many were selected, how many have a
+  production model, a count per status, and the problems ranked by how many buildings each affects —
+  *"Sand shortage — 8 buildings"* rather than eight separate lines. Expand a group to see which
+  buildings, open any of them in the ordinary panel, or move the view to one.
+- **Snapshot semantics.** An area report is taken once, when you release the drag, and re-taken when you
+  press Refresh. Nothing is polled in the background.
+
+It counts observations. It does not trace production between buildings, so it will not tell you which
+machine caused a shortage — see [what it does not support](#what-it-does-not-support).
+
 ## What 0.1.x supports
 
 - **A single verdict per building.** Every inspection ends in one primary diagnosis: running, disabled,
@@ -30,8 +46,10 @@ never modifies the state it inspects.
 
 ## What it does not support
 
-- **Anything beyond the selected building.** No conveyor tracing, no area or sector analysis, no
-  bottleneck search. FactoryScope will not tell you which upstream machine starved this one.
+- **Production networks.** No conveyor tracing, no upstream or downstream search, no bottleneck or
+  root-cause analysis. An area report can say that eight buildings are short of sand, because it counted
+  eight buildings that each report a sand shortage. It cannot say that sand production is the cause,
+  and it does not pretend to.
 - **Full production modelling outside `GenericCrafter`.** That covers the conventional crafting blocks on
   both planets. Drills, pumps, generators, unit factories and the rest are inspected — inputs, power,
   efficiency, verdict — but get no production rates, and the panel says so.
@@ -68,12 +86,17 @@ Restart Mindustry afterwards.
 
 1. Enter any game.
 2. Press the FactoryScope button in the bottom-left corner of the HUD.
-3. Select a production block. Selecting anywhere else cancels.
-4. Read the diagnosis. The panel keeps refreshing while it is open.
+3. Then either:
+   - **click or tap a building** to diagnose that one, or
+   - **drag a rectangle** to diagnose everything of yours inside it *(0.2 development)*.
+4. Read the report. The single-building panel keeps refreshing while it is open; an area report is a
+   snapshot with a Refresh button.
 5. Close it with the close button or the usual back gesture.
 
-Selection is a single tap or click, so the same flow works with a mouse and with touch. Nothing is
-required from the keyboard, and nothing of FactoryScope stays in the input path once the panel is closed.
+A press that never travels far, or never leaves its starting tile, is a click — a shaky hand will not
+turn a click into an area. To cancel without selecting anything: press the FactoryScope button again,
+click empty ground, right-click, or press Escape. Everything works with a mouse and with touch, and
+nothing of FactoryScope stays in the input path once the overlay is gone.
 
 ## Building from source
 
@@ -101,6 +124,7 @@ jar is for quick local testing and is not a substitute for a release.
 gradlew test              # unit + headless-Mindustry integration tests, needs only a JDK
 gradlew acceptanceTest    # drives the inspector in a real Mindustry client, needs a local install
 gradlew verifyArtifacts   # checks the built jars carry only production code
+gradlew areaBenchmark     # prints what an area analysis costs at 50 to 4000 buildings
 ```
 
 `scripts/smoke-test.ps1` builds, installs into a throwaway sandbox and confirms this version loads in the
@@ -116,21 +140,22 @@ relevant part of `last_log.txt` from your Mindustry data folder.
 
 ## Roadmap
 
-None of the following is implemented.
+- v0.2 — area diagnostics: one report for a selected region *(in development on `develop`)*
+- v0.3 — production network graph: follow what actually feeds what
+- v0.4 — throughput monitoring: measure movement over time instead of deriving it
+- v0.5 — bottleneck and root-cause analysis, which the three above are prerequisites for
 
-- v0.2 — area diagnostics: analyse a selected region rather than a single block
-- v0.3 — conveyor throughput
-- v0.4 — power network inspector
-- v0.5 — liquid network diagnostics
-- v0.6 — schematic analysis
-- v0.7 — alerts for factories that stall
+Nothing past v0.2 is implemented, and v0.2 is not released.
 
 ## Notes for contributors
 
 - [docs/mindustry-notes.md](docs/mindustry-notes.md) — the parts of the v159.7 source the diagnosis
   depends on, including the order in which the game decides efficiency and why a couple of formulas are
   reimplemented rather than called. Read it before changing anything under `analysis/` or `probe/`.
-- [docs/testing.md](docs/testing.md) — the three test layers and how to run them.
+- [docs/architecture.md](docs/architecture.md) — how the pieces fit, why the area feature reuses the
+  single-building engine rather than duplicating it, and where the line is between what FactoryScope
+  observes and what it refuses to claim.
+- [docs/testing.md](docs/testing.md) — the test layers and how to run them.
 - [docs/releasing.md](docs/releasing.md) — what a release needs.
 
 ## License

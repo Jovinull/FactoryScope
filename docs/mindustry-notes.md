@@ -178,12 +178,38 @@ converted to a per-second figure. Mindustry removes `Stat.powerUse` from that bl
 this reason; FactoryScope drops the number and shows the consumer without a rate rather than printing
 something meaningless.
 
-## Notes towards area diagnostics
+## Finding buildings in a region
 
-Two things found during the 0.1.1 audit matter for the next milestone:
+`Groups.build` is declared in `entities/GroupDefs.java` as `@GroupDef(value = Buildingc.class,
+update = true)` — **without** `spatial`, so it has no quadtree. `EntityGroup.intersect` dereferences that
+tree unconditionally, so `Groups.build.intersect(...)` is not an option; iterating the group instead
+would be a full scan of every building on the map for every selection.
+
+The engine's own rectangle query for buildings is `BlockIndexer.eachBlock(Team, Rect, pred, cons)`, which
+reads `team.data().buildingTree`, a real `QuadTree<Building>` maintained by `addIndex`/`removeIndex` on
+`TileChangeEvent`. Being rooted at one team's index is why an area selection cannot see another team's
+buildings at all: they are never visited, not filtered out afterwards. The method also skips
+`block.privileged`, which keeps world processors out of the results.
+
+`Building.hitbox` is `block.size * tilesize` centred on the building, so the quadtree answers with block
+footprints. Because tile rectangles are grid-aligned, sharing an edge is not sharing a tile, and the
+exact test is applied afterwards on tile coordinates rather than trusted from the query rectangle.
+
+`Tile.setBlock` points **every** tile of a multiblock at the same `Building` (the two-pass loop assigns
+`other.build = entity`), which is why a footprint test has to be paired with de-duplication: a 3x3 block
+would otherwise be collected nine times. The centring offset is `-(block.size - 1) / 2`, integer
+division, so it is not symmetric for even sizes — a 2x2 block occupies its own tile and the ones above
+and to the right, never below or left.
+
+## Other notes towards later milestones
 
 - Any area walk has to skip buildings where `efficiencyTracked` is false, or a wall-heavy base will fill
   the results with blocks that have no efficiency to report.
 - `PowerGraph` exposes cached totals (`getLastPowerProduced`, `getLastScaledPowerIn`, `getLastCapacity`)
   that cost nothing to read. A power-network view can be built on those without traversing the graph,
   which is the only reason per-frame power inspection is affordable.
+- `InputHandler.panCamera(Vec2)` is the game's own way of moving the view to a position; it touches the
+  camera only, and on desktop sets the flag that stops the camera snapping back to the player unit.
+- `Trigger.drawOver` fires inside `Renderer.draw` while sorted drawing is active, so a mod can draw in
+  world space at a chosen `Draw.z` from there. `Layer.overlayUI` puts a selection rectangle above the
+  blocks it covers.

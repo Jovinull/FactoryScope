@@ -1,13 +1,25 @@
 # Releasing FactoryScope
 
+## Branches
+
+`main` is the released version and nothing else. Mindustry's mod updater reads the `version` in
+`mod.hjson` on the repository's default branch, so an unreleased version sitting there advertises an
+update that does not exist. Feature work happens on `develop`, which may carry the next version number;
+it reaches `main` only as part of releasing it.
+
+Releasing means, in order: the checks below pass on `develop`, `develop` is merged into `main`, the tag
+is cut from `main`, and the release is published from the artifact CI built for that commit.
+
 ## Before tagging
 
 1. `gradlew clean test jar` passes.
-2. `scripts/smoke-test.ps1` passes against a real Mindustry install.
-3. `mod.hjson` carries the new `version`, and `minGameVersion` still matches the Mindustry release the
+2. `gradlew acceptanceTest` passes against a real Mindustry install. CI cannot run it — it needs a
+   graphical client — so it is on whoever cuts the release.
+3. `scripts/smoke-test.ps1` passes against a real Mindustry install.
+4. `mod.hjson` carries the new `version`, and `minGameVersion` still matches the Mindustry release the
    build is pinned to in `build.gradle`.
-4. The README describes what the release actually does. Anything on the roadmap stays on the roadmap.
-5. Translations are in step with the default bundle — `BundleTest` fails the build if they are not.
+5. The README describes what the release actually does. Anything on the roadmap stays on the roadmap.
+6. Translations are in step with the default bundle — `BundleTest` fails the build if they are not.
 
 ## The artifact
 

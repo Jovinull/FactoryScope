@@ -1,6 +1,6 @@
 # Testing FactoryScope
 
-Three layers, in order of how much they need.
+Three layers, in order of how much they need, plus a benchmark that measures rather than checks.
 
 ## 1. Unit and integration tests
 
@@ -8,11 +8,24 @@ Three layers, in order of how much they need.
 gradlew test
 ```
 
-Needs nothing but JDK 17. Covers the diagnostic engine, rate arithmetic and number formatting as pure
-logic, then boots a **headless Mindustry with real content** to place real blocks and check the diagnosis
-and derived rates against the values the game itself computes. Also sweeps every placeable vanilla block
-and stand-ins for common modded block shapes, asserting nothing throws, no rate is unprintable, no cause
-is asserted without evidence, and that inspection never alters game state.
+Needs nothing but JDK 17. Covers the diagnostic engine, rate arithmetic, number formatting and area
+aggregation as pure logic, then boots a **headless Mindustry with real content** to place real blocks and
+check the diagnosis and derived rates against the values the game itself computes. Also sweeps every
+placeable vanilla block and stand-ins for common modded block shapes, asserting nothing throws, no rate
+is unprintable, no cause is asserted without evidence, and that inspection never alters game state.
+
+For area diagnostics specifically:
+
+- `area/AreaSelectionTest` — tile arithmetic: the four drag directions normalising to one rectangle,
+  inclusive endpoints, footprint intersection for odd and even block sizes, clamping to the world.
+- `area/AreaAnalyzerTest` — the counting and grouping rules, driven by results the real
+  `FactoryAnalyzer` produced from real snapshots. Fixtures that invented their own `DiagnosticResult`
+  could pass against semantics the engine does not have.
+- `probe/AreaProbeTest` — the spatial query against the engine: footprint intersection, multi-tile
+  buildings collected exactly once, other teams never visited, out-of-world selections, and reference
+  identity surviving (or correctly not surviving) destruction, replacement and team change.
+- `probe/AreaModCompatibilityTest` — an area containing vanilla, modded, boosted and unrecognised
+  crafters plus a block with no production model at all.
 
 The headless boot downloads the Mindustry `assets.jar` once and unpacks the non-sprite part of it into
 `build/mindustry-assets`; that is why the first `gradlew test` is slower than the rest.
@@ -45,6 +58,27 @@ It covers:
 - Panel layout at several scene sizes and UI scales.
 - Every user-facing string resolving in the active locale.
 
+Area diagnostics adds, through the same dispatch:
+
+- **The four drag directions.** Each corner-to-corner drag must report exactly the tile rectangle the
+  pointer covered, and select exactly the buildings inside it — two decoys sit just outside, so a
+  selection that is merely too generous fails too. The camera is far from the world origin and the check
+  asserts that, because a conversion that dropped the camera offset would otherwise pass at the origin.
+- **Click against drag.** A plain click still opens the single-building panel; a two-pixel wobble is
+  still a click.
+- **A multi-tile building clipped by the edge** of the selection, appearing once, and the same building
+  correctly excluded when the selection stops one tile short.
+- **A mixed area** — running, starved, output-blocked, disabled, multi-finding and unsupported buildings
+  in one rectangle — checked against the counts, the grouping and the ranking a player reads.
+- Healthy and empty areas, dragging across configurable blocks without opening their own dialogs,
+  refreshing after buildings were added and removed, expanding an issue group and opening one of its
+  buildings, report layout at three scene sizes, repeated use, and world changes during and after a
+  selection.
+
+The suite drives the real overlay end to end. It does not call an internal "select this rectangle"
+method, for the same reason the single-building test does not call `inspect(building)`: that would skip
+the code most likely to be wrong.
+
 Results are written to the game log as `[HARNESS]` lines; `scripts/acceptance-test.ps1` reads them and
 turns them into an exit code. Your saves, settings and installed mods are never touched.
 
@@ -66,6 +100,19 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1
 
 Builds, finds the local Mindustry install, launches it in a sandbox and checks the log for **this
 version** initialising with no errors. `-Install` also copies the jar into your real mods folder.
+
+## Benchmark
+
+```
+gradlew areaBenchmark
+```
+
+Prints what one area analysis costs at 50, 250, 1000 and 4000 buildings, split into spatial collection,
+probing, diagnosis, aggregation and building the report model. It asserts nothing about time: a
+wall-clock threshold in a test suite fails on a loaded machine and passes on a fast one, which teaches a
+maintainer to ignore it. A regression shows up as a number that moved.
+
+It is excluded from `gradlew test` by a JUnit tag, so an ordinary test run is not slowed by it.
 
 ## Artifact checks
 
