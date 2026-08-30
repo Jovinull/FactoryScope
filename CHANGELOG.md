@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — 2026-08-30
+
+### Fixed
+
+- Area issue rows without a resource icon now reserve the icon column, so localized labels such as
+  Brazilian Portuguese "Desativado" are not drawn underneath the placeholder.
+
 ## 0.2.0 — 2026-08-28
 
 ### Added

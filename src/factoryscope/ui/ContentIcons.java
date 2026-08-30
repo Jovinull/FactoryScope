@@ -1,5 +1,6 @@
 package factoryscope.ui;
 
+import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.scene.ui.layout.*;
 import factoryscope.model.*;
@@ -7,6 +8,7 @@ import mindustry.*;
 import mindustry.ctype.*;
 import mindustry.gen.*;
 import mindustry.graphics.*;
+import mindustry.ui.*;
 
 /**
  * Resolves an icon for a resource from the content id the probe recorded.
@@ -38,7 +40,7 @@ public final class ContentIcons{
         }else if(kind == ResourceKind.power){
             table.image(Icon.power).size(size).color(Pal.power).padRight(6f);
         }else{
-            table.image(Icon.none).size(size).color(Pal.gray).padRight(6f);
+            table.image(Tex.whiteui).size(size).color(Color.clear).padRight(6f);
         }
     }
 
