@@ -113,9 +113,16 @@ public final class MindustryNetworkProbe{
                     add(edges, ref, incoming, right(incoming), sideItems, true);
                 }
             }
-        }else if(build instanceof Router.RouterBuild || build instanceof DuctRouter.DuctRouterBuild){
+        }else if(build instanceof Router.RouterBuild){
             for(NetworkSide incoming : NetworkSide.values()) for(NetworkSide out : NetworkSide.values()){
                 if(out != incoming) add(edges, ref, incoming, out, ItemConstraint.any(), true);
+            }
+        }else if(build instanceof OverflowGate.OverflowGateBuild){
+            //The gate chooses straight or side exits from receiver availability. All are structural possibilities.
+            for(NetworkSide incoming : NetworkSide.values()){
+                add(edges, ref, incoming, incoming.opposite(), ItemConstraint.any(), true);
+                add(edges, ref, incoming, left(incoming), ItemConstraint.any(), true);
+                add(edges, ref, incoming, right(incoming), ItemConstraint.any(), true);
             }
         }else if(build instanceof Duct.DuctBuild || build instanceof Conveyor.ConveyorBuild || build instanceof StackConveyor.StackConveyorBuild){
             NetworkSide forward = NetworkSide.rotation(build.rotation);
@@ -143,7 +150,7 @@ public final class MindustryNetworkProbe{
 
     private static boolean isKnownTransport(Building build){
         return build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof Junction.JunctionBuild
-            || build instanceof Router.RouterBuild || build instanceof Sorter.SorterBuild || build instanceof DuctRouter.DuctRouterBuild
+            || build instanceof Router.RouterBuild || build instanceof Sorter.SorterBuild || build instanceof OverflowGate.OverflowGateBuild
             || build instanceof ItemBridge.ItemBridgeBuild || build instanceof OverflowDuct.OverflowDuctBuild;
     }
 
