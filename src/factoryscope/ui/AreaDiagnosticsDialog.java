@@ -43,6 +43,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     private Cell<Table> bodyCell;
     private AreaSelection selection;
     private AreaDiagnosticResult result;
+    private final NetworkDialog networkDialog = new NetworkDialog();
 
     public AreaDiagnosticsDialog(Runnable onSelectAnother, Cons<Building> onInspect, Cons<BuildingRef> onLocate){
         super("");
@@ -62,6 +63,8 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
             .size(190f, 64f).name("factoryscope-area-refresh");
         buttons.button(FsBundle.ref("area.select-another"), Icon.grid, this::selectAnother)
             .size(250f, 64f).name("factoryscope-area-select");
+        buttons.button(FsBundle.ref("network.open"), Icon.list, this::openNetwork)
+            .size(180f, 64f).name("factoryscope-area-network");
         addCloseButton();
     }
 
@@ -125,6 +128,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     public void clear(){
         selection = null;
         result = null;
+        networkDialog.hide();
         if(body != null) body.clear();
         if(isShown()) hide();
     }
@@ -132,6 +136,10 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     private void selectAnother(){
         hide();
         onSelectAnother.run();
+    }
+
+    private void openNetwork(){
+        if(result != null && result.network != null) networkDialog.show(result.network);
     }
 
     private static Team viewerTeam(){
