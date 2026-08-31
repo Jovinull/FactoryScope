@@ -89,6 +89,16 @@ class MindustryNetworkProbeTest{
         assertFalse(network.graph.isReachable(output(sourceRef, NetworkSide.east), input(nearbyRef, NetworkSide.east), copper));
     }
 
+    @Test
+    void anExitIntoTheNextTileOutsideTheSelectionIsAContinuationNotADisconnection(){
+        Building inside = place(Blocks.conveyor, 10, 10, 0);
+        place(Blocks.conveyor, 11, 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(10, 10, 10, 10), Team.sharded);
+
+        assertTrue(network.boundaryPorts.contains(output(AreaProbe.refOf(inside), NetworkSide.east)));
+    }
+
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort output(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
 
