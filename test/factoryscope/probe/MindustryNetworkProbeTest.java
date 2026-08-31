@@ -99,6 +99,32 @@ class MindustryNetworkProbeTest{
         assertTrue(network.boundaryPorts.contains(output(AreaProbe.refOf(inside), NetworkSide.east)));
     }
 
+    @Test
+    void ductBridgesUseTheirDirectionalLink(){
+        Building source = place(Blocks.ductBridge, 8, 10, 0);
+        Building target = place(Blocks.ductBridge, 12, 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 14, 12), Team.sharded);
+        BuildingRef sourceRef = AreaProbe.refOf(source);
+        BuildingRef targetRef = AreaProbe.refOf(target);
+
+        assertTrue(network.graph.isReachable(output(sourceRef, NetworkSide.east), input(targetRef, NetworkSide.west), copper));
+    }
+
+    @Test
+    void ductRouterUsesItsConfiguredItemForTheForwardExit(){
+        Building router = place(Blocks.ductRouter, 10, 10, 0);
+        router.configure(Items.copper);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+        BuildingRef ref = AreaProbe.refOf(router);
+        NetworkPort input = input(ref, NetworkSide.west);
+
+        assertTrue(network.graph.isReachable(input, output(ref, NetworkSide.east), copper));
+        assertFalse(network.graph.isReachable(input, output(ref, NetworkSide.north), copper));
+        assertFalse(network.graph.isReachable(input, output(ref, NetworkSide.east), lead));
+        assertTrue(network.graph.isReachable(input, output(ref, NetworkSide.north), lead));
+    }
+
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort output(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
 
