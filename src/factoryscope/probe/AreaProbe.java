@@ -80,7 +80,7 @@ public final class AreaProbe{
             }
         }
 
-        return AreaAnalyzer.analyze(selection, buildings.size, entries);
+        return AreaAnalyzer.analyze(selection, buildings.size, entries).withNetwork(MindustryNetworkProbe.scan(selection, viewer));
     }
 
     public static BuildingRef refOf(Building build){
