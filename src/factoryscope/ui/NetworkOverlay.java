@@ -27,7 +27,7 @@ final class NetworkOverlay{
             Draw.color(edge.conditional ? Pal.lightOrange : Pal.accent);
             Lines.stroke(edge.conditional ? 1.4f : 2f);
             Lines.line(x1, y1, x2, y2);
-            Fill.circle(x2, y2, 2.2f);
+            arrow(x1, y1, x2, y2);
             drawn++;
         }
         Draw.color(Pal.accent);
@@ -39,6 +39,17 @@ final class NetworkOverlay{
             Fill.circle(x + dx, y + dy, 2.5f);
         }
         Draw.reset();
+    }
+
+    private static void arrow(float x1, float y1, float x2, float y2){
+        float dx = x2 - x1, dy = y2 - y1;
+        float length = (float)Math.sqrt(dx * dx + dy * dy);
+        if(length < 0.1f) return;
+        float ux = dx / length, uy = dy / length;
+        float px = -uy, py = ux;
+        float tipX = x2 - ux * 1.5f, tipY = y2 - uy * 1.5f;
+        float baseX = tipX - ux * 4.5f, baseY = tipY - uy * 4.5f;
+        Fill.tri(tipX, tipY, baseX + px * 2.6f, baseY + py * 2.6f, baseX - px * 2.6f, baseY - py * 2.6f);
     }
 
     private static float worldX(NetworkPort port){
