@@ -321,6 +321,7 @@ public class AcceptanceHarness extends Mod{
         singleClickStillInspects();
         tinyDragIsAClick();
         mixedProblems();
+        itemNetworkView();
         healthyArea();
         emptyArea();
         configurableBlocks();
@@ -557,6 +558,31 @@ public class AcceptanceHarness extends Mod{
             }
         });
         queue(() -> capture("mixed-area"));
+    }
+
+    void itemNetworkView(){
+        int x1 = rx(), y1 = ry(), x2 = rx() + 10, y2 = ry() + 4;
+
+        scenario("the Network view opens through the production area report");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            Building sorter = placeAt(Blocks.sorter, rx() + 5, ry() + 2);
+            sorter.configure(Items.copper);
+            placeAt(Blocks.conveyor, rx() + 4, ry() + 2).rotation = 0;
+            placeAt(Blocks.conveyor, rx() + 6, ry() + 2).rotation = 0;
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> check("the network patch opened an area report", FactoryScopeUI.areaReport() != null));
+        queue(() -> clickNamed("factoryscope-area-network"));
+        queue(() -> {
+            check("the Network view opened", Core.scene.find("factoryscope-network-dialog") != null);
+            check("the configured item is offered as a filter", Core.scene.find("factoryscope-network-item-copper") != null);
+        });
+        queue(() -> clickNamed("factoryscope-network-item-copper"));
+        queue(() -> check("the Network view remains open after selecting an item", Core.scene.find("factoryscope-network-dialog") != null));
+        queue(this::closeAnyDialog);
     }
 
     void healthyArea(){

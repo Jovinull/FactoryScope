@@ -27,6 +27,19 @@ than measuring which one is currently chosen.
 Item bridges use their configured link, not proximity. A valid remote edge must be derived from the
 stored link and must remain team-safe. An unlinked or broken target has no remote topology edge.
 
+Directional Duct Bridges do not store a configurable target. `DirectionBridgeBuild.findLink()` searches
+the first same-team bridge of the same block in front, within the block range. That verified geometric link
+is the only remote edge; a bridge outside range is not connected.
+
+## Duct Router and limits
+
+`DuctRouterBuild` accepts from its rear, sends its configured item forward, and sends other items to a
+side exit. Those side exits are structurally possible alternatives, not a claim about the current choice.
+
+Plastanium Stack Conveyors have load, move and unload states derived from neighbouring blocks and stored
+items. Mass Drivers depend on configured links and a separate state machine. FactoryScope 0.3 records both
+as unsupported transport rather than approximating them as ordinary conveyors.
+
 ## Scope
 
 The graph is item-only. Liquid conduits and payload logistics are outside 0.3. Ducts are item

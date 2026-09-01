@@ -16,6 +16,7 @@ final class NetworkDialog extends BaseDialog{
 
     NetworkDialog(){
         super("");
+        name = "factoryscope-network-dialog";
         title.setText(FsBundle.get("network.title"));
         addCloseButton();
         hidden(FactoryScopeUI::stopNetworkOverlay);
@@ -45,10 +46,10 @@ final class NetworkDialog extends BaseDialog{
             cont.add(FsBundle.get("network.resource")).color(Pal.accent).padTop(10f).row();
             cont.table(table -> {
                 table.button(FsBundle.get("network.all-items"), Styles.flatt, () -> { selected = null; FactoryScopeUI.showNetworkOverlay(network, null); rebuild(); })
-                    .checked(button -> selected == null);
+                    .checked(button -> selected == null).name("factoryscope-network-all");
                 for(ResourceRef item : network.resources){
                     table.button(item.name, Styles.flatt, () -> { selected = item; FactoryScopeUI.showNetworkOverlay(network, item); rebuild(); })
-                        .checked(button -> item.equals(selected));
+                        .checked(button -> item.equals(selected)).name("factoryscope-network-item-" + item.id);
                 }
             }).left().row();
         }
