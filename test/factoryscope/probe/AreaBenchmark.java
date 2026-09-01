@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>The only assertion is that the work actually happened - a benchmark that quietly measured an
  * empty area would be worse than none.
  */
-@Tag("benchmark")
+@Tag("area-benchmark")
 class AreaBenchmark{
     /** Enough repetitions that the JIT has warmed up and one slow GC pause does not dominate. */
     private static final int WARMUP = 3;
