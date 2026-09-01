@@ -107,10 +107,11 @@ final class NetworkDialog extends BaseDialog{
             int limit = Math.min(shownBuildings, buildings.size());
             for(int i = 0; i < limit; i++){
                 BuildingRef ref = buildings.get(i);
-                table.button(ref.blockName + " (" + ref.tileX + ", " + ref.tileY + ")", Styles.flatt, () -> {
-                    selectedBuilding = ref;
-                    rebuild();
-                }).checked(button -> ref.equals(selectedBuilding)).name("factoryscope-network-building").row();
+                table.button(row -> row.add(ref.blockName + " (" + ref.tileX + ", " + ref.tileY + ")")
+                    .growX().left(), Styles.flatt, () -> {
+                        selectedBuilding = ref;
+                        rebuild();
+                    }).checked(button -> ref.equals(selectedBuilding)).name("factoryscope-network-building").left().row();
             }
             if(limit < buildings.size()) table.button(FsBundle.get("area.show-more"), Styles.flatt, () -> {
                 shownBuildings += 40;
