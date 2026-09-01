@@ -40,6 +40,7 @@ public final class FactoryScopeUI{
     private static AreaDiagnosticsDialog areaDialog;
     private static InspectionOverlay picker;
     private static LocateOverlay locate;
+    private static NetworkOverlay networkOverlay;
     private static Table hint;
     private static boolean initialized;
 
@@ -140,6 +141,7 @@ public final class FactoryScopeUI{
     private static void drawWorld(){
         if(picker != null) picker.drawWorld();
         if(locate != null) locate.drawWorld();
+        if(networkOverlay != null) networkOverlay.draw();
     }
 
     // ------------------------------------------------------------------ selection
@@ -212,6 +214,14 @@ public final class FactoryScopeUI{
         return locate != null;
     }
 
+    static void showNetworkOverlay(factoryscope.network.ItemNetwork network, factoryscope.model.ResourceRef item){
+        networkOverlay = network == null ? null : new NetworkOverlay(network, item);
+    }
+
+    static void stopNetworkOverlay(){
+        networkOverlay = null;
+    }
+
     // ------------------------------------------------------------------ reports
 
     /**
@@ -257,6 +267,7 @@ public final class FactoryScopeUI{
     public static void reset(){
         stopPicking();
         stopLocating();
+        stopNetworkOverlay();
         if(panel != null && panel.isShown()) panel.hide();
         if(areaDialog != null) areaDialog.clear();
         FsLog.reset();

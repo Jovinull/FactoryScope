@@ -18,11 +18,13 @@ final class NetworkDialog extends BaseDialog{
         super("");
         title.setText(FsBundle.get("network.title"));
         addCloseButton();
+        hidden(FactoryScopeUI::stopNetworkOverlay);
     }
 
     void show(ItemNetwork network){
         this.network = network;
         this.selected = null;
+        FactoryScopeUI.showNetworkOverlay(network, null);
         rebuild();
         show();
     }
@@ -42,10 +44,10 @@ final class NetworkDialog extends BaseDialog{
         if(!network.resources.isEmpty()){
             cont.add(FsBundle.get("network.resource")).color(Pal.accent).padTop(10f).row();
             cont.table(table -> {
-                table.button(FsBundle.get("network.all-items"), Styles.flatt, () -> { selected = null; rebuild(); })
+                table.button(FsBundle.get("network.all-items"), Styles.flatt, () -> { selected = null; FactoryScopeUI.showNetworkOverlay(network, null); rebuild(); })
                     .checked(button -> selected == null);
                 for(ResourceRef item : network.resources){
-                    table.button(item.name, Styles.flatt, () -> { selected = item; rebuild(); })
+                    table.button(item.name, Styles.flatt, () -> { selected = item; FactoryScopeUI.showNetworkOverlay(network, item); rebuild(); })
                         .checked(button -> item.equals(selected));
                 }
             }).left().row();
