@@ -138,6 +138,17 @@ class MindustryNetworkProbeTest{
         assertTrue(network.graph.edges.isEmpty());
     }
 
+    @Test
+    void conventionalModdedCraftersContributeTheirInputsAndOutputToTheFilter(){
+        place(ModdedBlocks.conventional, 10, 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 14, 14), Team.sharded);
+        Set<String> resources = new HashSet<>();
+        for(ResourceRef resource : network.resources) resources.add(resource.id);
+
+        assertEquals(Set.of("copper", "lead", "graphite"), resources);
+    }
+
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort output(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
 

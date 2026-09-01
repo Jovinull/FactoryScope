@@ -11,6 +11,7 @@ import mindustry.world.*;
 import mindustry.world.blocks.distribution.*;
 import mindustry.world.blocks.production.*;
 import mindustry.world.blocks.storage.*;
+import mindustry.world.consumers.*;
 import mindustry.world.meta.*;
 
 import java.util.*;
@@ -46,11 +47,7 @@ public final class MindustryNetworkProbe{
             }else if(isUnknownTransport(build)){
                 unsupported.add(ref);
             }
-            if(build instanceof Sorter.SorterBuild sorter && sorter.sortItem != null) resources.add(itemRef(sorter.sortItem));
-            if(build instanceof DuctRouter.DuctRouterBuild router && router.sortItem != null) resources.add(itemRef(router.sortItem));
-            if(build instanceof Unloader.UnloaderBuild unloader && unloader.sortItem != null) resources.add(itemRef(unloader.sortItem));
-            if(build instanceof GenericCrafter.GenericCrafterBuild crafter && crafter.block instanceof GenericCrafter block && block.outputItem != null)
-                resources.add(itemRef(block.outputItem.item));
+            collectResources(build, resources);
         }
 
         for(var entry : buildings.entrySet()){
@@ -244,6 +241,23 @@ public final class MindustryNetworkProbe{
         if(build instanceof GenericCrafter.GenericCrafterBuild crafter && crafter.block instanceof GenericCrafter block && block.outputItem != null)
             return ItemConstraint.only(itemRef(block.outputItem.item));
         return ItemConstraint.any();
+    }
+
+    private static void collectResources(Building build, List<ResourceRef> resources){
+        if(build instanceof Sorter.SorterBuild sorter && sorter.sortItem != null) resources.add(itemRef(sorter.sortItem));
+        if(build instanceof DuctRouter.DuctRouterBuild router && router.sortItem != null) resources.add(itemRef(router.sortItem));
+        if(build instanceof Unloader.UnloaderBuild unloader && unloader.sortItem != null) resources.add(itemRef(unloader.sortItem));
+        if(build.block instanceof GenericCrafter crafter && crafter.outputItem != null) resources.add(itemRef(crafter.outputItem.item));
+        for(Consume consume : build.block.consumers){
+            if(consume instanceof ConsumeItems items){
+                for(ItemStack stack : items.items) resources.add(itemRef(stack.item));
+            }else if(consume instanceof ConsumeItemDynamic dynamic){
+                for(ItemStack stack : dynamic.items.get(build)) resources.add(itemRef(stack.item));
+            }else if(consume instanceof ConsumeItemFilter filter){
+                Item item = filter.getConsumed(build);
+                if(item != null) resources.add(itemRef(item));
+            }
+        }
     }
 
     private static boolean acceptsTopologyFrom(Building target, Building source){
