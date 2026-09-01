@@ -147,4 +147,18 @@ each report a sand shortage. It cannot say *"sand production is the bottleneck"*
 a network, and there is no network here to make it from. The wording in the interface is chosen to keep
 that line clear, and the same restraint applies to any new text.
 
-Following production between buildings is the next milestone, not this one.
+## Static item topology
+
+`FactoryAnalyzer` remains the authority for current building diagnostics. The separate
+`MindustryNetworkProbe` reads only structural state (block type, rotation, item configuration and bridge
+links) and creates a pure directed `NetworkGraph`. Its edges mean that an item can structurally travel;
+they never describe current flow, measured throughput, blockage, or a cause of a diagnostic finding.
+
+Each physical side has distinct input and output ports. This prevents a Junction from becoming one fully
+connected building: north-south and east-west remain independent internal channels. Sorter and Duct Router
+edges carry explicit item constraints, while gates are marked conditional because their choice depends on
+runtime receiver availability without removing any structurally possible route.
+
+Graphs stay area-scoped. A direct friendly connection leaving the selection becomes a boundary continuation
+and is not recursively explored. Unrecognised item transport is omitted and marks the graph partial rather
+than inventing neighbour edges.
