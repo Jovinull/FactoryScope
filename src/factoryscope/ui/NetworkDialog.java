@@ -45,13 +45,14 @@ final class NetworkDialog extends BaseDialog{
         if(!network.resources.isEmpty()){
             cont.add(FsBundle.get("network.resource")).color(Pal.accent).padTop(10f).row();
             cont.table(table -> {
+                table.left().defaults().height(42f).growX().left();
                 table.button(FsBundle.get("network.all-items"), Styles.flatt, () -> { selected = null; FactoryScopeUI.showNetworkOverlay(network, null); rebuild(); })
-                    .checked(button -> selected == null).name("factoryscope-network-all");
+                    .checked(button -> selected == null).name("factoryscope-network-all").row();
                 for(ResourceRef item : network.resources){
                     table.button(item.name, Styles.flatt, () -> { selected = item; FactoryScopeUI.showNetworkOverlay(network, item); rebuild(); })
-                        .checked(button -> item.equals(selected)).name("factoryscope-network-item-" + item.id);
+                        .checked(button -> item.equals(selected)).name("factoryscope-network-item-" + item.id).row();
                 }
-            }).left().row();
+            }).growX().left().row();
         }
         if(network.completeness == NetworkCompleteness.partialUnsupportedTransport){
             cont.add(FsBundle.get("network.partial")).color(Pal.lightOrange).wrap().padTop(10f).row();
