@@ -87,6 +87,7 @@ class MindustryNetworkProbeTest{
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 14, 12), Team.sharded);
 
         assertEquals(8, network.graph.ports.size(), "the enemy conveyor must not be collected as a neighbor");
+        assertTrue(network.boundaryPorts.isEmpty(), "an enemy neighbor is not a boundary continuation");
     }
 
     @Test
