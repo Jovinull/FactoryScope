@@ -17,6 +17,8 @@ never modifies the state it inspects.
   buildings, open any of them in the ordinary panel, or send the view to one and come straight back.
 - **Snapshot semantics.** An area report is taken once, when you release the drag, and re-taken when you
   press Refresh. Nothing is polled in the background.
+- **Item network topology.** Open Network from an area report to see directed structural routes, remote
+  bridge links, boundary continuations, and item-specific sorter paths. These routes are not current flow.
 
 It counts observations. It does not trace production between buildings, so it will not tell you which
 machine caused a shortage — see [what it does not support](#what-it-does-not-support).
@@ -129,6 +131,7 @@ gradlew test              # unit + headless-Mindustry integration tests, needs o
 gradlew acceptanceTest    # drives the inspector in a real Mindustry client, needs a local install
 gradlew verifyArtifacts   # checks the built jars carry only production code
 gradlew areaBenchmark     # prints what an area analysis costs at 50 to 4000 buildings
+gradlew networkBenchmark  # prints static network construction cost at 50 to 4000 buildings
 ```
 
 `scripts/smoke-test.ps1` builds, installs into a throwaway sandbox and confirms this version loads in the
