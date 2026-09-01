@@ -9,6 +9,8 @@ import mindustry.gen.*;
 import mindustry.world.*;
 import org.junit.jupiter.api.*;
 
+import java.util.*;
+
 import static mindustry.Vars.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -123,6 +125,17 @@ class MindustryNetworkProbeTest{
         assertFalse(network.graph.isReachable(input, output(ref, NetworkSide.north), copper));
         assertFalse(network.graph.isReachable(input, output(ref, NetworkSide.east), lead));
         assertTrue(network.graph.isReachable(input, output(ref, NetworkSide.north), lead));
+    }
+
+    @Test
+    void unknownModdedTransportIsReportedWithoutGuessedEdges(){
+        Building unknown = place(ModdedBlocks.unknownTransport, 10, 10, 0);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+
+        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
+        assertEquals(List.of(AreaProbe.refOf(unknown)), network.unsupportedTransport);
+        assertTrue(network.graph.ports.isEmpty());
+        assertTrue(network.graph.edges.isEmpty());
     }
 
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
