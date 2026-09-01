@@ -561,16 +561,17 @@ public class AcceptanceHarness extends Mod{
     }
 
     void itemNetworkView(){
-        int x1 = rx(), y1 = ry(), x2 = rx() + 10, y2 = ry() + 4;
+        int x1 = rx(), y1 = ry(), x2 = rx() + 14, y2 = ry() + 4;
 
         scenario("the Network view opens through the production area report");
         queue(this::closeAnyDialog);
         queue(() -> {
             clearRegion();
-            Building sorter = placeAt(Blocks.sorter, rx() + 5, ry() + 2);
+            renderer.targetscale = renderer.camerascale = 3f;
+            for(int x = 1; x <= 8; x++) placeAt(Blocks.conveyor, rx() + x, ry() + 2);
+            Building sorter = placeAt(Blocks.sorter, rx() + 9, ry() + 2);
             sorter.configure(Items.copper);
-            placeAt(Blocks.conveyor, rx() + 4, ry() + 2).rotation = 0;
-            placeAt(Blocks.conveyor, rx() + 6, ry() + 2).rotation = 0;
+            placeAt(Blocks.conveyor, rx() + 10, ry() + 2);
         });
         queue(this::armPicker);
         queue(() -> dragTiles(x1, y1, x2, y2));
@@ -597,6 +598,7 @@ public class AcceptanceHarness extends Mod{
             check("dismissing the world overlay removes its return control", Core.scene.find("factoryscope-network-viewing") == null);
             check("dismissing the world overlay drops the held report", !FactoryScopeUI.areaReportHeld());
         });
+        queue(() -> renderer.targetscale = renderer.camerascale = 1.5f);
     }
 
     void healthyArea(){
