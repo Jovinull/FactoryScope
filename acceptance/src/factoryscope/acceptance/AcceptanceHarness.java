@@ -583,6 +583,8 @@ public class AcceptanceHarness extends Mod{
         });
         queue(() -> clickNamed("factoryscope-network-item-copper"));
         queue(() -> check("the Network view remains open after selecting an item", Core.scene.find("factoryscope-network-dialog") != null));
+        queue(() -> clickNamed("factoryscope-network-building"));
+        queue(() -> check("a network building opens topology detail", Core.scene.find("factoryscope-network-dialog") != null));
         queue(() -> capture("network-view"));
         queue(() -> clickNamed("factoryscope-network-view-world"));
         queue(() -> {
