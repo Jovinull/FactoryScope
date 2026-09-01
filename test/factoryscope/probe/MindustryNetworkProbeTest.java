@@ -66,6 +66,20 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void invertedSorterReversesTheConfiguredItemRoute(){
+        Building sorter = place(Blocks.invertedSorter, 10, 10, 0);
+        sorter.configure(Items.copper);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+        BuildingRef ref = AreaProbe.refOf(sorter);
+        NetworkPort west = input(ref, NetworkSide.west);
+
+        assertFalse(network.graph.isReachable(west, output(ref, NetworkSide.east), copper));
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.north), copper));
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.east), lead));
+        assertFalse(network.graph.isReachable(west, output(ref, NetworkSide.north), lead));
+    }
+
+    @Test
     void anEnemyTransportDoesNotAppearInThePlayersTopology(){
         place(Blocks.conveyor, 10, 10, 0);
         place(Blocks.conveyor, 11, 10, Team.crux, 0);
