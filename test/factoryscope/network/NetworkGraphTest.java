@@ -15,7 +15,9 @@ class NetworkGraphTest{
     @Test
     void directedReachabilityDoesNotInventAReverseConveyor(){
         NetworkPort a = port(1), b = port(2), c = port(3);
-        NetworkGraph graph = graph(a, b, c, edge(a, b), edge(b, c));
+        NetworkGraph graph = graph(a, b, c,
+            new NetworkEdge(a, b, ItemConstraint.only(copper), false),
+            new NetworkEdge(b, c, ItemConstraint.only(copper), false));
 
         assertTrue(graph.isReachable(a, c, copper));
         assertFalse(graph.isReachable(c, a, copper));
@@ -40,6 +42,17 @@ class NetworkGraphTest{
         NetworkGraph graph = graph(a, b, c, edge(a, b), edge(b, c), edge(c, a));
 
         assertEquals(Set.of(a, b, c), graph.reachableFrom(a, copper));
+    }
+
+    @Test
+    void reverseReachabilityFindsUpstreamPorts(){
+        NetworkPort a = port(1), b = port(2), c = port(3);
+        NetworkGraph graph = graph(a, b, c,
+            new NetworkEdge(a, b, ItemConstraint.only(copper), false),
+            new NetworkEdge(b, c, ItemConstraint.only(copper), false));
+
+        assertEquals(Set.of(a, b, c), graph.reaching(c, copper));
+        assertEquals(Set.of(c), graph.reaching(c, lead));
     }
 
     @Test
