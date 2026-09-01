@@ -80,6 +80,28 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void ductsHaveOnlyTheirForwardRoute(){
+        Building duct = place(Blocks.duct, 10, 10, 0);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+        BuildingRef ref = AreaProbe.refOf(duct);
+
+        assertTrue(network.graph.isReachable(input(ref, NetworkSide.west), output(ref, NetworkSide.east), copper));
+        assertFalse(network.graph.isReachable(input(ref, NetworkSide.east), output(ref, NetworkSide.west), copper));
+    }
+
+    @Test
+    void overflowGateKeepsForwardAndSideRoutesAsConditionalPossibilities(){
+        Building gate = place(Blocks.overflowGate, 10, 10, 0);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+        BuildingRef ref = AreaProbe.refOf(gate);
+        NetworkPort west = input(ref, NetworkSide.west);
+
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.east), copper));
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.north), copper));
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.south), copper));
+    }
+
+    @Test
     void anEnemyTransportDoesNotAppearInThePlayersTopology(){
         place(Blocks.conveyor, 10, 10, 0);
         place(Blocks.conveyor, 11, 10, Team.crux, 0);
