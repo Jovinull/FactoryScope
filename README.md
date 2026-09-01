@@ -20,8 +20,8 @@ never modifies the state it inspects.
 - **Item network topology.** Open Network from an area report to see directed structural routes, remote
   bridge links, boundary continuations, and item-specific sorter paths. These routes are not current flow.
 
-It counts observations. It does not trace production between buildings, so it will not tell you which
-machine caused a shortage — see [what it does not support](#what-it-does-not-support).
+It counts observations and maps static item topology. It does not use that topology to identify which
+machine caused a shortage; see [what it does not support](#what-it-does-not-support).
 
 ## Single-building diagnostics
 
@@ -45,10 +45,10 @@ machine caused a shortage — see [what it does not support](#what-it-does-not-s
 
 ## What it does not support
 
-- **Production networks.** No conveyor tracing, no upstream or downstream search, no bottleneck or
-  root-cause analysis. An area report can say that eight buildings are short of sand, because it counted
-  eight buildings that each report a sand shortage. It cannot say that sand production is the cause,
-  and it does not pretend to.
+- **Measured logistics.** Network routes are structural possibility only: no transfer sampling,
+  throughput, bottleneck, or root-cause analysis. An area report can say that eight buildings are short
+  of sand because it counted eight buildings that each report a sand shortage. It cannot say that sand
+  production is the cause, and it does not pretend to.
 - **Full production modelling outside `GenericCrafter`.** That covers the conventional crafting blocks on
   both planets. Drills, pumps, generators, unit factories and the rest are inspected — inputs, power,
   efficiency, verdict — but get no production rates, and the panel says so.

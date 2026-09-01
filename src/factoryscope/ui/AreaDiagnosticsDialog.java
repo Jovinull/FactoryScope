@@ -26,8 +26,7 @@ import mindustry.world.meta.*;
  *
  * <h2>What it does not claim</h2>
  * The issue list counts buildings that report the same problem. It does not say which building caused
- * it: FactoryScope has no model of how factories feed each other, so "sand shortages affect eight
- * buildings" is as far as the evidence goes.
+ * it: static topology shows possible item routes, not a cause of a current diagnostic condition.
  */
 public final class AreaDiagnosticsDialog extends BaseDialog{
     /** Enough rows to see the shape of a problem; the rest are one button away. */
