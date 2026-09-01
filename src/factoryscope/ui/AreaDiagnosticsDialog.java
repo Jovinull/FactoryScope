@@ -51,6 +51,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         this.onLocate = onLocate;
 
         title.setText(FsBundle.get("area.title"));
+        networkDialog.setOnViewWorld(this::viewNetworkInWorld);
         //a column rather than the full width of the window: a count pinned to the far edge of a 4K
         //display is a long way from the label it belongs to
         cont.pane(outer -> {
@@ -139,6 +140,15 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
 
     private void openNetwork(){
         if(result != null && result.network != null) networkDialog.show(result.network);
+    }
+
+    private void viewNetworkInWorld(){
+        if(result == null || result.network == null) return;
+        hide();
+        FactoryScopeUI.viewNetworkInWorld(result.network, networkDialog.selected(), () -> {
+            show();
+            networkDialog.reopen();
+        }, this::clear);
     }
 
     private static Team viewerTeam(){

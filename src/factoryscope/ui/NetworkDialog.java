@@ -13,13 +13,19 @@ import mindustry.ui.dialogs.*;
 final class NetworkDialog extends BaseDialog{
     private ItemNetwork network;
     private ResourceRef selected;
+    private Runnable onViewWorld;
+    private boolean keepOverlay;
 
     NetworkDialog(){
         super("");
         name = "factoryscope-network-dialog";
         title.setText(FsBundle.get("network.title"));
         addCloseButton();
-        hidden(FactoryScopeUI::stopNetworkOverlay);
+        hidden(() -> {
+            if(!keepOverlay) FactoryScopeUI.stopNetworkOverlay();
+        });
+        buttons.button(FsBundle.ref("network.view-world"), Icon.eye, this::viewInWorld)
+            .size(220f, 64f).name("factoryscope-network-view-world");
     }
 
     void show(ItemNetwork network){
@@ -28,6 +34,30 @@ final class NetworkDialog extends BaseDialog{
         FactoryScopeUI.showNetworkOverlay(network, null);
         rebuild();
         show();
+    }
+
+    void setOnViewWorld(Runnable onViewWorld){
+        this.onViewWorld = onViewWorld;
+    }
+
+    ResourceRef selected(){
+        return selected;
+    }
+
+    void reopen(){
+        keepOverlay = false;
+        if(network != null){
+            FactoryScopeUI.showNetworkOverlay(network, selected);
+            rebuild();
+            show();
+        }
+    }
+
+    private void viewInWorld(){
+        if(network == null || onViewWorld == null) return;
+        keepOverlay = true;
+        hide();
+        onViewWorld.run();
     }
 
     private void rebuild(){

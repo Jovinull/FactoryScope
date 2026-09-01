@@ -41,6 +41,7 @@ public final class FactoryScopeUI{
     private static InspectionOverlay picker;
     private static LocateOverlay locate;
     private static NetworkOverlay networkOverlay;
+    private static NetworkViewOverlay networkView;
     private static Table hint;
     private static boolean initialized;
 
@@ -222,6 +223,27 @@ public final class FactoryScopeUI{
         networkOverlay = null;
     }
 
+    static void viewNetworkInWorld(factoryscope.network.ItemNetwork network, factoryscope.model.ResourceRef item,
+                                   Runnable onReturn, Runnable onDismiss){
+        stopNetworkView();
+        showNetworkOverlay(network, item);
+        networkView = new NetworkViewOverlay(item, () -> {
+            stopNetworkView();
+            onReturn.run();
+        }, () -> {
+            stopNetworkView();
+            stopNetworkOverlay();
+            onDismiss.run();
+        });
+    }
+
+    private static void stopNetworkView(){
+        if(networkView != null){
+            networkView.remove();
+            networkView = null;
+        }
+    }
+
     // ------------------------------------------------------------------ reports
 
     /**
@@ -267,6 +289,7 @@ public final class FactoryScopeUI{
     public static void reset(){
         stopPicking();
         stopLocating();
+        stopNetworkView();
         stopNetworkOverlay();
         if(panel != null && panel.isShown()) panel.hide();
         if(areaDialog != null) areaDialog.clear();
