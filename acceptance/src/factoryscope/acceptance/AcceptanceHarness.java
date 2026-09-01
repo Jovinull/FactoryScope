@@ -583,7 +583,20 @@ public class AcceptanceHarness extends Mod{
         queue(() -> clickNamed("factoryscope-network-item-copper"));
         queue(() -> check("the Network view remains open after selecting an item", Core.scene.find("factoryscope-network-dialog") != null));
         queue(() -> capture("network-view"));
-        queue(this::closeAnyDialog);
+        queue(() -> clickNamed("factoryscope-network-view-world"));
+        queue(() -> {
+            check("the static routes can be viewed over the world", Core.scene.find("factoryscope-network-viewing") != null);
+            check("the Network view keeps its return control", Core.scene.find("factoryscope-network-return") != null);
+        });
+        queue(() -> capture("network-world"));
+        queue(() -> clickNamed("factoryscope-network-return"));
+        queue(() -> check("return restores the Network view", Core.scene.find("factoryscope-network-dialog") != null));
+        queue(() -> clickNamed("factoryscope-network-view-world"));
+        queue(() -> clickNamed("factoryscope-network-dismiss"));
+        queue(() -> {
+            check("dismissing the world overlay removes its return control", Core.scene.find("factoryscope-network-viewing") == null);
+            check("dismissing the world overlay drops the held report", !FactoryScopeUI.areaReportHeld());
+        });
     }
 
     void healthyArea(){
