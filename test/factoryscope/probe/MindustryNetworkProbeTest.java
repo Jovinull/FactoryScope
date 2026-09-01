@@ -40,6 +40,20 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void armoredConveyorsKeepTheSameForwardOnlyTopology(){
+        for(int rotation = 0; rotation < 4; rotation++){
+            Building conveyor = place(Blocks.armoredConveyor, 10, 10, rotation);
+            ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+            BuildingRef ref = AreaProbe.refOf(conveyor);
+            NetworkSide forward = NetworkSide.rotation(rotation);
+
+            assertTrue(network.graph.isReachable(input(ref, forward.opposite()), output(ref, forward), copper));
+            assertFalse(network.graph.isReachable(input(ref, forward), output(ref, forward.opposite()), copper));
+            conveyor.tile.remove();
+        }
+    }
+
+    @Test
     void junctionChannelsCrossWithoutConnectingToEachOther(){
         Building junction = place(Blocks.junction, 10, 10, 0);
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
@@ -102,6 +116,30 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void underflowGateKeepsItsAlternativeRoutesAsConditionalPossibilities(){
+        Building gate = place(Blocks.underflowGate, 10, 10, 0);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+        BuildingRef ref = AreaProbe.refOf(gate);
+        NetworkPort west = input(ref, NetworkSide.west);
+
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.east), copper));
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.north), copper));
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.south), copper));
+    }
+
+    @Test
+    void overflowDuctKeepsForwardAndSideRoutesAsConditionalPossibilities(){
+        Building duct = place(Blocks.overflowDuct, 10, 10, 0);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+        BuildingRef ref = AreaProbe.refOf(duct);
+        NetworkPort west = input(ref, NetworkSide.west);
+
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.east), copper));
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.north), copper));
+        assertTrue(network.graph.isReachable(west, output(ref, NetworkSide.south), copper));
+    }
+
+    @Test
     void anEnemyTransportDoesNotAppearInThePlayersTopology(){
         place(Blocks.conveyor, 10, 10, 0);
         place(Blocks.conveyor, 11, 10, Team.crux, 0);
@@ -126,6 +164,22 @@ class MindustryNetworkProbeTest{
 
         assertTrue(network.graph.isReachable(output(sourceRef, NetworkSide.east), input(linkedRef, NetworkSide.east), copper));
         assertFalse(network.graph.isReachable(output(sourceRef, NetworkSide.east), input(nearbyRef, NetworkSide.east), copper));
+    }
+
+    @Test
+    void itemBridgesDoNotCreateRemoteRoutesWithoutAValidConfiguredTarget(){
+        Building source = place(Blocks.itemBridge, 8, 10, 0);
+        Building candidate = place(Blocks.itemBridge, 14, 10, 0);
+        Building conveyor = place(Blocks.conveyor, 11, 10, 0);
+
+        ItemNetwork unconfigured = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 16, 12), Team.sharded);
+        assertFalse(unconfigured.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
+            input(AreaProbe.refOf(candidate), NetworkSide.east), copper));
+
+        source.configure(conveyor.tile.pos());
+        ItemNetwork broken = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 16, 12), Team.sharded);
+        assertFalse(broken.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
+            input(AreaProbe.refOf(candidate), NetworkSide.east), copper));
     }
 
     @Test
@@ -173,6 +227,15 @@ class MindustryNetworkProbeTest{
         assertEquals(List.of(AreaProbe.refOf(unknown)), network.unsupportedTransport);
         assertTrue(network.graph.ports.isEmpty());
         assertTrue(network.graph.edges.isEmpty());
+    }
+
+    @Test
+    void plastaniumConveyorsAreExplicitlyPartialUntilTheirBatchModesAreModeled(){
+        Building conveyor = place(Blocks.plastaniumConveyor, 10, 10, 0);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+
+        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
+        assertEquals(List.of(AreaProbe.refOf(conveyor)), network.unsupportedTransport);
     }
 
     @Test
