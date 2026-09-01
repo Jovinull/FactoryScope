@@ -154,7 +154,7 @@ public final class MindustryNetworkProbe{
                 add(edges, ref, incoming, left(incoming), ItemConstraint.any(), true);
                 add(edges, ref, incoming, right(incoming), ItemConstraint.any(), true);
             }
-        }else if(build instanceof Duct.DuctBuild || build instanceof Conveyor.ConveyorBuild || build instanceof StackConveyor.StackConveyorBuild
+        }else if(build instanceof Duct.DuctBuild || build instanceof Conveyor.ConveyorBuild
             || build instanceof DirectionBridge.DirectionBridgeBuild){
             NetworkSide forward = NetworkSide.rotation(build.rotation);
             for(NetworkSide input : NetworkSide.values()) if(input != forward) add(edges, ref, input, forward, ItemConstraint.any(), false);
@@ -196,11 +196,11 @@ public final class MindustryNetworkProbe{
     }
 
     private static boolean isUnknownTransport(Building build){
-        return build.block.group == BlockGroup.transportation && build.block.hasItems;
+        return (build.block.group == BlockGroup.transportation && build.block.hasItems) || build instanceof MassDriver.MassDriverBuild;
     }
 
     private static EnumSet<NetworkSide> outputSides(Building build){
-        if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof StackConveyor.StackConveyorBuild
+        if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild
             || build instanceof DirectionBridge.DirectionBridgeBuild)
             return EnumSet.of(NetworkSide.rotation(build.rotation));
         if(build instanceof OverflowDuct.OverflowDuctBuild){
@@ -221,7 +221,7 @@ public final class MindustryNetworkProbe{
     }
 
     private static EnumSet<NetworkSide> inputSides(Building build){
-        if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof StackConveyor.StackConveyorBuild
+        if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild
             || build instanceof DirectionBridge.DirectionBridgeBuild){
             EnumSet<NetworkSide> sides = EnumSet.allOf(NetworkSide.class);
             sides.remove(NetworkSide.rotation(build.rotation));
