@@ -53,6 +53,14 @@ class NetworkGraphTest{
     }
 
     @Test
+    void weakComponentsIgnoreUnusedPorts(){
+        NetworkPort a = port(1), b = port(2), unused = port(3);
+        NetworkGraph graph = graph(a, b, unused, edge(a, b));
+
+        assertEquals(List.of(Set.of(a, b)), graph.weakComponents());
+    }
+
+    @Test
     void insertionOrderCannotChangeTheGraphOrder(){
         NetworkPort a = port(1), b = port(2), c = port(3);
         NetworkGraph first = graph(c, a, b, edge(b, c), edge(a, b));

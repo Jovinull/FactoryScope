@@ -43,14 +43,13 @@ public final class NetworkGraph{
     /** Weak components are for summaries only; item travel always uses directed reachability. */
     public List<Set<NetworkPort>> weakComponents(){
         Map<NetworkPort, Set<NetworkPort>> adjacent = new TreeMap<>();
-        for(NetworkPort port : ports) adjacent.put(port, new TreeSet<>());
         for(NetworkEdge edge : edges){
             adjacent.computeIfAbsent(edge.from, ignored -> new TreeSet<>()).add(edge.to);
             adjacent.computeIfAbsent(edge.to, ignored -> new TreeSet<>()).add(edge.from);
         }
         List<Set<NetworkPort>> result = new ArrayList<>();
         Set<NetworkPort> visited = new TreeSet<>();
-        for(NetworkPort first : ports){
+        for(NetworkPort first : adjacent.keySet()){
             if(!visited.add(first)) continue;
             Set<NetworkPort> component = new TreeSet<>();
             ArrayDeque<NetworkPort> pending = new ArrayDeque<>();
