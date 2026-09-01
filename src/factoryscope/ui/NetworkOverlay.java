@@ -32,7 +32,6 @@ final class NetworkOverlay{
         }
         Draw.color(Pal.accent);
         for(NetworkPort port : network.boundaryPorts){
-            if(item != null && !hasVisibleExit(port)) continue;
             float x = worldX(port), y = worldY(port);
             float dx = port.side.dx * Vars.tilesize * 0.3f, dy = port.side.dy * Vars.tilesize * 0.3f;
             Lines.stroke(2f);
@@ -40,11 +39,6 @@ final class NetworkOverlay{
             Fill.circle(x + dx, y + dy, 2.5f);
         }
         Draw.reset();
-    }
-
-    private boolean hasVisibleExit(NetworkPort port){
-        for(NetworkEdge edge : network.graph.edges) if(edge.from.equals(port) && edge.items.allows(item)) return true;
-        return true;
     }
 
     private static float worldX(NetworkPort port){

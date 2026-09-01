@@ -149,6 +149,24 @@ class MindustryNetworkProbeTest{
         assertEquals(Set.of("copper", "lead", "graphite"), resources);
     }
 
+    @Test
+    void extractionDoesNotChangeWorldState(){
+        Building bridge = place(Blocks.itemBridge, 10, 10, 1);
+        bridge.configure(world.tile(14, 10).pos());
+        bridge.enabled = false;
+        bridge.items.add(Items.copper, 3);
+        int rotation = bridge.rotation;
+        int link = ((mindustry.world.blocks.distribution.ItemBridge.ItemBridgeBuild)bridge).link;
+        int items = bridge.items.get(Items.copper);
+
+        MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 16, 12), Team.sharded);
+
+        assertEquals(rotation, bridge.rotation);
+        assertEquals(link, ((mindustry.world.blocks.distribution.ItemBridge.ItemBridgeBuild)bridge).link);
+        assertEquals(items, bridge.items.get(Items.copper));
+        assertFalse(bridge.enabled);
+    }
+
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort output(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
 
