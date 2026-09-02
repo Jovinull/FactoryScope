@@ -111,6 +111,7 @@ version** initialising with no errors. `-Install` also copies the jar into your 
 
 ```
 gradlew areaBenchmark
+gradlew networkBenchmark
 ```
 
 Prints what one area analysis costs at 50, 250, 1000 and 4000 buildings, split into spatial collection,

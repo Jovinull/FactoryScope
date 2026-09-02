@@ -321,6 +321,7 @@ public class AcceptanceHarness extends Mod{
         singleClickStillInspects();
         tinyDragIsAClick();
         mixedProblems();
+        itemNetworkView();
         healthyArea();
         emptyArea();
         configurableBlocks();
@@ -557,6 +558,49 @@ public class AcceptanceHarness extends Mod{
             }
         });
         queue(() -> capture("mixed-area"));
+    }
+
+    void itemNetworkView(){
+        int x1 = rx(), y1 = ry(), x2 = rx() + 14, y2 = ry() + 4;
+
+        scenario("the Network view opens through the production area report");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            renderer.targetscale = renderer.camerascale = 3f;
+            for(int x = 1; x <= 8; x++) placeAt(Blocks.conveyor, rx() + x, ry() + 2);
+            Building sorter = placeAt(Blocks.sorter, rx() + 9, ry() + 2);
+            sorter.configure(Items.copper);
+            placeAt(Blocks.conveyor, rx() + 10, ry() + 2);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> check("the network patch opened an area report", FactoryScopeUI.areaReport() != null));
+        queue(() -> clickNamed("factoryscope-area-network"));
+        queue(() -> {
+            check("the Network view opened", Core.scene.find("factoryscope-network-dialog") != null);
+            check("the configured item is offered as a filter", Core.scene.find("factoryscope-network-item-copper") != null);
+        });
+        queue(() -> clickNamed("factoryscope-network-item-copper"));
+        queue(() -> check("the Network view remains open after selecting an item", Core.scene.find("factoryscope-network-dialog") != null));
+        queue(() -> clickNamed("factoryscope-network-building"));
+        queue(() -> check("a network building opens topology detail", Core.scene.find("factoryscope-network-dialog") != null));
+        queue(() -> capture("network-view"));
+        queue(() -> clickNamed("factoryscope-network-view-world"));
+        queue(() -> {
+            check("the static routes can be viewed over the world", Core.scene.find("factoryscope-network-viewing") != null);
+            check("the Network view keeps its return control", Core.scene.find("factoryscope-network-return") != null);
+        });
+        queue(() -> capture("network-world"));
+        queue(() -> clickNamed("factoryscope-network-return"));
+        queue(() -> check("return restores the Network view", Core.scene.find("factoryscope-network-dialog") != null));
+        queue(() -> clickNamed("factoryscope-network-view-world"));
+        queue(() -> clickNamed("factoryscope-network-dismiss"));
+        queue(() -> {
+            check("dismissing the world overlay removes its return control", Core.scene.find("factoryscope-network-viewing") == null);
+            check("dismissing the world overlay drops the held report", !FactoryScopeUI.areaReportHeld());
+        });
+        queue(() -> renderer.targetscale = renderer.camerascale = 1.5f);
     }
 
     void healthyArea(){

@@ -7,6 +7,7 @@ import mindustry.type.*;
 import mindustry.world.*;
 import mindustry.world.blocks.production.*;
 import mindustry.world.consumers.*;
+import mindustry.world.meta.*;
 
 /**
  * Blocks that stand in for the shapes other mods actually ship, registered alongside vanilla content
@@ -17,6 +18,7 @@ final class ModdedBlocks{
     static GenericCrafter boosted;
     static GenericCrafter exotic;
     static Block oddBuilding;
+    static Block unknownTransport;
 
     private ModdedBlocks(){
     }
@@ -48,6 +50,7 @@ final class ModdedBlocks{
         }};
 
         oddBuilding = new OddBlock("fs-test-odd");
+        unknownTransport = new UnknownTransportBlock("fs-test-unknown-transport");
     }
 
     /** A consumer type FactoryScope has never heard of, with a satisfaction the test can steer. */
@@ -76,6 +79,20 @@ final class ModdedBlocks{
             public boolean shouldConsume(){
                 return false;
             }
+        }
+    }
+
+    static class UnknownTransportBlock extends Block{
+        UnknownTransportBlock(String name){
+            super(name);
+            hasItems = true;
+            group = BlockGroup.transportation;
+            solid = true;
+            update = true;
+            buildType = UnknownTransportBuild::new;
+        }
+
+        class UnknownTransportBuild extends Building{
         }
     }
 }

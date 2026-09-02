@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 - Unreleased
+
+### Added
+
+- Area-scoped static item topology with directed, resource-aware routes and boundary continuations.
+- Network view, resource filter, world overlay, and explicit partial coverage for unsupported transport.
+- `gradlew networkBenchmark` for on-demand topology construction measurements.
+
+### Not in this release
+
+No measured throughput, transfer sampling, transport utilization, saturation, bottleneck detection,
+root-cause correlation, or recommendations.
+
 ## 0.2.1 — 2026-08-30
 
 ### Fixed

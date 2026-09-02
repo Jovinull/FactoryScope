@@ -40,6 +40,8 @@ public final class FactoryScopeUI{
     private static AreaDiagnosticsDialog areaDialog;
     private static InspectionOverlay picker;
     private static LocateOverlay locate;
+    private static NetworkOverlay networkOverlay;
+    private static NetworkViewOverlay networkView;
     private static Table hint;
     private static boolean initialized;
 
@@ -140,6 +142,7 @@ public final class FactoryScopeUI{
     private static void drawWorld(){
         if(picker != null) picker.drawWorld();
         if(locate != null) locate.drawWorld();
+        if(networkOverlay != null) networkOverlay.draw();
     }
 
     // ------------------------------------------------------------------ selection
@@ -212,6 +215,35 @@ public final class FactoryScopeUI{
         return locate != null;
     }
 
+    static void showNetworkOverlay(factoryscope.network.ItemNetwork network, factoryscope.model.ResourceRef item){
+        networkOverlay = network == null ? null : new NetworkOverlay(network, item);
+    }
+
+    static void stopNetworkOverlay(){
+        networkOverlay = null;
+    }
+
+    static void viewNetworkInWorld(factoryscope.network.ItemNetwork network, factoryscope.model.ResourceRef item,
+                                   Runnable onReturn, Runnable onDismiss){
+        stopNetworkView();
+        showNetworkOverlay(network, item);
+        networkView = new NetworkViewOverlay(item, () -> {
+            stopNetworkView();
+            onReturn.run();
+        }, () -> {
+            stopNetworkView();
+            stopNetworkOverlay();
+            onDismiss.run();
+        });
+    }
+
+    private static void stopNetworkView(){
+        if(networkView != null){
+            networkView.remove();
+            networkView = null;
+        }
+    }
+
     // ------------------------------------------------------------------ reports
 
     /**
@@ -257,6 +289,8 @@ public final class FactoryScopeUI{
     public static void reset(){
         stopPicking();
         stopLocating();
+        stopNetworkView();
+        stopNetworkOverlay();
         if(panel != null && panel.isShown()) panel.hide();
         if(areaDialog != null) areaDialog.clear();
         FsLog.reset();

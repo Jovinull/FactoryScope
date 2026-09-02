@@ -26,8 +26,7 @@ import mindustry.world.meta.*;
  *
  * <h2>What it does not claim</h2>
  * The issue list counts buildings that report the same problem. It does not say which building caused
- * it: FactoryScope has no model of how factories feed each other, so "sand shortages affect eight
- * buildings" is as far as the evidence goes.
+ * it: static topology shows possible item routes, not a cause of a current diagnostic condition.
  */
 public final class AreaDiagnosticsDialog extends BaseDialog{
     /** Enough rows to see the shape of a problem; the rest are one button away. */
@@ -43,6 +42,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     private Cell<Table> bodyCell;
     private AreaSelection selection;
     private AreaDiagnosticResult result;
+    private final NetworkDialog networkDialog = new NetworkDialog();
 
     public AreaDiagnosticsDialog(Runnable onSelectAnother, Cons<Building> onInspect, Cons<BuildingRef> onLocate){
         super("");
@@ -51,6 +51,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         this.onLocate = onLocate;
 
         title.setText(FsBundle.get("area.title"));
+        networkDialog.setOnViewWorld(this::viewNetworkInWorld);
         //a column rather than the full width of the window: a count pinned to the far edge of a 4K
         //display is a long way from the label it belongs to
         cont.pane(outer -> {
@@ -62,6 +63,8 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
             .size(190f, 64f).name("factoryscope-area-refresh");
         buttons.button(FsBundle.ref("area.select-another"), Icon.grid, this::selectAnother)
             .size(250f, 64f).name("factoryscope-area-select");
+        buttons.button(FsBundle.ref("network.open"), Icon.list, this::openNetwork)
+            .size(180f, 64f).name("factoryscope-area-network");
         addCloseButton();
     }
 
@@ -125,6 +128,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     public void clear(){
         selection = null;
         result = null;
+        networkDialog.hide();
         if(body != null) body.clear();
         if(isShown()) hide();
     }
@@ -132,6 +136,19 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     private void selectAnother(){
         hide();
         onSelectAnother.run();
+    }
+
+    private void openNetwork(){
+        if(result != null && result.network != null) networkDialog.show(result.network);
+    }
+
+    private void viewNetworkInWorld(){
+        if(result == null || result.network == null) return;
+        hide();
+        FactoryScopeUI.viewNetworkInWorld(result.network, networkDialog.selected(), () -> {
+            show();
+            networkDialog.reopen();
+        }, this::clear);
     }
 
     private static Team viewerTeam(){

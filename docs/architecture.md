@@ -137,14 +137,26 @@ localized name, and grouping uses the id. Grouping by display name would mean th
 another language changed which shortages counted as the same shortage, and that two modded items with
 the same name silently merged.
 
-## What FactoryScope does not know
+## Static topology limits
 
-It has no model of how factories feed each other. It sees conveyors, routers and bridges the way it sees
-a wall: as buildings with no production model. It does not follow them.
+Static topology follows supported item transport, but it does not establish causation.
 
-So an area result can say *"eight buildings are short of sand"*, because it counted eight buildings that
-each report a sand shortage. It cannot say *"sand production is the bottleneck"* — that is a claim about
-a network, and there is no network here to make it from. The wording in the interface is chosen to keep
-that line clear, and the same restraint applies to any new text.
+An area result can say *"eight buildings are short of sand"* because it counted eight buildings that
+report a sand shortage. A route can show that Sand is structurally reachable, but it cannot say that
+Sand production is the bottleneck or the cause of that condition.
 
-Following production between buildings is the next milestone, not this one.
+## Static item topology
+
+`FactoryAnalyzer` remains the authority for current building diagnostics. The separate
+`MindustryNetworkProbe` reads only structural state (block type, rotation, item configuration and bridge
+links) and creates a pure directed `NetworkGraph`. Its edges mean that an item can structurally travel;
+they never describe current flow, measured throughput, blockage, or a cause of a diagnostic finding.
+
+Each physical side has distinct input and output ports. This prevents a Junction from becoming one fully
+connected building: north-south and east-west remain independent internal channels. Sorter and Duct Router
+edges carry explicit item constraints, while gates are marked conditional because their choice depends on
+runtime receiver availability without removing any structurally possible route.
+
+Graphs stay area-scoped. A direct friendly connection leaving the selection becomes a boundary continuation
+and is not recursively explored. Unrecognised item transport is omitted and marks the graph partial rather
+than inventing neighbour edges.
