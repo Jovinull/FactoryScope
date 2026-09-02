@@ -17,6 +17,7 @@
 [CmdletBinding()]
 param(
     [string]$MindustryPath,
+    [string]$ModJar,
     [switch]$SkipBuild,
     [switch]$KeepSandbox,
     # BCP 47 language tag, e.g. "en-US" or "pt-BR". A fresh sandbox has no language setting, so
@@ -33,7 +34,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'mindustry.ps1')
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$modJar = Join-Path $projectRoot 'build\libs\FactoryScopeDesktop.jar'
+$modJar = if($ModJar){ [IO.Path]::GetFullPath($ModJar) }else{ Join-Path $projectRoot 'build\libs\FactoryScopeDesktop.jar' }
 $harnessJar = Join-Path $projectRoot 'build\libs\FactoryScopeAcceptance.jar'
 
 function Write-Step($message){ Write-Host "==> $message" -ForegroundColor Cyan }
@@ -62,7 +63,9 @@ function Assert-Fresh($jar, $sources){
         throw "$(Split-Path -Leaf $jar) is older than $($newest.Name); rebuild before running with -SkipBuild"
     }
 }
-Assert-Fresh $modJar @((Join-Path $projectRoot 'src'), (Join-Path $projectRoot 'assets'), (Join-Path $projectRoot 'mod.hjson'))
+if(-not $ModJar){
+    Assert-Fresh $modJar @((Join-Path $projectRoot 'src'), (Join-Path $projectRoot 'assets'), (Join-Path $projectRoot 'mod.hjson'))
+}
 Assert-Fresh $harnessJar @((Join-Path $projectRoot 'acceptance'))
 
 $running = @(Get-Process -Name 'Mindustry' -ErrorAction SilentlyContinue)
