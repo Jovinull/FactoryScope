@@ -54,6 +54,21 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void distributorUsesItsWholeFootprintForExternalRoutes(){
+        Building source = place(Blocks.conveyor, 9, 10, 0);
+        Building distributor = place(Blocks.distributor, 10, 10, 0);
+        Building target = place(Blocks.conveyor, 12, 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 14, 13), Team.sharded);
+
+        assertTrue(network.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
+            input(AreaProbe.refOf(target), NetworkSide.west), copper));
+        assertFalse(network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(AreaProbe.refOf(distributor))
+            && edge.to.building.equals(AreaProbe.refOf(distributor)) && edge.from.channel.equals("out")
+            && edge.to.channel.equals("in")));
+    }
+
+    @Test
     void junctionChannelsCrossWithoutConnectingToEachOther(){
         Building junction = place(Blocks.junction, 10, 10, 0);
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);

@@ -53,8 +53,10 @@ public final class MindustryNetworkProbe{
         for(var entry : buildings.entrySet()){
             Building source = entry.getValue();
             BuildingRef sourceRef = entry.getKey();
-            for(NetworkSide side : outputSides(source)){
-                Building neighbor = source.nearby(side.ordinal());
+            for(Adjacent adjacent : adjacent(source)){
+                NetworkSide side = adjacent.side;
+                if(!outputSides(source).contains(side)) continue;
+                Building neighbor = adjacent.building;
                 if(neighbor == null || neighbor.team != viewer) continue;
                 NetworkPort out = output(sourceRef, side);
                 BuildingRef targetRef = refs.get(neighbor);
@@ -70,6 +72,27 @@ public final class MindustryNetworkProbe{
         addDuctBridgeEdges(edges, boundary, buildings, refs, viewer);
         return new ItemNetwork(new NetworkGraph(ports, edges), boundary, unsupported, resources);
     }
+
+    private static List<Adjacent> adjacent(Building build){
+        List<Adjacent> result = new ArrayList<>();
+        if(build.tile == null) return result;
+        int offset = -(build.block.size - 1) / 2;
+        int minX = build.tile.x + offset;
+        int minY = build.tile.y + offset;
+        int maxX = minX + build.block.size - 1;
+        int maxY = minY + build.block.size - 1;
+        build.eachEdge(tile -> {
+            Building neighbor = tile.build;
+            if(neighbor == null || neighbor == build) return;
+            if(tile.x < minX) result.add(new Adjacent(neighbor, NetworkSide.west));
+            else if(tile.x > maxX) result.add(new Adjacent(neighbor, NetworkSide.east));
+            else if(tile.y < minY) result.add(new Adjacent(neighbor, NetworkSide.south));
+            else if(tile.y > maxY) result.add(new Adjacent(neighbor, NetworkSide.north));
+        });
+        return result;
+    }
+
+    private record Adjacent(Building building, NetworkSide side){ }
 
     private static void addBridgeEdges(List<NetworkEdge> edges, List<NetworkPort> boundary,
                                        Map<BuildingRef, Building> selected, Map<Building, BuildingRef> refs, Team viewer){
