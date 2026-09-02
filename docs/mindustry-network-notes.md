@@ -27,9 +27,9 @@ than measuring which one is currently chosen.
 Item bridges use their configured link, not proximity. A valid remote edge must be derived from the
 stored link and must remain team-safe. An unlinked or broken target has no remote topology edge.
 
-Directional Duct Bridges do not store a configurable target. `DirectionBridgeBuild.findLink()` searches
-the first same-team bridge of the same block in front, within the block range. That verified geometric link
-is the only remote edge; a bridge outside range is not connected.
+Directional Duct Bridges are explicitly unsupported in 0.3. Their remote ingress and local fallback
+behaviour cannot be represented by the same ports as a normal Duct without inventing a local route, so
+they mark the area topology partial rather than adding an approximation.
 
 ## Duct Router and limits
 

@@ -41,7 +41,7 @@ public final class MindustryNetworkProbe{
             BuildingRef ref = entry.getKey();
             if(isKnownTransport(build)){
                 addPorts(ports, ref);
-                addInternal(edges, build, ref);
+                addInternal(edges, build, ref, viewer);
             }else if(isEndpoint(build)){
                 addPorts(ports, ref);
             }else if(isUnknownTransport(build)){
@@ -55,21 +55,20 @@ public final class MindustryNetworkProbe{
             BuildingRef sourceRef = entry.getKey();
             for(Adjacent adjacent : adjacent(source)){
                 NetworkSide side = adjacent.side;
-                if(!outputSides(source).contains(side)) continue;
+                if(!outputSides(source, viewer).contains(side)) continue;
                 Building neighbor = adjacent.building;
                 if(neighbor == null || neighbor.team != viewer) continue;
                 NetworkPort out = output(sourceRef, side);
                 BuildingRef targetRef = refs.get(neighbor);
                 if(targetRef == null){
                     boundary.add(out);
-                }else if(inputSides(neighbor).contains(side.opposite()) && acceptsTopologyFrom(neighbor, source)){
+                }else if(inputSides(neighbor, viewer).contains(side.opposite()) && acceptsTopologyFrom(neighbor, source)){
                     edges.add(new NetworkEdge(out, input(targetRef, side.opposite()), outputConstraint(source), false));
                 }
             }
         }
 
         addBridgeEdges(edges, boundary, buildings, refs, viewer);
-        addDuctBridgeEdges(edges, boundary, buildings, refs, viewer);
         return new ItemNetwork(new NetworkGraph(ports, edges), boundary, unsupported, resources);
     }
 
@@ -98,27 +97,13 @@ public final class MindustryNetworkProbe{
                                        Map<BuildingRef, Building> selected, Map<Building, BuildingRef> refs, Team viewer){
         for(var entry : selected.entrySet()){
             if(!(entry.getValue() instanceof ItemBridge.ItemBridgeBuild bridge)) continue;
-            if(bridge.link < 0) continue;
-            Tile linkedTile = mindustry.Vars.world.tile(bridge.link);
-            Building linked = linkedTile == null ? null : linkedTile.build;
-            if(!(linked instanceof ItemBridge.ItemBridgeBuild) || linked.team != viewer) continue;
+            Building linked = validBridgeTarget(bridge, viewer);
+            if(linked == null) continue;
             BuildingRef target = refs.get(linked);
-            NetworkPort from = output(entry.getKey(), NetworkSide.rotation(bridge.rotation));
+            NetworkSide direction = sideTo(bridge, linked);
+            NetworkPort from = output(entry.getKey(), direction);
             if(target == null) boundary.add(from);
-            else edges.add(new NetworkEdge(from, input(target, NetworkSide.rotation(linked.rotation)), ItemConstraint.any(), false));
-        }
-    }
-
-    private static void addDuctBridgeEdges(List<NetworkEdge> edges, List<NetworkPort> boundary,
-                                           Map<BuildingRef, Building> selected, Map<Building, BuildingRef> refs, Team viewer){
-        for(var entry : selected.entrySet()){
-            if(!(entry.getValue() instanceof DirectionBridge.DirectionBridgeBuild bridge)) continue;
-            DirectionBridge.DirectionBridgeBuild linked = bridge.findLink();
-            if(linked == null || linked.team != viewer) continue;
-            NetworkPort from = output(entry.getKey(), NetworkSide.rotation(bridge.rotation));
-            BuildingRef target = refs.get(linked);
-            if(target == null) boundary.add(from);
-            else edges.add(new NetworkEdge(from, input(target, NetworkSide.rotation(linked.rotation).opposite()), ItemConstraint.any(), false));
+            else edges.add(new NetworkEdge(from, input(target, direction.opposite()), ItemConstraint.any(), false));
         }
     }
 
@@ -132,7 +117,7 @@ public final class MindustryNetworkProbe{
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort output(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
 
-    private static void addInternal(List<NetworkEdge> edges, Building build, BuildingRef ref){
+    private static void addInternal(List<NetworkEdge> edges, Building build, BuildingRef ref, Team viewer){
         if(build instanceof Junction.JunctionBuild){
             for(NetworkSide side : NetworkSide.values()) add(edges, ref, side, side.opposite(), ItemConstraint.any(), false);
         }else if(build instanceof Sorter.SorterBuild sorter){
@@ -179,14 +164,18 @@ public final class MindustryNetworkProbe{
                 add(edges, ref, incoming, left(incoming), ItemConstraint.any(), true);
                 add(edges, ref, incoming, right(incoming), ItemConstraint.any(), true);
             }
-        }else if(build instanceof Duct.DuctBuild || build instanceof Conveyor.ConveyorBuild
-            || build instanceof DirectionBridge.DirectionBridgeBuild){
+        }else if(build instanceof Duct.DuctBuild || build instanceof Conveyor.ConveyorBuild){
             NetworkSide forward = NetworkSide.rotation(build.rotation);
             for(NetworkSide input : NetworkSide.values()) if(input != forward) add(edges, ref, input, forward, ItemConstraint.any(), false);
-        }else if(build instanceof ItemBridge.ItemBridgeBuild){
-            //The remote edge is handled from the stored link. Local dumping is structural but may use any side.
-            for(NetworkSide input : NetworkSide.values()) for(NetworkSide out : NetworkSide.values()) if(out != input)
-                add(edges, ref, input, out, ItemConstraint.any(), true);
+        }else if(build instanceof ItemBridge.ItemBridgeBuild bridge){
+            Building linked = validBridgeTarget(bridge, viewer);
+            if(linked != null){
+                NetworkSide direction = sideTo(bridge, linked);
+                for(NetworkSide input : NetworkSide.values()) add(edges, ref, input, direction, ItemConstraint.any(), false);
+            }else{
+                for(NetworkSide input : NetworkSide.values()) for(NetworkSide out : NetworkSide.values()) if(out != input)
+                    add(edges, ref, input, out, ItemConstraint.any(), true);
+            }
         }else if(build instanceof Unloader.UnloaderBuild unloader){
             ItemConstraint items = unloader.sortItem == null ? ItemConstraint.any() : ItemConstraint.only(itemRef(unloader.sortItem));
             for(NetworkSide input : NetworkSide.values()) for(NetworkSide out : NetworkSide.values()) if(out != input)
@@ -211,7 +200,7 @@ public final class MindustryNetworkProbe{
     private static boolean isKnownTransport(Building build){
         return build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof Junction.JunctionBuild
             || build instanceof Router.RouterBuild || build instanceof Sorter.SorterBuild || build instanceof DuctRouter.DuctRouterBuild || build instanceof OverflowGate.OverflowGateBuild
-            || build instanceof ItemBridge.ItemBridgeBuild || build instanceof DirectionBridge.DirectionBridgeBuild || build instanceof Unloader.UnloaderBuild
+            || build instanceof ItemBridge.ItemBridgeBuild || build instanceof Unloader.UnloaderBuild
             || build instanceof OverflowDuct.OverflowDuctBuild;
     }
 
@@ -224,9 +213,8 @@ public final class MindustryNetworkProbe{
         return (build.block.group == BlockGroup.transportation && build.block.hasItems) || build instanceof MassDriver.MassDriverBuild;
     }
 
-    private static EnumSet<NetworkSide> outputSides(Building build){
-        if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild
-            || build instanceof DirectionBridge.DirectionBridgeBuild)
+    private static EnumSet<NetworkSide> outputSides(Building build, Team viewer){
+        if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild)
             return EnumSet.of(NetworkSide.rotation(build.rotation));
         if(build instanceof OverflowDuct.OverflowDuctBuild){
             NetworkSide forward = NetworkSide.rotation(build.rotation);
@@ -237,17 +225,18 @@ public final class MindustryNetworkProbe{
             return EnumSet.of(forward, left(forward), right(forward));
         }
         if(build instanceof Junction.JunctionBuild || build instanceof Sorter.SorterBuild || build instanceof Router.RouterBuild
-            || build instanceof OverflowGate.OverflowGateBuild || build instanceof ItemBridge.ItemBridgeBuild)
+            || build instanceof OverflowGate.OverflowGateBuild)
             return EnumSet.allOf(NetworkSide.class);
+        if(build instanceof ItemBridge.ItemBridgeBuild bridge)
+            return validBridgeTarget(bridge, viewer) == null ? EnumSet.allOf(NetworkSide.class) : EnumSet.noneOf(NetworkSide.class);
         if(build instanceof GenericCrafter.GenericCrafterBuild || build instanceof Drill.DrillBuild
             || build instanceof StorageBlock.StorageBuild || build instanceof CoreBlock.CoreBuild || build instanceof Unloader.UnloaderBuild)
             return EnumSet.allOf(NetworkSide.class);
         return EnumSet.noneOf(NetworkSide.class);
     }
 
-    private static EnumSet<NetworkSide> inputSides(Building build){
-        if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild
-            || build instanceof DirectionBridge.DirectionBridgeBuild){
+    private static EnumSet<NetworkSide> inputSides(Building build, Team viewer){
+        if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild){
             EnumSet<NetworkSide> sides = EnumSet.allOf(NetworkSide.class);
             sides.remove(NetworkSide.rotation(build.rotation));
             return sides;
@@ -255,9 +244,31 @@ public final class MindustryNetworkProbe{
         if(build instanceof OverflowDuct.OverflowDuctBuild) return EnumSet.of(NetworkSide.rotation(build.rotation).opposite());
         if(build instanceof DuctRouter.DuctRouterBuild) return EnumSet.of(NetworkSide.rotation(build.rotation).opposite());
         if(build instanceof Junction.JunctionBuild || build instanceof Sorter.SorterBuild || build instanceof Router.RouterBuild
-            || build instanceof OverflowGate.OverflowGateBuild || build instanceof ItemBridge.ItemBridgeBuild
+            || build instanceof OverflowGate.OverflowGateBuild
             || build instanceof Unloader.UnloaderBuild || isEndpoint(build)) return EnumSet.allOf(NetworkSide.class);
+        if(build instanceof ItemBridge.ItemBridgeBuild bridge){
+            Building linked = validBridgeTarget(bridge, viewer);
+            if(linked == null) return EnumSet.noneOf(NetworkSide.class);
+            EnumSet<NetworkSide> sides = EnumSet.allOf(NetworkSide.class);
+            sides.remove(sideTo(bridge, linked));
+            return sides;
+        }
         return EnumSet.noneOf(NetworkSide.class);
+    }
+
+    private static Building validBridgeTarget(ItemBridge.ItemBridgeBuild bridge, Team viewer){
+        if(bridge.link < 0 || bridge.tile == null || !(bridge.block instanceof ItemBridge block)) return null;
+        Tile linkedTile = mindustry.Vars.world.tile(bridge.link);
+        Building linked = linkedTile == null ? null : linkedTile.build;
+        if(!(linked instanceof ItemBridge.ItemBridgeBuild target) || linked.team != viewer) return null;
+        return block.linkValid(bridge.tile, linkedTile) ? linked : null;
+    }
+
+    private static NetworkSide sideTo(Building from, Building to){
+        if(to.tile.x > from.tile.x) return NetworkSide.east;
+        if(to.tile.x < from.tile.x) return NetworkSide.west;
+        if(to.tile.y > from.tile.y) return NetworkSide.north;
+        return NetworkSide.south;
     }
 
     private static ResourceRef itemRef(Item item){

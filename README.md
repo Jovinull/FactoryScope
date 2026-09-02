@@ -18,7 +18,7 @@ never modifies the state it inspects.
 - **Snapshot semantics.** An area report is taken once, when you release the drag, and re-taken when you
   press Refresh. Nothing is polled in the background.
 - **Item network topology.** Open Network from an area report to see directed structural routes, remote
-  bridge links, boundary continuations, and item-specific sorter paths. These routes are not current flow.
+  item-bridge links, boundary continuations, and item-specific sorter paths. These routes are not current flow.
 
 It counts observations and maps static item topology. It does not use that topology to identify which
 machine caused a shortage; see [what it does not support](#what-it-does-not-support).

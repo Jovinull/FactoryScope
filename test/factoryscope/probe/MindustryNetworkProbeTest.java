@@ -185,7 +185,7 @@ class MindustryNetworkProbeTest{
     @Test
     void itemBridgesUseTheirConfiguredRemoteLinkRatherThanProximity(){
         Building source = place(Blocks.itemBridge, 8, 10, 0);
-        Building linked = place(Blocks.itemBridge, 14, 10, 0);
+        Building linked = place(Blocks.itemBridge, 12, 10, 0);
         Building nearby = place(Blocks.itemBridge, 9, 10, 0);
         source.configure(linked.tile.pos());
 
@@ -194,8 +194,26 @@ class MindustryNetworkProbeTest{
         BuildingRef linkedRef = AreaProbe.refOf(linked);
         BuildingRef nearbyRef = AreaProbe.refOf(nearby);
 
-        assertTrue(network.graph.isReachable(output(sourceRef, NetworkSide.east), input(linkedRef, NetworkSide.east), copper));
-        assertFalse(network.graph.isReachable(output(sourceRef, NetworkSide.east), input(nearbyRef, NetworkSide.east), copper));
+        assertTrue(network.graph.isReachable(output(sourceRef, NetworkSide.east), input(linkedRef, NetworkSide.west), copper));
+        assertFalse(network.graph.isReachable(output(sourceRef, NetworkSide.east), input(nearbyRef, NetworkSide.west), copper));
+    }
+
+    @Test
+    void linkedItemBridgesDoNotAlsoDumpIntoTheirLocalNeighbors(){
+        Building feeder = place(Blocks.conveyor, 7, 10, 0);
+        Building source = place(Blocks.itemBridge, 8, 10, 0);
+        Building local = place(Blocks.conveyor, 9, 10, 0);
+        Building target = place(Blocks.itemBridge, 12, 10, 0);
+        source.configure(target.tile.pos());
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 16, 12), Team.sharded);
+
+        assertTrue(network.graph.isReachable(output(AreaProbe.refOf(feeder), NetworkSide.east),
+            input(AreaProbe.refOf(source), NetworkSide.west), copper));
+        assertFalse(network.graph.isReachable(output(AreaProbe.refOf(feeder), NetworkSide.east),
+            input(AreaProbe.refOf(local), NetworkSide.west), copper));
+        assertTrue(network.graph.isReachable(output(AreaProbe.refOf(feeder), NetworkSide.east),
+            input(AreaProbe.refOf(target), NetworkSide.west), copper));
     }
 
     @Test
@@ -215,6 +233,18 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void itemBridgesRejectConfiguredTargetsOutsideTheirEngineRange(){
+        Building source = place(Blocks.itemBridge, 8, 10, 0);
+        Building distant = place(Blocks.itemBridge, 14, 10, 0);
+        source.configure(distant.tile.pos());
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 16, 12), Team.sharded);
+
+        assertFalse(network.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
+            input(AreaProbe.refOf(distant), NetworkSide.west), copper));
+    }
+
+    @Test
     void anExitIntoTheNextTileOutsideTheSelectionIsAContinuationNotADisconnection(){
         Building inside = place(Blocks.conveyor, 10, 10, 0);
         place(Blocks.conveyor, 11, 10, 0);
@@ -225,15 +255,15 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
-    void ductBridgesUseTheirDirectionalLink(){
+    void ductBridgesArePartialUntilTheirRemoteIngressIsModeled(){
         Building source = place(Blocks.ductBridge, 8, 10, 0);
         Building target = place(Blocks.ductBridge, 12, 10, 0);
 
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 14, 12), Team.sharded);
-        BuildingRef sourceRef = AreaProbe.refOf(source);
-        BuildingRef targetRef = AreaProbe.refOf(target);
 
-        assertTrue(network.graph.isReachable(output(sourceRef, NetworkSide.east), input(targetRef, NetworkSide.west), copper));
+        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
+        assertEquals(Set.of(AreaProbe.refOf(source), AreaProbe.refOf(target)), new HashSet<>(network.unsupportedTransport));
+        assertTrue(network.graph.edges.isEmpty());
     }
 
     @Test
