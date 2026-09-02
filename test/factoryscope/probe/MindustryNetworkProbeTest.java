@@ -158,6 +158,20 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void gatesKeepPreferredAndFallbackRoutesDistinct(){
+        Building overflow = place(Blocks.overflowGate, 10, 10, 0);
+        Building underflow = place(Blocks.underflowGate, 14, 10, 0);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 16, 12), Team.sharded);
+
+        BuildingRef overflowRef = AreaProbe.refOf(overflow);
+        BuildingRef underflowRef = AreaProbe.refOf(underflow);
+        assertFalse(edge(network, overflowRef, NetworkSide.west, NetworkSide.east).conditional);
+        assertTrue(edge(network, overflowRef, NetworkSide.west, NetworkSide.north).conditional);
+        assertTrue(edge(network, underflowRef, NetworkSide.west, NetworkSide.east).conditional);
+        assertFalse(edge(network, underflowRef, NetworkSide.west, NetworkSide.north).conditional);
+    }
+
+    @Test
     void overflowDuctKeepsForwardAndSideRoutesAsConditionalPossibilities(){
         Building duct = place(Blocks.overflowDuct, 10, 10, 0);
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
@@ -352,6 +366,11 @@ class MindustryNetworkProbeTest{
 
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort output(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
+
+    private static NetworkEdge edge(ItemNetwork network, BuildingRef ref, NetworkSide from, NetworkSide to){
+        return network.graph.edges.stream().filter(edge -> edge.from.equals(input(ref, from)) && edge.to.equals(output(ref, to)))
+            .findFirst().orElseThrow();
+    }
 
     private static Building place(Block block, int x, int y, int rotation){ return place(block, x, y, Team.sharded, rotation); }
 

@@ -158,11 +158,11 @@ public final class MindustryNetworkProbe{
                 if(out != incoming) add(edges, ref, incoming, out, ItemConstraint.any(), true);
             }
         }else if(build instanceof OverflowGate.OverflowGateBuild){
-            //The gate chooses straight or side exits from receiver availability. All are structural possibilities.
+            boolean inverted = ((OverflowGate)build.block).invert;
             for(NetworkSide incoming : NetworkSide.values()){
-                add(edges, ref, incoming, incoming.opposite(), ItemConstraint.any(), true);
-                add(edges, ref, incoming, left(incoming), ItemConstraint.any(), true);
-                add(edges, ref, incoming, right(incoming), ItemConstraint.any(), true);
+                add(edges, ref, incoming, incoming.opposite(), ItemConstraint.any(), inverted);
+                add(edges, ref, incoming, left(incoming), ItemConstraint.any(), !inverted);
+                add(edges, ref, incoming, right(incoming), ItemConstraint.any(), !inverted);
             }
         }else if(build instanceof Duct.DuctBuild || build instanceof Conveyor.ConveyorBuild){
             NetworkSide forward = NetworkSide.rotation(build.rotation);
@@ -179,9 +179,10 @@ public final class MindustryNetworkProbe{
         }else if(build instanceof OverflowDuct.OverflowDuctBuild){
             NetworkSide forward = NetworkSide.rotation(build.rotation);
             NetworkSide back = forward.opposite();
-            add(edges, ref, back, forward, ItemConstraint.any(), true);
-            add(edges, ref, back, left(forward), ItemConstraint.any(), true);
-            add(edges, ref, back, right(forward), ItemConstraint.any(), true);
+            boolean inverted = ((OverflowDuct)build.block).invert;
+            add(edges, ref, back, forward, ItemConstraint.any(), inverted);
+            add(edges, ref, back, left(forward), ItemConstraint.any(), !inverted);
+            add(edges, ref, back, right(forward), ItemConstraint.any(), !inverted);
         }
     }
 
