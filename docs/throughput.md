@@ -22,3 +22,16 @@ ambiguous routes are unavailable, never zero or split across neighbours.
 
 The rolling window stores bounded counts by simulation-time bucket. A topology refresh, new selection,
 or world change ends the session because measurements belong to one graph snapshot.
+
+## Initial support matrix
+
+| Family | Edge throughput | Building ingress |
+| --- | --- | --- |
+| Conveyor | Unavailable until output removal and destination are observed as one event | Unavailable |
+| Junction | Unavailable until each directional buffer is observed independently | Unavailable |
+| Router, Sorter, gates | Unavailable until the chosen runtime destination is observed | Unavailable |
+| Duct and Duct Router | Unavailable until the handoff is attributable | Unavailable |
+| Item Bridge | Unavailable until its remote transfer counter can be proven exact | Unavailable |
+
+The table is intentionally conservative. A before/after inventory difference is not sufficient evidence
+on its own, even for a block with a single structural output.
