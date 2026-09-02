@@ -229,8 +229,7 @@ public final class MindustryNetworkProbe{
             return EnumSet.allOf(NetworkSide.class);
         if(build instanceof ItemBridge.ItemBridgeBuild bridge)
             return validBridgeTarget(bridge, viewer) == null ? EnumSet.allOf(NetworkSide.class) : EnumSet.noneOf(NetworkSide.class);
-        if(build instanceof GenericCrafter.GenericCrafterBuild || build instanceof Drill.DrillBuild
-            || build instanceof StorageBlock.StorageBuild || build instanceof CoreBlock.CoreBuild || build instanceof Unloader.UnloaderBuild)
+        if(build instanceof GenericCrafter.GenericCrafterBuild || build instanceof Drill.DrillBuild || build instanceof Unloader.UnloaderBuild)
             return EnumSet.allOf(NetworkSide.class);
         return EnumSet.noneOf(NetworkSide.class);
     }

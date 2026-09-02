@@ -183,6 +183,17 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void storageIsAnItemEndpointNotAnAutomaticConveyorSource(){
+        Building storage = place(Blocks.container, 10, 10, 0);
+        Building conveyor = place(Blocks.conveyor, 12, 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 14, 13), Team.sharded);
+
+        assertFalse(network.graph.isReachable(output(AreaProbe.refOf(storage), NetworkSide.east),
+            input(AreaProbe.refOf(conveyor), NetworkSide.west), copper));
+    }
+
+    @Test
     void itemBridgesUseTheirConfiguredRemoteLinkRatherThanProximity(){
         Building source = place(Blocks.itemBridge, 8, 10, 0);
         Building linked = place(Blocks.itemBridge, 12, 10, 0);
