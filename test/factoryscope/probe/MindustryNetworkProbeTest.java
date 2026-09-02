@@ -364,6 +364,25 @@ class MindustryNetworkProbeTest{
         assertFalse(bridge.enabled);
     }
 
+    @Test
+    void runtimeFullnessAndEnablementDoNotChangeStaticRoutes(){
+        Building first = place(Blocks.conveyor, 10, 10, 0);
+        Building second = place(Blocks.conveyor, 11, 10, 0);
+        AreaSelection area = AreaSelection.of(8, 8, 13, 12);
+        ItemNetwork before = MindustryNetworkProbe.scan(area, Team.sharded);
+
+        first.items.add(Items.copper, first.block.itemCapacity);
+        second.items.add(Items.copper, second.block.itemCapacity);
+        first.enabled = false;
+        ItemNetwork after = MindustryNetworkProbe.scan(area, Team.sharded);
+
+        assertEquals(before.graph.ports, after.graph.ports);
+        assertEquals(before.graph.edges.size(), after.graph.edges.size());
+        for(int i = 0; i < before.graph.edges.size(); i++){
+            assertEquals(0, before.graph.edges.get(i).compareTo(after.graph.edges.get(i)));
+        }
+    }
+
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort output(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
 
