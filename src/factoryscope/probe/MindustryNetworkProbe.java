@@ -91,7 +91,15 @@ public final class MindustryNetworkProbe{
         return result;
     }
 
-    private record Adjacent(Building building, NetworkSide side){ }
+    private static final class Adjacent{
+        final Building building;
+        final NetworkSide side;
+
+        Adjacent(Building building, NetworkSide side){
+            this.building = building;
+            this.side = side;
+        }
+    }
 
     private static void addBridgeEdges(List<NetworkEdge> edges, List<NetworkPort> boundary,
                                        Map<BuildingRef, Building> selected, Map<Building, BuildingRef> refs, Team viewer){
