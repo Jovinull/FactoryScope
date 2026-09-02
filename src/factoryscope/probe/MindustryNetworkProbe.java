@@ -176,10 +176,6 @@ public final class MindustryNetworkProbe{
                 for(NetworkSide input : NetworkSide.values()) for(NetworkSide out : NetworkSide.values()) if(out != input)
                     add(edges, ref, input, out, ItemConstraint.any(), true);
             }
-        }else if(build instanceof Unloader.UnloaderBuild unloader){
-            ItemConstraint items = unloader.sortItem == null ? ItemConstraint.any() : ItemConstraint.only(itemRef(unloader.sortItem));
-            for(NetworkSide input : NetworkSide.values()) for(NetworkSide out : NetworkSide.values()) if(out != input)
-                add(edges, ref, input, out, items, true);
         }else if(build instanceof OverflowDuct.OverflowDuctBuild){
             NetworkSide forward = NetworkSide.rotation(build.rotation);
             NetworkSide back = forward.opposite();
@@ -200,7 +196,7 @@ public final class MindustryNetworkProbe{
     private static boolean isKnownTransport(Building build){
         return build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof Junction.JunctionBuild
             || build instanceof Router.RouterBuild || build instanceof Sorter.SorterBuild || build instanceof DuctRouter.DuctRouterBuild || build instanceof OverflowGate.OverflowGateBuild
-            || build instanceof ItemBridge.ItemBridgeBuild || build instanceof Unloader.UnloaderBuild
+            || build instanceof ItemBridge.ItemBridgeBuild
             || build instanceof OverflowDuct.OverflowDuctBuild;
     }
 
@@ -210,7 +206,8 @@ public final class MindustryNetworkProbe{
     }
 
     private static boolean isUnknownTransport(Building build){
-        return (build.block.group == BlockGroup.transportation && build.block.hasItems) || build instanceof MassDriver.MassDriverBuild;
+        return (build.block.group == BlockGroup.transportation && build.block.hasItems)
+            || build instanceof MassDriver.MassDriverBuild || build instanceof Unloader.UnloaderBuild;
     }
 
     private static EnumSet<NetworkSide> outputSides(Building build, Team viewer){
@@ -229,7 +226,7 @@ public final class MindustryNetworkProbe{
             return EnumSet.allOf(NetworkSide.class);
         if(build instanceof ItemBridge.ItemBridgeBuild bridge)
             return validBridgeTarget(bridge, viewer) == null ? EnumSet.allOf(NetworkSide.class) : EnumSet.noneOf(NetworkSide.class);
-        if(build instanceof GenericCrafter.GenericCrafterBuild || build instanceof Drill.DrillBuild || build instanceof Unloader.UnloaderBuild)
+        if(build instanceof GenericCrafter.GenericCrafterBuild || build instanceof Drill.DrillBuild)
             return EnumSet.allOf(NetworkSide.class);
         return EnumSet.noneOf(NetworkSide.class);
     }
@@ -243,8 +240,7 @@ public final class MindustryNetworkProbe{
         if(build instanceof OverflowDuct.OverflowDuctBuild) return EnumSet.of(NetworkSide.rotation(build.rotation).opposite());
         if(build instanceof DuctRouter.DuctRouterBuild) return EnumSet.of(NetworkSide.rotation(build.rotation).opposite());
         if(build instanceof Junction.JunctionBuild || build instanceof Sorter.SorterBuild || build instanceof Router.RouterBuild
-            || build instanceof OverflowGate.OverflowGateBuild
-            || build instanceof Unloader.UnloaderBuild || isEndpoint(build)) return EnumSet.allOf(NetworkSide.class);
+            || build instanceof OverflowGate.OverflowGateBuild || isEndpoint(build)) return EnumSet.allOf(NetworkSide.class);
         if(build instanceof ItemBridge.ItemBridgeBuild bridge){
             Building linked = validBridgeTarget(bridge, viewer);
             if(linked == null) return EnumSet.noneOf(NetworkSide.class);
@@ -275,7 +271,6 @@ public final class MindustryNetworkProbe{
     }
 
     private static ItemConstraint outputConstraint(Building build){
-        if(build instanceof Unloader.UnloaderBuild unloader && unloader.sortItem != null) return ItemConstraint.only(itemRef(unloader.sortItem));
         if(build instanceof GenericCrafter.GenericCrafterBuild crafter && crafter.block instanceof GenericCrafter block && block.outputItem != null)
             return ItemConstraint.only(itemRef(block.outputItem.item));
         return ItemConstraint.any();
@@ -284,7 +279,6 @@ public final class MindustryNetworkProbe{
     private static void collectResources(Building build, List<ResourceRef> resources){
         if(build instanceof Sorter.SorterBuild sorter && sorter.sortItem != null) resources.add(itemRef(sorter.sortItem));
         if(build instanceof DuctRouter.DuctRouterBuild router && router.sortItem != null) resources.add(itemRef(router.sortItem));
-        if(build instanceof Unloader.UnloaderBuild unloader && unloader.sortItem != null) resources.add(itemRef(unloader.sortItem));
         if(build.block instanceof GenericCrafter crafter && crafter.outputItem != null) resources.add(itemRef(crafter.outputItem.item));
         for(Consume consume : build.block.consumers){
             if(consume instanceof ConsumeItems items){
@@ -299,9 +293,6 @@ public final class MindustryNetworkProbe{
     }
 
     private static boolean acceptsTopologyFrom(Building target, Building source){
-        if(target instanceof Unloader.UnloaderBuild){
-            return source instanceof StorageBlock.StorageBuild || source instanceof CoreBlock.CoreBuild;
-        }
         return true;
     }
 }

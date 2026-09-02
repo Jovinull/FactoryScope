@@ -194,6 +194,18 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void unloadersArePartialUntilTheirNeighborTransferRulesAreModeled(){
+        Building unloader = place(Blocks.unloader, 10, 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+
+        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
+        assertEquals(List.of(AreaProbe.refOf(unloader)), network.unsupportedTransport);
+        assertTrue(network.graph.ports.isEmpty());
+        assertTrue(network.graph.edges.isEmpty());
+    }
+
+    @Test
     void itemBridgesUseTheirConfiguredRemoteLinkRatherThanProximity(){
         Building source = place(Blocks.itemBridge, 8, 10, 0);
         Building linked = place(Blocks.itemBridge, 12, 10, 0);
