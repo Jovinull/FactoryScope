@@ -148,7 +148,7 @@ Sand production is the bottleneck or the cause of that condition.
 ## Static item topology
 
 `FactoryAnalyzer` remains the authority for current building diagnostics. The separate
-`MindustryNetworkProbe` reads only structural state (block type, rotation, item configuration and bridge
+`MindustryNetworkProbe` reads only structural state (block type, rotation, item configuration and item-bridge
 links) and creates a pure directed `NetworkGraph`. Its edges mean that an item can structurally travel;
 they never describe current flow, measured throughput, blockage, or a cause of a diagnostic finding.
 
