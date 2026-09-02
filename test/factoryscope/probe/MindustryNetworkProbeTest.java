@@ -40,17 +40,15 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
-    void armoredConveyorsKeepTheSameForwardOnlyTopology(){
-        for(int rotation = 0; rotation < 4; rotation++){
-            Building conveyor = place(Blocks.armoredConveyor, 10, 10, rotation);
-            ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
-            BuildingRef ref = AreaProbe.refOf(conveyor);
-            NetworkSide forward = NetworkSide.rotation(rotation);
+    void armoredConveyorsAndDuctsArePartialUntilTheirInputRulesAreModeled(){
+        Building conveyor = place(Blocks.armoredConveyor, 10, 10, 0);
+        Building duct = place(Blocks.armoredDuct, 14, 10, 0);
 
-            assertTrue(network.graph.isReachable(input(ref, forward.opposite()), output(ref, forward), copper));
-            assertFalse(network.graph.isReachable(input(ref, forward), output(ref, forward.opposite()), copper));
-            conveyor.tile.remove();
-        }
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 16, 12), Team.sharded);
+
+        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
+        assertEquals(Set.of(AreaProbe.refOf(conveyor), AreaProbe.refOf(duct)), new HashSet<>(network.unsupportedTransport));
+        assertTrue(network.graph.edges.isEmpty());
     }
 
     @Test

@@ -36,10 +36,11 @@ they mark the area topology partial rather than adding an approximation.
 `DuctRouterBuild` accepts from its rear, sends its configured item forward, and sends other items to a
 side exit. Those side exits are structurally possible alternatives, not a claim about the current choice.
 
-Plastanium Stack Conveyors have load, move and unload states derived from neighbouring blocks and stored
-items. Mass Drivers depend on configured links and a separate state machine. Unloaders choose a source and
-destination across their full neighbouring set rather than behaving as a simple storage output. FactoryScope
-0.3 records all three as unsupported transport rather than approximating them as ordinary conveyors.
+Armored Conveyors and Armored Ducts have source-sensitive acceptance rules. Plastanium Stack Conveyors have
+load, move and unload states derived from neighbouring blocks and stored items. Mass Drivers depend on
+configured links and a separate state machine. Unloaders choose a source and destination across their full
+neighbouring set rather than behaving as a simple storage output. FactoryScope 0.3 records all of these as
+unsupported transport rather than approximating them as ordinary conveyors.
 
 ## Scope
 

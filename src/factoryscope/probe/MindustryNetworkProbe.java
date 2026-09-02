@@ -194,10 +194,10 @@ public final class MindustryNetworkProbe{
     private static NetworkSide right(NetworkSide side){ return NetworkSide.rotation(side.ordinal() - 1); }
 
     private static boolean isKnownTransport(Building build){
-        return build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof Junction.JunctionBuild
+        return !isExplicitlyUnsupported(build) && (build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof Junction.JunctionBuild
             || build instanceof Router.RouterBuild || build instanceof Sorter.SorterBuild || build instanceof DuctRouter.DuctRouterBuild || build instanceof OverflowGate.OverflowGateBuild
             || build instanceof ItemBridge.ItemBridgeBuild
-            || build instanceof OverflowDuct.OverflowDuctBuild;
+            || build instanceof OverflowDuct.OverflowDuctBuild);
     }
 
     private static boolean isEndpoint(Building build){
@@ -206,11 +206,16 @@ public final class MindustryNetworkProbe{
     }
 
     private static boolean isUnknownTransport(Building build){
-        return (build.block.group == BlockGroup.transportation && build.block.hasItems)
+        return isExplicitlyUnsupported(build) || (build.block.group == BlockGroup.transportation && build.block.hasItems)
             || build instanceof MassDriver.MassDriverBuild || build instanceof Unloader.UnloaderBuild;
     }
 
+    private static boolean isExplicitlyUnsupported(Building build){
+        return build.block instanceof ArmoredConveyor || (build.block instanceof Duct duct && duct.armored);
+    }
+
     private static EnumSet<NetworkSide> outputSides(Building build, Team viewer){
+        if(isExplicitlyUnsupported(build)) return EnumSet.noneOf(NetworkSide.class);
         if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild)
             return EnumSet.of(NetworkSide.rotation(build.rotation));
         if(build instanceof OverflowDuct.OverflowDuctBuild){
@@ -232,6 +237,7 @@ public final class MindustryNetworkProbe{
     }
 
     private static EnumSet<NetworkSide> inputSides(Building build, Team viewer){
+        if(isExplicitlyUnsupported(build)) return EnumSet.noneOf(NetworkSide.class);
         if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild){
             EnumSet<NetworkSide> sides = EnumSet.allOf(NetworkSide.class);
             sides.remove(NetworkSide.rotation(build.rotation));
