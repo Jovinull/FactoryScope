@@ -117,7 +117,12 @@ public final class MindustryNetworkProbe{
             for(NetworkSide incoming : NetworkSide.values()){
                 NetworkSide straight = incoming.opposite();
                 if(selected == null){
-                    add(edges, ref, incoming, straight, ItemConstraint.any(), false);
+                    if(((Sorter)sorter.block).invert){
+                        add(edges, ref, incoming, straight, ItemConstraint.any(), false);
+                    }else{
+                        add(edges, ref, incoming, left(incoming), ItemConstraint.any(), true);
+                        add(edges, ref, incoming, right(incoming), ItemConstraint.any(), true);
+                    }
                 }else{
                     boolean inverted = ((Sorter)sorter.block).invert;
                     ItemConstraint straightItems = inverted ? ItemConstraint.except(selected) : ItemConstraint.only(selected);

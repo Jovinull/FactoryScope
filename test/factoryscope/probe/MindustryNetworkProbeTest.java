@@ -94,6 +94,23 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void unconfiguredSortersKeepTheirEngineDefaultRoutes(){
+        Building normal = place(Blocks.sorter, 10, 10, 0);
+        Building inverted = place(Blocks.invertedSorter, 14, 10, 0);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 16, 12), Team.sharded);
+
+        BuildingRef normalRef = AreaProbe.refOf(normal);
+        BuildingRef invertedRef = AreaProbe.refOf(inverted);
+        NetworkPort normalWest = input(normalRef, NetworkSide.west);
+        NetworkPort invertedWest = input(invertedRef, NetworkSide.west);
+
+        assertFalse(network.graph.isReachable(normalWest, output(normalRef, NetworkSide.east), copper));
+        assertTrue(network.graph.isReachable(normalWest, output(normalRef, NetworkSide.north), copper));
+        assertTrue(network.graph.isReachable(invertedWest, output(invertedRef, NetworkSide.east), copper));
+        assertFalse(network.graph.isReachable(invertedWest, output(invertedRef, NetworkSide.north), copper));
+    }
+
+    @Test
     void ductsHaveOnlyTheirForwardRoute(){
         Building duct = place(Blocks.duct, 10, 10, 0);
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
