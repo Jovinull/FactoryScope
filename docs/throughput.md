@@ -14,6 +14,12 @@ must not dilute a rate while the game is paused.
 it records additions to an item module. That is neither safe to enable for an area of buildings nor
 sufficient to identify a transport edge.
 
+The transport implementations call `target.handleItem(this, item)` directly (for example Conveyor,
+Junction, Router, Sorter and ItemBridge). v159.7 exposes no corresponding item-transfer event; its
+public event list has game-update boundaries but no source/destination/item transfer payload. Replacing
+or wrapping those methods would modify vanilla game behaviour and is outside FactoryScope's
+observational contract.
+
 ## Attribution
 
 An edge rate is exact only when a successful transfer can be tied to that exact directed port pair and
