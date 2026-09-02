@@ -23,4 +23,23 @@ class RollingThroughputTest{
         flow.advance(2_000);
         assertEquals(0, flow.sample().items);
     }
+
+    @Test void keepsOnlyTheRollingWindowAfterABurst(){
+        RollingThroughput flow = new RollingThroughput(1_000, 100, 100);
+        flow.observe(0, 10);
+        flow.advance(500);
+        assertEquals(10, flow.sample().items);
+        flow.observe(1_100, 2);
+        assertEquals(2, flow.sample().items);
+    }
+
+    @Test void resetReturnsToCollecting(){
+        RollingThroughput flow = new RollingThroughput(1_000, 100, 100);
+        flow.observe(0, 5);
+        flow.advance(100);
+        assertTrue(flow.sample().ready);
+        flow.reset();
+        assertFalse(flow.sample().ready);
+        assertEquals(0, flow.sample().items);
+    }
 }
