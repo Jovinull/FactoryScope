@@ -8,6 +8,11 @@
 - Network view, resource filter, world overlay, and explicit partial coverage for unsupported transport.
 - `gradlew networkBenchmark` for on-demand topology construction measurements.
 
+### Topology limits
+
+- Armored transport, Plastanium Stack Conveyors, Duct Bridges, Mass Drivers, unloaders, and unknown
+  modded transport are reported as incomplete rather than inferred from nearby blocks.
+
 ### Not in this release
 
 No measured throughput, transfer sampling, transport utilization, saturation, bottleneck detection,

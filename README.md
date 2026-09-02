@@ -49,6 +49,10 @@ machine caused a shortage; see [what it does not support](#what-it-does-not-supp
   throughput, bottleneck, or root-cause analysis. An area report can say that eight buildings are short
   of sand because it counted eight buildings that each report a sand shortage. It cannot say that sand
   production is the cause, and it does not pretend to.
+- **Some transport families.** Armored conveyors and ducts, Plastanium Stack Conveyors, Duct Bridges,
+  Mass Drivers, unloaders, and unknown modded transport are marked as incomplete topology rather than
+  being approximated. Item bridges, ordinary conveyors, junctions, routers, sorters, gates, ducts, and
+  duct routers are covered.
 - **Full production modelling outside `GenericCrafter`.** That covers the conventional crafting blocks on
   both planets. Drills, pumps, generators, unit factories and the rest are inspected — inputs, power,
   efficiency, verdict — but get no production rates, and the panel says so.
