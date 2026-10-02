@@ -41,8 +41,9 @@ yet provide.
 2. `gradlew acceptanceTest` passes against a real Mindustry install. CI cannot run it — it needs a
    graphical client — so it is on whoever cuts the release.
 3. `scripts/smoke-test.ps1` passes against a real Mindustry install.
-4. `mod.hjson` carries the new `version`, and `minGameVersion` still matches the Mindustry release the
-   build is pinned to in `build.gradle`.
+4. `mod.hjson` carries the new `version`; `minGameVersion` is the earliest build that provides every
+   Mindustry API the mod uses. It need not repeat the patch version pinned in `build.gradle` when that
+   API already exists earlier in the same major build line.
 5. The README describes what the release actually does. Anything on the roadmap stays on the roadmap.
 6. Translations are in step with the default bundle — `BundleTest` fails the build if they are not.
 
@@ -66,3 +67,11 @@ tagged.
 
 The indexer also expects a valid `mod.hjson` at the repository root, a README, and a release whose
 attached jar is the mod itself.
+
+For Build 160, the current indexer recognizes release titles tagged with `[v160]` and prefers a release
+targeting the running game line. Use a title such as `FactoryScope 0.3.1 [v160]`; keep the Git tag as
+`v0.3.1`. The mod metadata's minimum build is an independent compatibility floor, not the release title.
+
+The indexer only downloads repository icons when the repository has at least two stars. It looks for
+`icon.png` at the root or under `assets/` and scales it to 64 by 64. FactoryScope currently has fewer
+than two stars, so an icon file would not appear in the browser yet.

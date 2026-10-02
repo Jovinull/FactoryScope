@@ -9,7 +9,7 @@ import java.util.*;
  *
  * <h2>Why the checks are ordered the way they are</h2>
  * The order is not a preference, it follows how Mindustry gates production in
- * {@code Building.updateConsumption()} (v159.7):
+ * {@code Building.updateConsumption()} (v160.5):
  * <ol>
  *   <li>{@code !enabled} zeroes efficiency <em>and</em> potentialEfficiency before any consumer is
  *       evaluated, so a disabled building tells you nothing about its inputs.</li>
