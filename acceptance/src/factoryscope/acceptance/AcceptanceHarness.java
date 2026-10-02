@@ -1042,6 +1042,7 @@ public class AcceptanceHarness extends Mod{
                 result != null && dialogShows(FsBundle.format("power.generator-problems", 1)));
             check("the generator member list is available for navigation",
                 Core.scene.find("factoryscope-power-list-toggle") != null);
+            capture("power-battery-supported-deficit");
         });
         queue(() -> clickNamed("factoryscope-power-list-toggle"));
         queue(() -> clickNamed("factoryscope-power-locate"));
