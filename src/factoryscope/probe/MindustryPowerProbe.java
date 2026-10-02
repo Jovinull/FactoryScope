@@ -59,10 +59,13 @@ public final class MindustryPowerProbe{
         for(int i = 0; i < ordered.size(); i++) ids.put(ordered.get(i).graph, i);
 
         List<PowerGridResult> results = new ArrayList<>(ordered.size());
+        Map<Integer, PowerGridSnapshot> snapshots = new HashMap<>();
         for(int i = 0; i < ordered.size(); i++){
             GraphSeed seed = ordered.get(i);
             try{
-                results.add(PowerGridAnalyzer.analyze(seed.snapshot(i, selectedRefs, knownSnapshots)));
+                PowerGridSnapshot snapshot = seed.snapshot(i, selectedRefs, knownSnapshots);
+                results.add(PowerGridAnalyzer.analyze(snapshot));
+                snapshots.put(i, snapshot);
             }catch(Exception e){
                 FsLog.warnOnce("power-grid:" + seed.anchor(),
                     "could not snapshot power grid at " + seed.anchor(), e);
@@ -73,9 +76,17 @@ public final class MindustryPowerProbe{
         for(DiodeSeed diode : diodes){
             Integer from = ids.get(diode.from), to = ids.get(diode.to);
             if(from != null && to != null && !from.equals(to)){
-                boolean canTransfer = PowerGraphMetrics.batteryCapacity(diode.from) > 0f
-                    && PowerGraphMetrics.batteryCapacity(diode.to) > 0f;
-                links.add(new PowerDiodeLink(diode.ref, from, to, canTransfer));
+                PowerGridSnapshot fromSnapshot = snapshots.get(from), toSnapshot = snapshots.get(to);
+                PowerDiodeBatteryState batteryState;
+                if(fromSnapshot == null || toSnapshot == null || !fromSnapshot.hasMetrics || !toSnapshot.hasMetrics
+                    || !fromSnapshot.visibilityComplete || !toSnapshot.visibilityComplete){
+                    batteryState = PowerDiodeBatteryState.unavailable;
+                }else if(fromSnapshot.batteryCapacity <= 0f || toSnapshot.batteryCapacity <= 0f){
+                    batteryState = PowerDiodeBatteryState.atLeastOneEndpointLacksCapacity;
+                }else{
+                    batteryState = PowerDiodeBatteryState.bothEndpointsHaveCapacity;
+                }
+                links.add(new PowerDiodeLink(diode.ref, from, to, batteryState));
             }
         }
         links.sort(Comparator.comparing(link -> link.diode, MindustryPowerProbe::compareRefs));
@@ -92,7 +103,8 @@ public final class MindustryPowerProbe{
 
     private static boolean validDiodeSide(Building build, Team team){
         return build != null && build.isValid() && build.team == team && build.power != null
-            && build.power.graph != null && build.block.hasPower;
+            && build.power.graph != null && build.block.hasPower
+            && MindustryFactoryProbe.canInspect(build, team);
     }
 
     private static int compareRefs(BuildingRef a, BuildingRef b){

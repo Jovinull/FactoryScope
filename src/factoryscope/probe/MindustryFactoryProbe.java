@@ -5,6 +5,7 @@ import factoryscope.*;
 import factoryscope.analysis.*;
 import factoryscope.model.*;
 import mindustry.*;
+import mindustry.game.Team;
 import mindustry.gen.*;
 import mindustry.type.*;
 import mindustry.world.*;
@@ -43,15 +44,16 @@ public final class MindustryFactoryProbe{
     }
 
     public static FactorySnapshot probe(Building build){
-        return probe(build, true);
+        Team viewer = Vars.player == null ? (build == null ? null : build.team) : Vars.player.team();
+        return probe(build, true, viewer);
     }
 
     /** Area snapshots omit graph aggregates; PowerScope captures each shared graph once separately. */
     static FactorySnapshot probeForArea(Building build){
-        return probe(build, false);
+        return probe(build, false, null);
     }
 
-    private static FactorySnapshot probe(Building build, boolean includeGridMetrics){
+    private static FactorySnapshot probe(Building build, boolean includeGridMetrics, Team viewer){
         Block block = build.block;
         float frameTicks = Math.max(Time.delta, MIN_FRAME_TICKS);
         float timeScale = build.timeScale();
@@ -77,7 +79,12 @@ public final class MindustryFactoryProbe{
                 build.efficiency, build.potentialEfficiency, gateOpen));
 
         addInputs(build, block, snapshot, frameTicks, timeScale);
-        if(block.consPower != null) snapshot.power(readPower(build, block.consPower, includeGridMetrics));
+        if(block.consPower != null){
+            PowerGraph graph = build.power == null ? null : build.power.graph;
+            boolean visibleGraph = includeGridMetrics && graph != null
+                && PowerGraphMetrics.completelyVisible(graph, viewer);
+            snapshot.power(readPower(build, block.consPower, visibleGraph));
+        }
         if(crafter) addCrafterProduction(build, (GenericCrafter)block, snapshot, frameTicks, timeScale);
         if(build instanceof Drill.DrillBuild drill && drill.dominantItem != null){
             snapshot.producedItem(new ResourceRef(ResourceKind.item, drill.dominantItem.name, drill.dominantItem.localizedName));

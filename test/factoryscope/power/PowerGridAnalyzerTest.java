@@ -41,6 +41,32 @@ class PowerGridAnalyzerTest{
     }
 
     @Test
+    void storedBatteryEnergyDoesNotImplyThatItCoveredTheCurrentDeficit(){
+        PowerGridResult result = analyze(grid(false, true, 40f, 100f, 0.4f, 5f, 100f, -20f, true));
+
+        assertEquals(PowerGridState.underpowered, result.state);
+        assertTrue(result.has(PowerFinding.GRID_UNDERPOWERED));
+        assertTrue(result.has(PowerFinding.BATTERY_RESERVES_PRESENT),
+            "the finding reports co-observed stored energy, not delivered energy");
+    }
+
+    @Test
+    void satisfactionThresholdAndRateEpsilonHaveStableBoundaries(){
+        PowerGridResult belowSatisfactionTolerance = analyze(grid(false, true, 99.8f, 100f,
+            0.9989f, 0f, 0f, 0f, true));
+        PowerGridResult atSatisfactionTolerance = analyze(grid(false, true, 99.9f, 100f,
+            0.999f, 0f, 0f, 0f, true));
+        PowerGridResult withinRateEpsilon = analyze(grid(false, true, 100f, 100.00005f,
+            1f, 0f, 0f, 0f, true));
+
+        assertEquals(PowerGridState.underpowered, belowSatisfactionTolerance.state);
+        assertEquals(PowerGridState.generationBelowDemand, atSatisfactionTolerance.state,
+            "the satisfaction tolerance avoids oscillating into underpowered on a 0.1% boundary");
+        assertEquals(PowerGridState.balanced, withinRateEpsilon.state,
+            "sub-epsilon float noise is not presented as a surplus or deficit");
+    }
+
+    @Test
     void noDemandDoesNotBecomeInfiniteSurplus(){
         PowerGridResult result = analyze(grid(false, true, 100f, 0f, 1f, 0f, 10f, 10f, true));
 

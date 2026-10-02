@@ -1,9 +1,12 @@
 package factoryscope.probe;
 
 import arc.util.Time;
+import mindustry.game.Team;
 import mindustry.gen.Building;
 import mindustry.world.blocks.power.PowerGraph;
 import mindustry.world.consumers.ConsumePower;
+
+import java.util.*;
 
 /** Shared read-only conversion of Mindustry's frame-integrated PowerGraph values. */
 final class PowerGraphMetrics{
@@ -14,6 +17,26 @@ final class PowerGraphMetrics{
 
     static boolean cheatPowered(PowerGraph graph){
         return graph != null && !graph.consumers.isEmpty() && graph.consumers.first().cheating();
+    }
+
+    /** Fails closed before exposing a pooled graph metric to a single-building inspector. */
+    static boolean completelyVisible(PowerGraph graph, Team viewer){
+        if(graph == null || viewer == null) return false;
+        Set<Building> members = Collections.newSetFromMap(new IdentityHashMap<>());
+        for(Building build : graph.all){
+            if(build == null || !build.isValid() || build.power == null || build.power.graph != graph
+                || build.team != viewer || !MindustryFactoryProbe.canInspect(build, viewer)) return false;
+            members.add(build);
+        }
+        if(members.isEmpty()) return false;
+        return containsOnlyMembers(graph.producers, members)
+            && containsOnlyMembers(graph.consumers, members)
+            && containsOnlyMembers(graph.batteries, members);
+    }
+
+    private static boolean containsOnlyMembers(arc.struct.Seq<Building> role, Set<Building> members){
+        for(Building build : role) if(!members.contains(build)) return false;
+        return true;
     }
 
     static float generationPerSecond(PowerGraph graph){
@@ -77,6 +100,9 @@ final class PowerGraphMetrics{
 
     private static float normalize(float frameIntegrated, float pausedFallback){
         float frameTicks = Time.delta;
+        //Only a finite, non-negative zero delta represents a paused simulation. NaN/Infinity (or a
+        //negative delta supplied by a mod) is not a valid basis for manufacturing a zero rate.
+        if(!finite(frameTicks) || frameTicks < 0f) return Float.NaN;
         if(frameTicks > MIN_FRAME_TICKS && finite(frameTicks)){
             if(!finite(frameIntegrated)) return Float.NaN;
             float normalized = frameIntegrated / frameTicks * 60f;

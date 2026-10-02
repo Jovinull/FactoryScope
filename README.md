@@ -23,7 +23,7 @@ never modifies the state it inspects.
   reachable producers and see their existing diagnostic state. The player selects the area to analyze;
   traces distinguish known dead ends, area boundaries, storage endpoints, and transport the topology does
   not fully model.
-- **PowerScope (0.5 development).** Inspect the actual Mindustry `PowerGraph` for a building or selected
+- **PowerScope.** Inspect the actual Mindustry `PowerGraph` for a building or selected
   area. Reports show whole-grid generation, demand, delivered satisfaction, battery storage, and connected
   generator diagnostics. A selected area can intersect several independent grids.
 
@@ -63,7 +63,8 @@ or prove that a reachable producer is supplying enough material; see
 - **Per-wire power flow.** PowerScope reads Mindustry's pooled `PowerGraph`; ordinary electrical links
   show established connectivity, not directional flow or a measured amount. Power Diodes remain explicit
   cross-grid connectors without an attributed transfer quantity. PowerScope reports evidence, not a root
-  cause, battery-depletion estimate, or recommendation.
+  cause, battery-depletion estimate, or recommendation. Remote multiplayer grid synchronization has not
+  been independently validated.
 - **Some transport families.** Armored conveyors and ducts, Plastanium Stack Conveyors, Duct Bridges,
   Mass Drivers, unloaders, and unknown modded transport are marked as incomplete topology rather than
   being approximated. Item bridges, ordinary conveyors, junctions, routers, sorters, gates, ducts, and
@@ -172,7 +173,7 @@ relevant part of `last_log.txt` from your Mindustry data folder.
 - **0.2 complete:** area diagnostics, issue aggregation, and affected-building navigation.
 - **0.3 complete:** static, item-aware network topology inside a selected area.
 - **0.4 complete:** network-aware diagnostics and Supply Trace.
-- **0.5 development:** PowerScope reads Mindustry's engine-maintained power grids.
+- **0.5 complete:** PowerScope reads Mindustry's engine-maintained power grids.
 
 Supply Trace correlates known topology with existing per-building diagnostics. It does not observe item
 movement or prove quantitative supply sufficiency. Future work has no promised date; possible areas

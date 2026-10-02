@@ -9,14 +9,14 @@ public final class PowerDiodeLink{
     public final BuildingRef diode;
     public final int fromGrid;
     public final int toGrid;
-    /** False when either endpoint graph has no enabled battery capacity, so Mindustry cannot transfer. */
-    public final boolean transferPossible;
+    /** Capacity presence is unavailable when either complete visible graph could not be inspected. */
+    public final PowerDiodeBatteryState batteryState;
 
-    public PowerDiodeLink(BuildingRef diode, int fromGrid, int toGrid, boolean transferPossible){
+    public PowerDiodeLink(BuildingRef diode, int fromGrid, int toGrid, PowerDiodeBatteryState batteryState){
         this.diode = Objects.requireNonNull(diode, "diode");
         if(fromGrid == toGrid) throw new IllegalArgumentException("a diode relation must connect distinct grids");
         this.fromGrid = fromGrid;
         this.toGrid = toGrid;
-        this.transferPossible = transferPossible;
+        this.batteryState = Objects.requireNonNull(batteryState, "batteryState");
     }
 }

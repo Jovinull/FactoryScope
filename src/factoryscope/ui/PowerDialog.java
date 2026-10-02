@@ -106,6 +106,7 @@ final class PowerDialog extends BaseDialog{
         if(report == null) return;
 
         body.labelWrap(FsBundle.get("power.scope-note")).color(Pal.lightishGray).padBottom(8f).growX().row();
+        body.labelWrap(FsBundle.get("power.diode-scope")).color(Pal.gray).padBottom(8f).growX().row();
         if(report.grids.isEmpty()){
             body.labelWrap(FsBundle.get("power.no-grid")).color(Pal.lightOrange).growX().row();
             return;
@@ -118,8 +119,12 @@ final class PowerDialog extends BaseDialog{
             for(PowerDiodeLink link : report.diodeLinks){
                 body.labelWrap(FsBundle.format("power.diode-link", link.diode.blockName,
                     link.fromGrid + 1, link.toGrid + 1)).color(Pal.lightishGray).growX().padBottom(4f).row();
-                body.labelWrap(FsBundle.get(link.transferPossible
-                        ? "power.diode-unmeasured" : "power.diode-no-batteries"))
+                String diodeStatus = switch(link.batteryState){
+                    case bothEndpointsHaveCapacity -> "power.diode-unmeasured";
+                    case atLeastOneEndpointLacksCapacity -> "power.diode-no-batteries";
+                    case unavailable -> "power.diode-capacity-unavailable";
+                };
+                body.labelWrap(FsBundle.get(diodeStatus))
                     .color(Pal.gray).padLeft(8f).growX().padBottom(6f).row();
             }
         }

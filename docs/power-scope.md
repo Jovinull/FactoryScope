@@ -1,4 +1,4 @@
-# PowerScope (0.5 development)
+# PowerScope
 
 PowerScope snapshots the **actual Mindustry `PowerGraph`** for every power grid intersecting a selected
 building or area. It does not create a second electrical-network simulation. Area membership is shown for
@@ -14,6 +14,10 @@ engine graph, including its visible same-team members outside the selected recta
 | Satisfaction | `PowerGraph.getSatisfaction()` from the latest graph update. Mindustry may include energy drawn from batteries, so satisfaction can be full while generation remains below demand. |
 | Stored / capacity | Read-only current status and capacity of enabled batteries. This is energy/storage, not a rate. |
 | Recent balance | The engine's 60-sample window of generation minus demand, with its Power Diode energy adjustment. It is not a per-cable rate and does not count battery discharge as generation. |
+
+The single-building inspector's separate **Nominal power use** row is the block's configured non-buffered
+usage at its time scale; it is not the current whole-grid request. PowerScope's **Current demand** is the
+engine graph's request from consumers that currently `shouldConsumePower`.
 
 PowerGraph generation and demand getters return frame-integrated values (`building.delta()` is included).
 PowerScope normalizes those values to the project's existing power/second convention. `PowerGraph`
@@ -41,7 +45,15 @@ links are read from engine state, not re-derived from range rules.
 
 Power Diodes are not normal graph edges. Mindustry keeps the grids on either side separate and applies a
 directional, battery-percentage-dependent transfer. PowerScope presents the diode as a distinct
-conditional cross-grid relation, and never invents a transfer amount or merges the two summaries.
+conditional back-to-front cross-grid relation, and never invents a transfer amount or merges the two
+summaries. A diode is reported only when its building is part of the current selection; PowerScope does
+not scan the rest of the world to discover external diode links. Grid metrics still describe the entire
+engine PowerGraph, so an external diode's battery adjustment may affect engine metrics without its link
+appearing in this selection-scoped diode list.
+
+Member counts and expandable member lists are explicitly counts of visible buildings. If fog or team
+visibility prevents complete inspection, PowerScope withholds aggregate metrics and reports incomplete
+visibility rather than presenting partial member counts as complete grid totals.
 
 ## Evidence and limits
 

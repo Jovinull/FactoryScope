@@ -3,6 +3,7 @@ package factoryscope.probe;
 import factoryscope.area.*;
 import factoryscope.analysis.DiagnosticReason;
 import factoryscope.power.*;
+import arc.util.Time;
 import mindustry.content.Blocks;
 import mindustry.content.Items;
 import mindustry.game.Team;
@@ -34,6 +35,7 @@ class MindustryPowerProbeTest{
         Building solar = place(Blocks.solarPanel, 8, 8);
         Building battery = place(Blocks.battery, 9, 8);
         Building smelter = place(Blocks.siliconSmelter, 10, 8);
+        smelter.shouldConsumePower = true;
         battery.power.status = 0.5f;
 
         PowerGridReport report = MindustryPowerProbe.scan(List.of(solar), Team.sharded);
@@ -47,6 +49,9 @@ class MindustryPowerProbeTest{
         assertTrue(grid.batteries.stream().anyMatch(member -> member.ref.equals(AreaProbe.refOf(battery))));
         assertTrue(grid.connections.stream().anyMatch(edge -> edge.first.equals(AreaProbe.refOf(solar))
             && edge.second.equals(AreaProbe.refOf(battery))));
+        assertEquals(solar.power.graph.getPowerNeeded() / arc.util.Time.delta * 60f,
+            grid.demandPerSecond, 0.001f,
+            "a one-building selection still reports the whole engine graph's external consumer demand");
     }
 
     @Test
@@ -98,6 +103,44 @@ class MindustryPowerProbeTest{
     }
 
     @Test
+    void foreignMemberInsideAnEngineGraphWithholdsAggregatesAndDoesNotLeakItsIdentity(){
+        state.rules.fog = true;
+        Building friendly = place(Blocks.solarPanel, 5, 5, Team.sharded);
+        Building foreign = place(Blocks.solarPanel, 35, 35, Team.crux);
+        //Simulate an unsupported/stale engine graph containing a foreign member. This is deliberately
+        //not normal Mindustry topology; it proves the adapter fails closed if a mod corrupts membership.
+        friendly.power.graph.add(foreign);
+
+        PowerGridSnapshot grid = MindustryPowerProbe.scan(friendly, Team.sharded).grids.get(0).snapshot;
+
+        assertFalse(grid.visibilityComplete);
+        assertFalse(grid.hasMetrics, "partial graph membership must not expose aggregate values");
+        assertTrue(grid.members.stream().allMatch(member -> member.ref.teamId == Team.sharded.id));
+        assertTrue(grid.producers.stream().allMatch(member -> member.ref.teamId == Team.sharded.id));
+        assertFalse(grid.members.stream().anyMatch(member -> member.ref.equals(AreaProbe.refOf(foreign))));
+        assertFalse(grid.producers.stream().anyMatch(member -> member.ref.equals(AreaProbe.refOf(foreign))));
+        assertEquals(0f, grid.generationPerSecond);
+        assertEquals(0f, grid.demandPerSecond);
+    }
+
+    @Test
+    void perBuildingPowerSnapshotAlsoWithholdsMetricsForAnIncompleteEngineGraph(){
+        state.rules.fog = true;
+        Building friendlyConsumer = place(Blocks.siliconSmelter, 5, 5, Team.sharded);
+        friendlyConsumer.shouldConsumePower = true;
+        Building hiddenEnemyGenerator = place(Blocks.solarPanel, 35, 35, Team.crux);
+        friendlyConsumer.power.graph.add(hiddenEnemyGenerator);
+
+        var power = MindustryFactoryProbe.probe(friendlyConsumer).power;
+
+        assertNotNull(power);
+        assertFalse(power.hasGridMetrics,
+            "single-building diagnostics must not bypass PowerScope's incomplete-graph visibility guard");
+        assertEquals(0f, power.gridGenerationPerSecond);
+        assertEquals(0f, power.gridDemandPerSecond);
+    }
+
+    @Test
     void areaScanIncludesOnePowerSnapshotForTheIntersectedGrid(){
         Building solar = place(Blocks.solarPanel, 8, 8);
         place(Blocks.battery, 9, 8);
@@ -144,6 +187,21 @@ class MindustryPowerProbeTest{
     }
 
     @Test
+    void aRefreshProbeObservesEnginePowerGraphsSplittingAfterANodeUnlink(){
+        Building solar = place(Blocks.solarPanel, 5, 5);
+        Building node = place(Blocks.powerNode, 11, 5);
+        node.configureAny(solar.pos());
+        assertSame(solar.power.graph, node.power.graph);
+
+        node.configureAny(solar.pos());
+        PowerGridReport after = MindustryPowerProbe.scan(List.of(solar, node), Team.sharded);
+
+        assertNotSame(solar.power.graph, node.power.graph);
+        assertEquals(2, after.grids.size());
+        assertTrue(after.grids.stream().allMatch(grid -> grid.snapshot.selectedMemberCount == 1));
+    }
+
+    @Test
     void beamNodeUsesItsEstablishedEngineGraphLinkRatherThanACopiedPowerNodeRule(){
         Building solar = place(Blocks.solarPanel, 5, 5);
         Building beam = place(Blocks.beamNode, 6, 5);
@@ -176,7 +234,8 @@ class MindustryPowerProbeTest{
         assertEquals(1, report.diodeLinks.size());
         PowerDiodeLink link = report.diodeLinks.get(0);
         assertEquals(AreaProbe.refOf(diode), link.diode);
-        assertTrue(link.transferPossible, "both endpoint graphs have enabled battery capacity");
+        assertEquals(PowerDiodeBatteryState.bothEndpointsHaveCapacity, link.batteryState,
+            "both endpoint graphs have enabled battery capacity");
         assertEquals(report.grids.get(0).snapshot.id, link.fromGrid);
         assertEquals(report.grids.get(1).snapshot.id, link.toGrid);
         assertTrue(report.grids.stream().allMatch(grid -> grid.snapshot.selectedMemberCount == 0));
@@ -193,7 +252,80 @@ class MindustryPowerProbeTest{
 
         assertNotSame(left.power.graph, right.power.graph);
         assertEquals(1, report.diodeLinks.size());
-        assertFalse(report.diodeLinks.get(0).transferPossible);
+        assertEquals(PowerDiodeBatteryState.atLeastOneEndpointLacksCapacity,
+            report.diodeLinks.get(0).batteryState);
+    }
+
+    @Test
+    void diodeDirectionUsesTheEngineBackAndFrontForAllRotations(){
+        int[][] directions = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+        for(int rotation = 0; rotation < directions.length; rotation++){
+            int centerX = 7 + rotation * 10, centerY = 12;
+            int dx = directions[rotation][0], dy = directions[rotation][1];
+            Building diode = place(Blocks.diode, centerX, centerY, Team.sharded, rotation);
+            Building expectedFront = place(Blocks.battery, centerX + dx, centerY + dy);
+            Building expectedBack = place(Blocks.battery, centerX - dx, centerY - dy);
+
+            PowerGridReport report = MindustryPowerProbe.scan(List.of(diode), Team.sharded);
+
+            assertEquals(2, report.grids.size(), "rotation " + rotation + " keeps endpoint graphs distinct");
+            assertEquals(1, report.diodeLinks.size());
+            PowerDiodeLink link = report.diodeLinks.get(0);
+            assertTrue(report.grids.get(link.fromGrid).snapshot.members.stream()
+                .anyMatch(member -> member.ref.equals(AreaProbe.refOf(expectedBack))),
+                "rotation " + rotation + " sends from the diode back");
+            assertTrue(report.grids.get(link.toGrid).snapshot.members.stream()
+                .anyMatch(member -> member.ref.equals(AreaProbe.refOf(expectedFront))),
+                "rotation " + rotation + " sends to the diode front");
+        }
+    }
+
+    @Test
+    void onlySelectedDiodesAreDiscoveredAndOutsideScopeIsExplicitlyLimited(){
+        Building back = place(Blocks.battery, 7, 12);
+        Building diode = place(Blocks.diode, 8, 12);
+        Building front = place(Blocks.battery, 9, 12);
+
+        PowerGridReport report = MindustryPowerProbe.scan(List.of(back), Team.sharded);
+
+        assertEquals(1, report.grids.size());
+        assertEquals(1, report.grids.get(0).snapshot.selectedMemberCount);
+        assertTrue(report.diodeLinks.isEmpty(),
+            "the adapter does not world-scan for a diode outside the selected buildings");
+        assertTrue(diode.isValid() && front.isValid());
+    }
+
+    @Test
+    void asymmetricDiodeBatteryCapacityIsNotReportedAsPresentOnBothSides(){
+        Building backBattery = place(Blocks.battery, 7, 12);
+        Building diode = place(Blocks.diode, 8, 12);
+        Building frontSolar = place(Blocks.solarPanel, 9, 12);
+
+        PowerDiodeLink link = MindustryPowerProbe.scan(List.of(diode), Team.sharded).diodeLinks.get(0);
+
+        assertEquals(PowerDiodeBatteryState.atLeastOneEndpointLacksCapacity, link.batteryState,
+            "one battery-bearing side does not establish battery capacity on both endpoints");
+        assertNotNull(backBattery.power.graph);
+        assertNotNull(frontSolar.power.graph);
+    }
+
+    @Test
+    void diodeCapacityIsUnavailableWhenAnEndpointGridHasHiddenMembers(){
+        state.rules.fog = true;
+        Building backSolar = place(Blocks.solarPanel, 5, 12);
+        Building diode = place(Blocks.diode, 6, 12);
+        Building frontBattery = place(Blocks.battery, 7, 12);
+        Building hiddenBattery = place(Blocks.battery, 30, 30, Team.crux);
+        backSolar.power.graph.add(hiddenBattery);
+
+        PowerGridReport report = MindustryPowerProbe.scan(List.of(diode), Team.sharded);
+
+        assertEquals(2, report.grids.size());
+        assertEquals(1, report.diodeLinks.size());
+        assertTrue(report.grids.stream().anyMatch(grid -> !grid.snapshot.visibilityComplete));
+        assertEquals(PowerDiodeBatteryState.unavailable, report.diodeLinks.get(0).batteryState,
+            "partial graph visibility must not leak whether the hidden endpoint has battery capacity");
+        assertNotNull(frontBattery);
     }
 
     @Test
@@ -206,6 +338,19 @@ class MindustryPowerProbeTest{
         assertTrue(grid.producers.get(0).ref.equals(AreaProbe.refOf(generator)));
         assertEquals(generator.getPowerProduction() * generator.timeScale() * 60f,
             grid.generationPerSecond, 0.001f);
+    }
+
+    @Test
+    void moddedPowerConsumerIsDiscoveredAndMeasuredByPowerGraphRole(){
+        Building consumer = place(ModdedBlocks.moddedPowerConsumer, 8, 8);
+        consumer.shouldConsumePower = true;
+
+        PowerGridSnapshot grid = MindustryPowerProbe.scan(consumer, Team.sharded).grids.get(0).snapshot;
+
+        assertEquals(1, grid.consumers.size());
+        assertTrue(grid.consumers.get(0).ref.equals(AreaProbe.refOf(consumer)));
+        assertEquals(consumer.block.consPower.requestedPower(consumer) * consumer.timeScale() * 60f,
+            grid.demandPerSecond, 0.001f);
     }
 
     @Test
@@ -245,10 +390,14 @@ class MindustryPowerProbeTest{
         Building generator = place(ModdedBlocks.moddedGenerator, 8, 8);
         ((mindustry.world.blocks.power.PowerGenerator.GeneratorBuild)generator).productionEfficiency = 1f;
         Building battery = place(Blocks.battery, 9, 8);
+        Building sink = place(Blocks.siliconSmelter, 10, 8);
+        sink.shouldConsumePower = true;
         generator.applyBoost(1.75f, 60f);
         assertEquals(1.75f, generator.timeScale(), 0.001f, "the fixture must actually be overdriven");
         battery.power.status = 0.25f;
         float frame = arc.util.Time.delta;
+        float expectedBalance = (generator.power.graph.getPowerProduced()
+            - generator.power.graph.getPowerNeeded()) / frame * 60f;
         generator.power.graph.update();
 
         PowerGridSnapshot grid = MindustryPowerProbe.scan(List.of(generator, battery), Team.sharded)
@@ -260,6 +409,67 @@ class MindustryPowerProbeTest{
         assertEquals(generator.power.graph.getPowerNeeded() / frame * 60f, grid.demandPerSecond, 0.001f);
         assertEquals(generator.power.graph.getBatteryStored(), grid.batteryStored, 0.001f);
         assertEquals(generator.power.graph.getTotalBatteryCapacity(), grid.batteryCapacity, 0.001f);
+        assertEquals(expectedBalance, grid.balancePerSecond, 0.001f,
+            "the first raw mean sample is (producer output - requested demand) / delta, then displayed per second");
+        assertEquals(generator.power.graph.hasPowerBalanceSamples(), grid.balanceReliable);
+        assertFalse(grid.balanceReliable, "one update is not the engine's mature 60-sample balance window");
+        assertEquals(grid.generationPerSecond,
+            grid.producers.stream().mapToDouble(member -> member.generationPerSecond).sum(), 0.001);
+        assertEquals(grid.demandPerSecond,
+            grid.consumers.stream().mapToDouble(member -> member.demandPerSecond).sum(), 0.001);
+        assertEquals(grid.batteryStored,
+            grid.batteries.stream().mapToDouble(member -> member.batteryStored).sum(), 0.001);
+        assertEquals(grid.batteryCapacity,
+            grid.batteries.stream().mapToDouble(member -> member.batteryCapacity).sum(), 0.001);
+    }
+
+    @Test
+    void pausedPowerRatesApplyTimeScaleOnceForProducerAndCurrentConsumerRequest(){
+        Building generator = place(ModdedBlocks.moddedGenerator, 8, 8);
+        ((mindustry.world.blocks.power.PowerGenerator.GeneratorBuild)generator).productionEfficiency = 1f;
+        Building sink = place(Blocks.siliconSmelter, 9, 8);
+        sink.shouldConsumePower = true;
+        generator.applyBoost(1.75f, 60f);
+        sink.applyBoost(1.5f, 60f);
+        float oldDelta = Time.delta;
+        try{
+            float expectedGeneration = generator.getPowerProduction() * generator.timeScale() * 60f;
+            float requested = sink.block.consPower.requestedPower(sink);
+            float expectedDemand = requested * sink.timeScale() * 60f;
+            for(float delta : new float[]{0.25f, 1f, 2f, 0f}){
+                Time.delta = delta;
+                PowerGridSnapshot grid = MindustryPowerProbe.scan(List.of(generator, sink), Team.sharded)
+                    .grids.get(0).snapshot;
+
+                assertTrue(grid.hasMetrics, "valid simulation delta " + delta);
+                assertEquals(expectedGeneration, grid.generationPerSecond, 0.001f,
+                    "generation remains frame-rate independent and scales once at delta " + delta);
+                assertEquals(expectedDemand, grid.demandPerSecond, 0.001f,
+                    "current requested demand remains frame-rate independent at delta " + delta);
+            }
+        }finally{
+            Time.delta = oldDelta;
+        }
+    }
+
+    @Test
+    void nonFiniteSimulationDeltaMakesAggregatePowerMetricsUnavailable(){
+        Building generator = place(ModdedBlocks.moddedGenerator, 8, 8);
+        Building sink = place(Blocks.siliconSmelter, 9, 8);
+        sink.shouldConsumePower = true;
+        float oldDelta = Time.delta;
+        try{
+            for(float invalidDelta : new float[]{Float.NaN, Float.POSITIVE_INFINITY, -1f}){
+                Time.delta = invalidDelta;
+                PowerGridSnapshot grid = MindustryPowerProbe.scan(List.of(generator, sink), Team.sharded)
+                    .grids.get(0).snapshot;
+                assertFalse(grid.hasMetrics, "invalid simulation delta " + invalidDelta + " is not a pause");
+                assertEquals(PowerGridState.unavailable, PowerGridAnalyzer.analyze(grid).state);
+                assertEquals(0f, grid.generationPerSecond, "unavailable metrics use a non-display placeholder");
+            }
+        }finally{
+            Time.delta = oldDelta;
+        }
     }
 
     private static Building place(Block block, int x, int y){
@@ -267,7 +477,11 @@ class MindustryPowerProbeTest{
     }
 
     private static Building place(Block block, int x, int y, Team team){
-        world.tile(x, y).setBlock(block, team, 0);
+        return place(block, x, y, team, 0);
+    }
+
+    private static Building place(Block block, int x, int y, Team team, int rotation){
+        world.tile(x, y).setBlock(block, team, rotation);
         Building build = world.tile(x, y).build;
         assertNotNull(build, "failed to place " + block.name);
         if(build.block.update) build.updateConsumption();

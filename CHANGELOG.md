@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 - Unreleased
+## 0.5.0 - 2026-10-02
 
 ### Added
 
@@ -9,6 +9,8 @@
 - Power summaries include generation, current demand, engine satisfaction, battery storage, recent engine
   balance, connected generator diagnostics, established electrical connections, and conservative
   cross-grid Power Diode relations.
+- Aggregate grid values are withheld when the full graph cannot be safely inspected; battery storage is
+  kept distinct from generation, and ordinary electrical links never claim per-wire flow.
 - Added real-engine PowerGraph and battery-support regression fixtures plus the `powerBenchmark` task.
 
 ### Not in this release

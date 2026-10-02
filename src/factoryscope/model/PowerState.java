@@ -9,7 +9,7 @@ package factoryscope.model;
 public final class PowerState{
     /** Fraction of requested power the grid is currently delivering, from {@code PowerModule.status}. */
     public final float satisfaction;
-    /** What this building asks for, per second. */
+    /** Nominal non-buffered power use at this building's time scale, not the grid's current total demand. */
     public final float usagePerSecond;
     /** Whether the consumer charges an internal buffer instead of drawing continuously. */
     public final boolean buffered;

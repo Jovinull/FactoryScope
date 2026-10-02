@@ -963,6 +963,25 @@ public class AcceptanceHarness extends Mod{
         queue(() -> clickNamed("factoryscope-power-back"));
         queue(() -> check("single-building PowerScope Return restores its inspector",
             FactoryScopeUI.inspected() == target && FactoryScopeUI.powerReport() == null));
+        scenario("PowerScope never renders cheat-rule placeholders as measured zeroes");
+        queue(() -> {
+            state.rules.teams.get(Team.sharded).cheat = true;
+            Building consumer = placeAt(Blocks.siliconSmelter, target.tileX() + 1, target.tileY());
+            if(consumer != null) consumer.updateConsumption();
+        });
+        queue(() -> clickNamed("factoryscope-inspect-power-grid"));
+        queue(() -> {
+            PowerGridReport report = FactoryScopeUI.powerReport();
+            PowerGridResult result = report == null || report.grids.isEmpty() ? null : report.grids.get(0);
+            check("team cheat power is marked and aggregate metrics are unavailable",
+                result != null && result.state == PowerGridState.cheatPowered && !result.snapshot.hasMetrics);
+            check("unavailable grid values are not rendered as generation or demand zeroes",
+                dialogShows(FsBundle.get("power.metrics-unavailable"))
+                    && !dialogShows(FsBundle.get("power.generation"))
+                    && !dialogShows(FsBundle.get("power.demand")));
+        });
+        queue(() -> clickNamed("factoryscope-power-back"));
+        queue(() -> state.rules.teams.get(Team.sharded).cheat = false);
         queue(this::closeAnyDialog);
 
         scenario("PowerScope separates a battery-supported generation deficit from an underpowered grid");
@@ -1075,6 +1094,7 @@ public class AcceptanceHarness extends Mod{
         scenario("the Area Power view keeps multiple engine grids separate");
         int x1 = rx(), y1 = ry(), x2 = rx() + 40, y2 = ry() + 12;
         Building[] gridProducers = new Building[2];
+        Building[] gridConnector = new Building[1];
         //The single-building Power dialog is stacked over its diagnostic panel. Let its close fade
         //finish before dismissing that panel, so the synthetic drag reaches the world picker.
         queue(() -> {});
@@ -1138,14 +1158,14 @@ public class AcceptanceHarness extends Mod{
                 + ", report=" + (FactoryScopeUI.powerReport() == null ? "none" : FactoryScopeUI.powerReport().grids.size())
                 + ", overlay=" + (Core.scene.find("factoryscope-power-viewing") != null)));
         queue(() -> {
-            Building connector = placeAt(Blocks.powerNode, x1 + 6, y1 + 2);
-            if(connector != null){
-                connector.configureAny(gridProducers[0].pos());
-                connector.configureAny(gridProducers[1].pos());
+            gridConnector[0] = placeAt(Blocks.powerNode, x1 + 6, y1 + 2);
+            if(gridConnector[0] != null){
+                gridConnector[0].configureAny(gridProducers[0].pos());
+                gridConnector[0].configureAny(gridProducers[1].pos());
             }
             check("a newly placed PowerNode merges the two live engine grids",
-                connector != null && gridProducers[0].power.graph == gridProducers[1].power.graph
-                    && connector.power.graph == gridProducers[0].power.graph);
+                gridConnector[0] != null && gridProducers[0].power.graph == gridProducers[1].power.graph
+                    && gridConnector[0].power.graph == gridProducers[0].power.graph);
         });
         queue(() -> clickNamed("factoryscope-power-refresh"));
         queue(() -> {
@@ -1160,6 +1180,33 @@ public class AcceptanceHarness extends Mod{
             Core.scene.find("factoryscope-area-power") != null && FactoryScopeUI.areaReport() != null
                 && FactoryScopeUI.areaReport().power == refreshedPowerSnapshot
                 && FactoryScopeUI.powerReport() == null));
+        queue(() -> {
+            gridConnector[0].configureAny(gridProducers[0].pos());
+            gridConnector[0].configureAny(gridProducers[1].pos());
+            check("removing both established PowerNode links splits the live engine grid",
+                gridProducers[0].power.graph != gridProducers[1].power.graph);
+        });
+        queue(() -> clickNamed("factoryscope-area-power"));
+        queue(() -> clickNamed("factoryscope-power-refresh"));
+        queue(() -> {
+            PowerGridReport report = FactoryScopeUI.powerReport();
+            long firstProducerGrids = report == null ? 0 : report.grids.stream()
+                .filter(grid -> grid.snapshot.members.stream()
+                    .anyMatch(member -> member.ref.equals(AreaProbe.refOf(gridProducers[0])))).count();
+            long secondProducerGrids = report == null ? 0 : report.grids.stream()
+                .filter(grid -> grid.snapshot.members.stream()
+                    .anyMatch(member -> member.ref.equals(AreaProbe.refOf(gridProducers[1])))).count();
+            long connectorGrids = report == null ? 0 : report.grids.stream()
+                .filter(grid -> grid.snapshot.members.stream()
+                    .anyMatch(member -> member.ref.equals(AreaProbe.refOf(gridConnector[0])))).count();
+            check("Refresh replaces the merged snapshot with both source grids and the isolated PowerNode grid",
+                report != null && report.grids.size() == 3 && firstProducerGrids == 1
+                    && secondProducerGrids == 1 && connectorGrids == 1,
+                "grids=" + (report == null ? "none" : report.grids.size())
+                    + ", producer memberships=" + firstProducerGrids + "/" + secondProducerGrids
+                    + ", connector memberships=" + connectorGrids);
+        });
+        queue(() -> clickNamed("factoryscope-power-back"));
         queue(this::closeAnyDialog);
 
         scenario("world change clears the PowerScope snapshot and electrical overlay");
@@ -1628,7 +1675,8 @@ public class AcceptanceHarness extends Mod{
     void checkPowerLocalization(){
         scenarioNow("every PowerScope string resolves in the active locale");
         Seq<String> keys = Seq.with("power.title", "power.open", "power.inspect-grid", "power.grid-member", "power.scope-note",
-            "power.no-grid", "power.grids", "power.grid", "power.status", "power.selected-members",
+            "label.power-usage-nominal",
+            "power.no-grid", "power.grids", "power.grid", "power.status", "power.selected-members", "power.diode-scope",
             "power.members", "power.extends-outside", "power.satisfaction", "power.generation", "power.demand",
             "power.balance", "power.balance-collecting", "power.battery", "power.generators", "power.consumers",
             "power.batteries", "power.generator-list", "power.consumer-list", "power.battery-list", "power.inspect",
@@ -1653,12 +1701,10 @@ public class AcceptanceHarness extends Mod{
         String locale = String.valueOf(Core.bundle.getLocale()).toLowerCase(java.util.Locale.ROOT);
         if(locale.startsWith("pt")){
             check("single-member PowerScope counts use neutral Portuguese wording",
-                oneMember.startsWith("1 na ") && oneMember.endsWith("1 na rede")
-                    && !oneMember.contains("membros") && !oneMember.contains("selecionados"), oneMember);
+                oneMember.equals("1 / 1"), oneMember);
         }else{
             check("single-member PowerScope counts avoid plural agreement errors",
-                oneMember.contains("selected") && oneMember.contains("in grid")
-                    && !oneMember.contains("visible members"), oneMember);
+                oneMember.equals("1 / 1"), oneMember);
         }
     }
 

@@ -256,7 +256,7 @@ public final class FactoryScopePanel extends BaseDialog{
             }else{
                 value(table, FsBundle.get("label.satisfaction"),
                     Numbers.percent(power.satisfaction), Diagnostics.efficiencyColor(power.satisfaction));
-                value(table, FsBundle.get("label.demand"),
+                value(table, FsBundle.get("label.power-usage-nominal"),
                     FsBundle.format("value.power-rate", Numbers.rate(power.usagePerSecond)), Pal.lightishGray);
             }
             if(power != null && power.hasGridMetrics){
