@@ -7,6 +7,7 @@ import mindustry.type.*;
 import mindustry.world.*;
 import mindustry.world.blocks.distribution.ItemBridge;
 import mindustry.world.blocks.production.*;
+import mindustry.world.blocks.power.PowerGenerator;
 import mindustry.world.consumers.*;
 import mindustry.world.meta.*;
 
@@ -26,6 +27,7 @@ final class ModdedBlocks{
     static ItemBridge crossTypeBridge;
     static ItemBridge otherCrossTypeBridge;
     static ItemBridge sameTypeBridge;
+    static PowerGenerator moddedGenerator;
 
     private ModdedBlocks(){
     }
@@ -85,6 +87,9 @@ final class ModdedBlocks{
         }};
         sameTypeBridge = new ItemBridge("fs-test-same-type-bridge"){{
             range = 6;
+        }};
+        moddedGenerator = new PowerGenerator("fs-test-generator"){{
+            powerProduction = 0.25f;
         }};
     }
 

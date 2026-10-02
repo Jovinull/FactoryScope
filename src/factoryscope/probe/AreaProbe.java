@@ -74,7 +74,7 @@ public final class AreaProbe{
         for(Building build : buildings){
             BuildingRef ref = refOf(build);
             try{
-                FactorySnapshot snapshot = MindustryFactoryProbe.probe(build);
+                FactorySnapshot snapshot = MindustryFactoryProbe.probeForArea(build);
                 snapshots.put(ref, snapshot);
                 entries.add(new AreaEntry(ref, snapshot, FactoryAnalyzer.analyze(snapshot)));
             }catch(Exception e){
@@ -87,6 +87,7 @@ public final class AreaProbe{
 
         return AreaAnalyzer.analyze(selection, buildings.size, entries)
             .withNetwork(MindustryNetworkProbe.scan(selection, viewer, snapshots))
+            .withPower(MindustryPowerProbe.scan(buildings, viewer, snapshots))
             .withSkippedBuildings(skipped);
     }
 
