@@ -47,8 +47,9 @@ PowerScope is tested in `power/PowerGridAnalyzerTest` as a pure domain analyzer 
 battery, and modded-generator behavior. `PowerGridBatteryIntegrationTest` runs actual engine grid updates
 to prove that battery discharge can keep delivered satisfaction high while generation remains below
 demand, and that an empty battery does not. The client acceptance path opens PowerScope from both a
-single-building inspector and Area Diagnostics, checks separate grids and battery role separation, then
-uses Refresh and the electrical-connection overlay.
+single-building inspector and Area Diagnostics, checks separate grids and battery role separation,
+exercises a real BeamNode connection and a directional Power Diode between separate grids, then uses
+Refresh and the electrical-connection overlay.
 
 ## 2. Acceptance suite
 

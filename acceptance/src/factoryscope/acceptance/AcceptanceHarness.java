@@ -1209,6 +1209,35 @@ public class AcceptanceHarness extends Mod{
         queue(() -> clickNamed("factoryscope-power-back"));
         queue(this::closeAnyDialog);
 
+        scenario("PowerScope uses the BeamNode connection maintained by Mindustry");
+        int beamX = rx(), beamY = ry();
+        Building[] beamFixture = new Building[2];
+        queue(() -> {
+            clearRegion();
+            beamFixture[0] = placeAt(Blocks.solarPanel, beamX + 4, beamY + 5);
+            beamFixture[1] = placeAt(Blocks.beamNode, beamX + 5, beamY + 5);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(beamX + 2, beamY + 3, beamX + 7, beamY + 7));
+        queue(() -> clickNamed("factoryscope-area-power"));
+        queue(() -> {
+            PowerGridReport report = FactoryScopeUI.powerReport();
+            PowerConnection expected = new PowerConnection(AreaProbe.refOf(beamFixture[0]),
+                AreaProbe.refOf(beamFixture[1]));
+            check("the real BeamNode and solar panel share Mindustry's established engine grid",
+                report != null && report.grids.size() == 1
+                    && beamFixture[0].power.graph == beamFixture[1].power.graph
+                    && report.grids.get(0).snapshot.connections.contains(expected));
+        });
+        queue(() -> clickNamed("factoryscope-power-view-world"));
+        queue(() -> check("the BeamNode grid can be viewed through the production overlay",
+            Core.scene.find("factoryscope-power-viewing") != null
+                && Core.scene.find("factoryscope-power-return") != null));
+        queue(() -> capture("power-beam-node-world"));
+        queue(() -> clickNamed("factoryscope-power-return"));
+        queue(() -> clickNamed("factoryscope-power-back"));
+        queue(this::closeAnyDialog);
+
         scenario("PowerScope presents a selected Power Diode as a conditional link between separate grids");
         int diodeX = rx(), diodeY = ry();
         Building[] diodeFixture = new Building[3];
