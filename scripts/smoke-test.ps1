@@ -19,6 +19,8 @@
 [CmdletBinding()]
 param(
     [string]$MindustryPath,
+    [string]$MindustryJar,
+    [string]$ModJar,
     [switch]$SkipBuild,
     [switch]$Install,
     [switch]$KeepSandbox,
@@ -32,7 +34,7 @@ $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $jarName = 'FactoryScopeDesktop.jar'
-$builtJar = Join-Path $projectRoot "build\libs\$jarName"
+$builtJar = if($ModJar){ [IO.Path]::GetFullPath($ModJar) }else{ Join-Path $projectRoot "build\libs\$jarName" }
 
 function Write-Step($message){ Write-Host "==> $message" -ForegroundColor Cyan }
 function Write-Fail($message){ Write-Host "!!! $message" -ForegroundColor Red }
@@ -50,14 +52,17 @@ if(-not $SkipBuild){
     }
 }
 
+if($MindustryPath -and $MindustryJar){ throw 'Pass either -MindustryPath or -MindustryJar, not both.' }
 if(-not (Test-Path -LiteralPath $builtJar)){ throw "expected jar not found: $builtJar" }
 
 $jarInfo = Get-Item $builtJar
 $declaredVersion = (Select-String -LiteralPath (Join-Path $projectRoot 'mod.hjson') -Pattern '^\s*version:\s*"([^"]+)"').Matches[0].Groups[1].Value
 
 # a jar older than the sources it is built from would make the whole run meaningless
-$newestSource = Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src'), (Join-Path $projectRoot 'assets') -Recurse -File |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$newestSource = if(-not $ModJar){
+    Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src'), (Join-Path $projectRoot 'assets') -Recurse -File |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+}
 if($newestSource -and $newestSource.LastWriteTime -gt $jarInfo.LastWriteTime){
     throw "the jar is older than $($newestSource.Name); rebuild before running with -SkipBuild"
 }
@@ -72,22 +77,32 @@ if($running.Count -gt 0){
 }
 
 Write-Step 'Locating Mindustry'
-$gamePath = Find-MindustryInstall -Hint $MindustryPath
-if(-not $gamePath){
-    throw 'No Mindustry installation found. Pass -MindustryPath with the folder containing Mindustry.exe.'
+$gameBuild = '159.7'
+if($MindustryJar){
+    $gamePath = [IO.Path]::GetFullPath($MindustryJar)
+    if(-not (Test-Path -LiteralPath $gamePath)){ throw "Mindustry jar not found: $gamePath" }
+    $launcher = Get-MindustryJarLauncher -JarPath $gamePath
+    if(-not $launcher){ throw 'java.exe was not found on PATH.' }
+    $dataDir = $null
+    Write-Host "    jar:      $gamePath"
+}else{
+    $gamePath = Find-MindustryInstall -Hint $MindustryPath
+    if(-not $gamePath){
+        throw 'No Mindustry installation found. Pass -MindustryPath with the folder containing Mindustry.exe or -MindustryJar with an official client jar.'
+    }
+    $launcher = Get-MindustryLauncher -InstallPath $gamePath
+    if(-not $launcher){ throw "No launcher found under $gamePath" }
+    $dataDir = Get-MindustryDataDir -InstallPath $gamePath
+    Write-Host "    install:  $gamePath"
+    Write-Host "    data dir: $dataDir"
 }
-$launcher = Get-MindustryLauncher -InstallPath $gamePath
-if(-not $launcher){ throw "No launcher found under $gamePath" }
-$dataDir = Get-MindustryDataDir -InstallPath $gamePath
 
-Write-Host "    install:  $gamePath"
 Write-Host "    launcher: $($launcher.Path)"
-Write-Host "    data dir: $dataDir"
 
 # --------------------------------------------------------------------------- install
 
 if($Install){
-    if(-not $dataDir){ throw 'Could not determine the Mindustry data directory.' }
+    if(-not $dataDir){ throw '-Install requires a normal Mindustry installation; it cannot be used with -MindustryJar.' }
     $modsDir = Join-Path $dataDir 'mods'
     New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
     # replace only our own artifact; anything else in the folder belongs to the player
@@ -106,13 +121,15 @@ Copy-Item -LiteralPath $builtJar -Destination (Join-Path $sandboxMods $jarName) 
 # The Steam desktop jar enables Steam solely from this classpath resource. Running it as a Steam client
 # also imports subscribed Workshop mods, which is outside the sandbox. The release modifier keeps the
 # same client code while skipping Steam initialization and its Workshop inventory.
-Set-Content -LiteralPath (Join-Path $sandbox 'version.properties') -Value @(
-    'number=8',
-    'build=159.7',
-    'modifier=release',
-    'type=official',
-    'commitHash=unknown'
-) -Encoding ascii
+if(-not $MindustryJar){
+    Set-Content -LiteralPath (Join-Path $sandbox 'version.properties') -Value @(
+        'number=8',
+        "build=$gameBuild",
+        'modifier=release',
+        'type=official',
+        'commitHash=unknown'
+    ) -Encoding ascii
+}
 
 $logFile = Join-Path $sandboxData 'last_log.txt'
 Write-Step "Starting Mindustry in sandbox $sandbox"

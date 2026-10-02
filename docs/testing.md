@@ -36,7 +36,8 @@ The headless boot downloads the Mindustry `assets.jar` once and unpacks the non-
 gradlew acceptanceTest
 ```
 
-Needs **a local Mindustry v8 install** and, for now, **Windows**.
+Needs **a Mindustry v8 client** and, for now, **Windows**. Pass `-MindustryPath` for an installed
+client or `-MindustryJar` for an official desktop release jar.
 
 This is the layer that catches what the other two cannot. `acceptance/` builds a second Mindustry mod,
 `FactoryScopeAcceptance.jar`, which loads next to FactoryScope in a throwaway sandbox and drives the
@@ -92,6 +93,7 @@ Run the script directly if you want the options:
 
 ```
 powershell -ExecutionPolicy Bypass -File scripts\acceptance-test.ps1 -KeepSandbox
+powershell -ExecutionPolicy Bypass -File scripts\acceptance-test.ps1 -MindustryJar C:\Games\Mindustry.jar -ModJar build\libs\FactoryScope.jar
 ```
 
 On a non-Windows machine `gradlew acceptanceTest` fails with a clear message rather than silently
@@ -105,7 +107,9 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1
 ```
 
 Builds, finds the local Mindustry install, launches it in a sandbox and checks the log for **this
-version** initialising with no errors. `-Install` also copies the jar into your real mods folder.
+version** initialising with no errors. `-MindustryJar` selects an official client jar and `-ModJar`
+selects the exact mod artifact to test. `-Install` copies the built jar into your real mods folder and
+is only available with `-MindustryPath` or automatic install discovery.
 
 ## Benchmark
 
