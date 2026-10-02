@@ -6,6 +6,7 @@
 
 - Item production rates and output-buffer diagnostics now account for Mindustry 160's dynamically scaled
   crafter outputs, including Attribute Crafters such as the Silicon Crucible.
+- Item-bridge routes now respect both endpoints' cross-type link settings.
 
 ### Changed
 
