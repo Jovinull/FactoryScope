@@ -5,6 +5,7 @@ import mindustry.content.*;
 import mindustry.gen.*;
 import mindustry.type.*;
 import mindustry.world.*;
+import mindustry.world.blocks.distribution.ItemBridge;
 import mindustry.world.blocks.production.*;
 import mindustry.world.consumers.*;
 import mindustry.world.meta.*;
@@ -16,9 +17,13 @@ import mindustry.world.meta.*;
 final class ModdedBlocks{
     static GenericCrafter conventional;
     static GenericCrafter boosted;
+    static AttributeCrafter yieldScaled;
     static GenericCrafter exotic;
     static Block oddBuilding;
     static Block unknownTransport;
+    static ItemBridge crossTypeBridge;
+    static ItemBridge otherCrossTypeBridge;
+    static ItemBridge sameTypeBridge;
 
     private ModdedBlocks(){
     }
@@ -42,6 +47,18 @@ final class ModdedBlocks{
             consume(new ConsumeItemFlammable()).boost();
         }};
 
+        yieldScaled = new AttributeCrafter("fs-test-yield-scaled"){{
+            craftTime = 60f;
+            outputItems = new ItemStack[]{
+                new ItemStack(Items.graphite, 2),
+                new ItemStack(Items.silicon, 1)
+            };
+            outputScale = 0.5f;
+            boostScale = 0.5f;
+            maxBoost = 1f;
+            itemCapacity = 10;
+        }};
+
         exotic = new GenericCrafter("fs-test-exotic"){{
             craftTime = 45f;
             outputItem = new ItemStack(Items.titanium, 1);
@@ -51,6 +68,17 @@ final class ModdedBlocks{
 
         oddBuilding = new OddBlock("fs-test-odd");
         unknownTransport = new UnknownTransportBlock("fs-test-unknown-transport");
+        crossTypeBridge = new ItemBridge("fs-test-cross-type-bridge"){{
+            linkSameType = false;
+            range = 6;
+        }};
+        otherCrossTypeBridge = new ItemBridge("fs-test-other-cross-type-bridge"){{
+            linkSameType = false;
+            range = 6;
+        }};
+        sameTypeBridge = new ItemBridge("fs-test-same-type-bridge"){{
+            range = 6;
+        }};
     }
 
     /** A consumer type FactoryScope has never heard of, with a satisfaction the test can steer. */

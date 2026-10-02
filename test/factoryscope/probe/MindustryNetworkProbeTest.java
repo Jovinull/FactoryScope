@@ -7,6 +7,7 @@ import mindustry.content.*;
 import mindustry.game.*;
 import mindustry.gen.*;
 import mindustry.world.*;
+import mindustry.world.blocks.distribution.ItemBridge;
 import org.junit.jupiter.api.*;
 
 import java.util.*;
@@ -14,7 +15,7 @@ import java.util.*;
 import static mindustry.Vars.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Transport semantics checked against real v159.7 block instances. */
+/** Transport semantics checked against real v160.5 block instances. */
 class MindustryNetworkProbeTest{
     private static final ResourceRef copper = new ResourceRef(ResourceKind.item, "copper", "Copper");
     private static final ResourceRef lead = new ResourceRef(ResourceKind.item, "lead", "Lead");
@@ -265,6 +266,34 @@ class MindustryNetworkProbeTest{
         ItemNetwork broken = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 16, 12), Team.sharded);
         assertFalse(broken.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
             input(AreaProbe.refOf(candidate), NetworkSide.east), copper));
+    }
+
+    @Test
+    void crossTypeBridgeNeedsBothBlocksToAllowThatLink(){
+        Building source = place(ModdedBlocks.crossTypeBridge, 8, 10, 0);
+        Building target = place(ModdedBlocks.sameTypeBridge, 12, 10, 0);
+        source.configure(target.tile.pos());
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 14, 12), Team.sharded);
+
+        assertTrue(((ItemBridge)source.block).linkValid(source.tile, target.tile));
+        assertFalse(((ItemBridge)target.block).linkValid(source.tile, target.tile));
+        assertFalse(target.acceptItem(source, Items.copper), "the receiving bridge rejects this cross-type link");
+        assertFalse(network.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
+            input(AreaProbe.refOf(target), NetworkSide.west), copper));
+    }
+
+    @Test
+    void crossTypeBridgeIsModeledWhenBothBlocksAllowIt(){
+        Building source = place(ModdedBlocks.crossTypeBridge, 8, 10, 0);
+        Building target = place(ModdedBlocks.otherCrossTypeBridge, 12, 10, 0);
+        source.configure(target.tile.pos());
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 14, 12), Team.sharded);
+
+        assertTrue(target.acceptItem(source, Items.copper));
+        assertTrue(network.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
+            input(AreaProbe.refOf(target), NetworkSide.west), copper));
     }
 
     @Test

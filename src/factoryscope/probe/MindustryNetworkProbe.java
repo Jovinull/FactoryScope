@@ -271,7 +271,8 @@ public final class MindustryNetworkProbe{
         Tile linkedTile = mindustry.Vars.world.tile(bridge.link);
         Building linked = linkedTile == null ? null : linkedTile.build;
         if(!(linked instanceof ItemBridge.ItemBridgeBuild target) || linked.team != viewer) return null;
-        return block.linkValid(bridge.tile, linkedTile) ? linked : null;
+        return block.linkValid(bridge.tile, linkedTile) && ((ItemBridge)target.block).linkValid(bridge.tile, linkedTile)
+            ? linked : null;
     }
 
     private static NetworkSide sideTo(Building from, Building to){
