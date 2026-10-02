@@ -30,7 +30,7 @@ final class Areas{
     }
 
     static AreaEntry entry(BuildingRef ref, FactorySnapshot snapshot){
-        return new AreaEntry(ref, snapshot.support, FactoryAnalyzer.analyze(snapshot));
+        return new AreaEntry(ref, snapshot, FactoryAnalyzer.analyze(snapshot));
     }
 
     static AreaEntry entry(FactorySnapshot snapshot){

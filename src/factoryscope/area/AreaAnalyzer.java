@@ -15,8 +15,8 @@ import java.util.*;
  * class only counts, groups and orders results that already exist.
  *
  * <p>It also does not infer causality between buildings. "Sand shortages affect eight buildings" is a
- * count of observations; it is not a claim that sand production is the root cause of anything. Root
- * cause needs a production-network model, which FactoryScope does not have.
+ * count of observations; it is not a claim that sand production caused another building's state.
+ * Supply Trace correlates those observations with structural routes but does not establish causation.
  *
  * <h2>Counting rules</h2>
  * <ul>

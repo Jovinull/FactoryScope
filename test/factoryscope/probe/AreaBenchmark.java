@@ -79,8 +79,7 @@ class AreaBenchmark{
             List<AreaEntry> entries = new ArrayList<>(buildings.size);
             for(int i = 0; i < buildings.size; i++){
                 FactorySnapshot snapshot = snapshots.get(i);
-                entries.add(new AreaEntry(AreaProbe.refOf(buildings.get(i)), snapshot.support,
-                    FactoryAnalyzer.analyze(snapshot)));
+                entries.add(new AreaEntry(AreaProbe.refOf(buildings.get(i)), snapshot, FactoryAnalyzer.analyze(snapshot)));
             }
             long t3 = System.nanoTime();
 

@@ -22,6 +22,10 @@ public final class MindustryNetworkProbe{
     }
 
     public static ItemNetwork scan(AreaSelection selection, Team viewer){
+        return scan(selection, viewer, Map.of());
+    }
+
+    public static ItemNetwork scan(AreaSelection selection, Team viewer, Map<BuildingRef, FactorySnapshot> snapshots){
         Seq<Building> selected = AreaProbe.collect(selection, viewer);
         Map<BuildingRef, Building> buildings = new TreeMap<>(Comparator
             .comparingInt((BuildingRef ref) -> ref.tileX).thenComparingInt(ref -> ref.tileY)
@@ -31,23 +35,47 @@ public final class MindustryNetworkProbe{
         List<NetworkPort> ports = new ArrayList<>();
         List<NetworkEdge> edges = new ArrayList<>();
         List<NetworkPort> boundary = new ArrayList<>();
+        List<NetworkPort> boundaryInputs = new ArrayList<>();
         List<BuildingRef> unsupported = new ArrayList<>();
+        List<NetworkInterruption> interruptions = new ArrayList<>();
+        List<BuildingRef> storage = new ArrayList<>();
         List<ResourceRef> resources = new ArrayList<>();
+        Set<Building> itemSources = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<Building> itemSinks = Collections.newSetFromMap(new IdentityHashMap<>());
+        Map<Building, List<ResourceRef>> itemProducts = new IdentityHashMap<>();
         Map<Building, BuildingRef> refs = new IdentityHashMap<>();
         buildings.forEach((ref, build) -> refs.put(build, ref));
 
         for(var entry : buildings.entrySet()){
             Building build = entry.getValue();
             BuildingRef ref = entry.getKey();
+            FactorySnapshot snapshot = snapshots.get(ref);
+            if(snapshot == null){
+                try{
+                    snapshot = MindustryFactoryProbe.probe(build);
+                }catch(Exception ignored){
+                    //Topology can still be reported when a custom diagnostic consumer cannot be read.
+                }
+            }
+            boolean storageEndpoint = build instanceof StorageBlock.StorageBuild || build instanceof CoreBlock.CoreBuild;
+            boolean itemConsumer = snapshot != null && snapshot.inputs.stream()
+                .anyMatch(input -> input.kind == ResourceKind.item);
+            boolean itemProducer = snapshot != null && !snapshot.producedItems.isEmpty();
             if(isKnownTransport(build)){
                 addPorts(ports, ref);
                 addInternal(edges, build, ref, viewer);
-            }else if(isEndpoint(build)){
+            }else if(isEndpoint(build) || (!isUnknownTransport(build) && (itemConsumer || itemProducer))){
                 addPorts(ports, ref);
+                if(storageEndpoint) storage.add(ref);
             }else if(isUnknownTransport(build)){
                 unsupported.add(ref);
             }
-            collectResources(build, resources);
+            if(itemProducer){
+                itemSources.add(build);
+                itemProducts.put(build, snapshot.producedItems);
+            }
+            if(itemConsumer || storageEndpoint) itemSinks.add(build);
+            collectResources(build, snapshot, resources);
         }
 
         for(var entry : buildings.entrySet()){
@@ -55,21 +83,48 @@ public final class MindustryNetworkProbe{
             BuildingRef sourceRef = entry.getKey();
             for(Adjacent adjacent : adjacent(source)){
                 NetworkSide side = adjacent.side;
-                if(!outputSides(source, viewer).contains(side)) continue;
+                if(!outputSides(source, viewer, itemSources).contains(side)) continue;
                 Building neighbor = adjacent.building;
                 if(neighbor == null || neighbor.team != viewer) continue;
                 NetworkPort out = output(sourceRef, side);
                 BuildingRef targetRef = refs.get(neighbor);
-                if(targetRef == null){
-                    boundary.add(out);
-                }else if(inputSides(neighbor, viewer).contains(side.opposite()) && acceptsTopologyFrom(neighbor, source)){
-                    edges.add(new NetworkEdge(out, input(targetRef, side.opposite()), outputConstraint(source), false));
+                if(isUnknownTransport(neighbor)){
+                    interruptions.add(new NetworkInterruption(out, targetRef == null ? AreaProbe.refOf(neighbor) : targetRef,
+                        NetworkInterruption.Direction.outgoing));
+                }else if(inputSides(neighbor, viewer, itemSinks).contains(side.opposite()) && acceptsTopologyFrom(neighbor, source)){
+                    if(targetRef == null){
+                        boundary.add(out);
+                    }else{
+                        edges.add(new NetworkEdge(out, input(targetRef, side.opposite()), outputConstraint(source, itemProducts), false));
+                    }
                 }
             }
         }
 
-        addBridgeEdges(edges, boundary, buildings, refs, viewer);
-        return new ItemNetwork(new NetworkGraph(ports, edges), boundary, unsupported, resources);
+        for(var entry : buildings.entrySet()){
+            Building target = entry.getValue();
+            BuildingRef targetRef = entry.getKey();
+            if(!isKnownTransport(target) && !isEndpoint(target)) continue;
+            for(Adjacent adjacent : adjacent(target)){
+                Building neighbor = adjacent.building;
+                if(neighbor == null || neighbor.team != viewer) continue;
+                NetworkSide side = adjacent.side;
+                if(!inputSides(target, viewer, itemSinks).contains(side)) continue;
+
+                if(isUnknownTransport(neighbor)){
+                    BuildingRef unsupportedRef = refs.getOrDefault(neighbor, AreaProbe.refOf(neighbor));
+                    interruptions.add(new NetworkInterruption(input(targetRef, side), unsupportedRef,
+                        NetworkInterruption.Direction.incoming));
+                }else if(!refs.containsKey(neighbor)
+                    && (outputSides(neighbor, viewer, itemSources).contains(side.opposite()) || hasItemOutput(neighbor, itemSources))){
+                    boundaryInputs.add(input(targetRef, side));
+                }
+            }
+        }
+
+        addBridgeEdges(edges, boundary, boundaryInputs, buildings, refs, viewer);
+        return new ItemNetwork(new NetworkGraph(ports, edges), boundary, boundaryInputs, unsupported,
+            interruptions, storage, resources);
     }
 
     private static List<Adjacent> adjacent(Building build){
@@ -102,16 +157,26 @@ public final class MindustryNetworkProbe{
     }
 
     private static void addBridgeEdges(List<NetworkEdge> edges, List<NetworkPort> boundary,
+                                       List<NetworkPort> boundaryInputs,
                                        Map<BuildingRef, Building> selected, Map<Building, BuildingRef> refs, Team viewer){
         for(var entry : selected.entrySet()){
             if(!(entry.getValue() instanceof ItemBridge.ItemBridgeBuild bridge)) continue;
             Building linked = validBridgeTarget(bridge, viewer);
-            if(linked == null) continue;
-            BuildingRef target = refs.get(linked);
-            NetworkSide direction = sideTo(bridge, linked);
-            NetworkPort from = output(entry.getKey(), direction);
-            if(target == null) boundary.add(from);
-            else edges.add(new NetworkEdge(from, input(target, direction.opposite()), ItemConstraint.any(), false));
+            if(linked != null){
+                BuildingRef target = refs.get(linked);
+                NetworkSide direction = sideTo(bridge, linked);
+                NetworkPort from = output(entry.getKey(), direction);
+                if(target == null) boundary.add(from);
+                else edges.add(new NetworkEdge(from, input(target, direction.opposite()), ItemConstraint.any(), false));
+            }
+
+            for(int i = 0; i < bridge.incoming.size; i++){
+                Tile sourceTile = mindustry.Vars.world.tile(bridge.incoming.items[i]);
+                Building source = sourceTile == null ? null : sourceTile.build;
+                if(!(source instanceof ItemBridge.ItemBridgeBuild sourceBridge) || source.team != viewer
+                    || refs.containsKey(source) || validBridgeTarget(sourceBridge, viewer) != bridge) continue;
+                boundaryInputs.add(input(entry.getKey(), sideTo(bridge, source)));
+            }
         }
     }
 
@@ -215,15 +280,16 @@ public final class MindustryNetworkProbe{
     }
 
     private static boolean isUnknownTransport(Building build){
-        return isExplicitlyUnsupported(build) || (build.block.group == BlockGroup.transportation && build.block.hasItems)
-            || build instanceof MassDriver.MassDriverBuild || build instanceof Unloader.UnloaderBuild;
+        return !isKnownTransport(build) && !isEndpoint(build)
+            && (isExplicitlyUnsupported(build) || (build.block.group == BlockGroup.transportation && build.block.hasItems)
+                || build instanceof MassDriver.MassDriverBuild || build instanceof Unloader.UnloaderBuild);
     }
 
     private static boolean isExplicitlyUnsupported(Building build){
         return build.block instanceof ArmoredConveyor || (build.block instanceof Duct duct && duct.armored);
     }
 
-    private static EnumSet<NetworkSide> outputSides(Building build, Team viewer){
+    private static EnumSet<NetworkSide> outputSides(Building build, Team viewer, Set<Building> itemSources){
         if(isExplicitlyUnsupported(build)) return EnumSet.noneOf(NetworkSide.class);
         if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild)
             return EnumSet.of(NetworkSide.rotation(build.rotation));
@@ -240,12 +306,12 @@ public final class MindustryNetworkProbe{
             return EnumSet.allOf(NetworkSide.class);
         if(build instanceof ItemBridge.ItemBridgeBuild bridge)
             return validBridgeTarget(bridge, viewer) == null ? EnumSet.allOf(NetworkSide.class) : EnumSet.noneOf(NetworkSide.class);
-        if(build instanceof GenericCrafter.GenericCrafterBuild || build instanceof Drill.DrillBuild)
+        if(itemSources.contains(build))
             return EnumSet.allOf(NetworkSide.class);
         return EnumSet.noneOf(NetworkSide.class);
     }
 
-    private static EnumSet<NetworkSide> inputSides(Building build, Team viewer){
+    private static EnumSet<NetworkSide> inputSides(Building build, Team viewer, Set<Building> itemSinks){
         if(isExplicitlyUnsupported(build)) return EnumSet.noneOf(NetworkSide.class);
         if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild){
             EnumSet<NetworkSide> sides = EnumSet.allOf(NetworkSide.class);
@@ -255,7 +321,7 @@ public final class MindustryNetworkProbe{
         if(build instanceof OverflowDuct.OverflowDuctBuild) return EnumSet.of(NetworkSide.rotation(build.rotation).opposite());
         if(build instanceof DuctRouter.DuctRouterBuild) return EnumSet.of(NetworkSide.rotation(build.rotation).opposite());
         if(build instanceof Junction.JunctionBuild || build instanceof Sorter.SorterBuild || build instanceof Router.RouterBuild
-            || build instanceof OverflowGate.OverflowGateBuild || isEndpoint(build)) return EnumSet.allOf(NetworkSide.class);
+            || build instanceof OverflowGate.OverflowGateBuild || itemSinks.contains(build)) return EnumSet.allOf(NetworkSide.class);
         if(build instanceof ItemBridge.ItemBridgeBuild bridge){
             Building linked = validBridgeTarget(bridge, viewer);
             if(linked == null) return EnumSet.noneOf(NetworkSide.class);
@@ -286,29 +352,34 @@ public final class MindustryNetworkProbe{
         return item == null ? null : new ResourceRef(ResourceKind.item, item.name, item.localizedName);
     }
 
-    private static ItemConstraint outputConstraint(Building build){
-        if(build instanceof GenericCrafter.GenericCrafterBuild crafter && crafter.block instanceof GenericCrafter block && block.outputItem != null)
-            return ItemConstraint.only(itemRef(block.outputItem.item));
+    private static ItemConstraint outputConstraint(Building build, Map<Building, List<ResourceRef>> itemProducts){
+        List<ResourceRef> products = itemProducts.get(build);
+        if(products != null && products.size() == 1) return ItemConstraint.only(products.get(0));
+        if(products != null && !products.isEmpty()) return ItemConstraint.oneOf(products);
         return ItemConstraint.any();
     }
 
-    private static void collectResources(Building build, List<ResourceRef> resources){
+    private static void collectResources(Building build, FactorySnapshot snapshot, List<ResourceRef> resources){
         if(build instanceof Sorter.SorterBuild sorter && sorter.sortItem != null) resources.add(itemRef(sorter.sortItem));
         if(build instanceof DuctRouter.DuctRouterBuild router && router.sortItem != null) resources.add(itemRef(router.sortItem));
-        if(build.block instanceof GenericCrafter crafter && crafter.outputItem != null) resources.add(itemRef(crafter.outputItem.item));
-        for(Consume consume : build.block.consumers){
-            if(consume instanceof ConsumeItems items){
-                for(ItemStack stack : items.items) resources.add(itemRef(stack.item));
-            }else if(consume instanceof ConsumeItemDynamic dynamic){
-                for(ItemStack stack : dynamic.items.get(build)) resources.add(itemRef(stack.item));
-            }else if(consume instanceof ConsumeItemFilter filter){
-                Item item = filter.getConsumed(build);
-                if(item != null) resources.add(itemRef(item));
-            }
+        if(snapshot == null) return;
+        for(ResourceState input : snapshot.inputs){
+            if(input.kind == ResourceKind.item && input.contentId != null) resources.add(input.ref());
         }
+        resources.addAll(snapshot.producedItems);
     }
 
     private static boolean acceptsTopologyFrom(Building target, Building source){
         return true;
+    }
+
+    private static boolean hasItemOutput(Building build, Set<Building> itemSources){
+        if(itemSources.contains(build)) return true;
+        if(isUnknownTransport(build)) return false;
+        try{
+            return !MindustryFactoryProbe.probe(build).producedItems.isEmpty();
+        }catch(Exception ignored){
+            return false;
+        }
     }
 }

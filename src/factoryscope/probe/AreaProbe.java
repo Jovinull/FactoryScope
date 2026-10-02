@@ -68,11 +68,14 @@ public final class AreaProbe{
     public static AreaDiagnosticResult scan(AreaSelection selection, Team viewer){
         Seq<Building> buildings = collect(selection, viewer);
         List<AreaEntry> entries = new ArrayList<>(buildings.size);
+        Map<BuildingRef, FactorySnapshot> snapshots = new HashMap<>();
 
         for(Building build : buildings){
             try{
                 FactorySnapshot snapshot = MindustryFactoryProbe.probe(build);
-                entries.add(new AreaEntry(refOf(build), snapshot.support, FactoryAnalyzer.analyze(snapshot)));
+                BuildingRef ref = refOf(build);
+                snapshots.put(ref, snapshot);
+                entries.add(new AreaEntry(ref, snapshot, FactoryAnalyzer.analyze(snapshot)));
             }catch(Exception e){
                 //one hostile block must not cost the player the whole report
                 FsLog.warnOnce("area:" + build.block.name,
@@ -80,7 +83,8 @@ public final class AreaProbe{
             }
         }
 
-        return AreaAnalyzer.analyze(selection, buildings.size, entries).withNetwork(MindustryNetworkProbe.scan(selection, viewer));
+        return AreaAnalyzer.analyze(selection, buildings.size, entries)
+            .withNetwork(MindustryNetworkProbe.scan(selection, viewer, snapshots));
     }
 
     public static BuildingRef refOf(Building build){

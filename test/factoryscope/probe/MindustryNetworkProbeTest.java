@@ -1,12 +1,15 @@
 package factoryscope.probe;
 
 import factoryscope.area.*;
+import factoryscope.analysis.DiagnosticReason;
 import factoryscope.model.*;
 import factoryscope.network.*;
+import factoryscope.trace.*;
 import mindustry.content.*;
 import mindustry.game.*;
 import mindustry.gen.*;
 import mindustry.world.*;
+import mindustry.world.blocks.environment.Floor;
 import mindustry.world.blocks.distribution.ItemBridge;
 import org.junit.jupiter.api.*;
 
@@ -19,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MindustryNetworkProbeTest{
     private static final ResourceRef copper = new ResourceRef(ResourceKind.item, "copper", "Copper");
     private static final ResourceRef lead = new ResourceRef(ResourceKind.item, "lead", "Lead");
+    private static final ResourceRef sand = new ResourceRef(ResourceKind.item, "sand", "Sand");
 
     @BeforeAll
     static void boot(){ HeadlessGame.start(); }
@@ -319,6 +323,131 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void anOutsideSourceWithACompatibleOutputIsRecordedAsAnInputContinuation(){
+        place(Blocks.conveyor, 10, 10, 0);
+        Building inside = place(Blocks.conveyor, 11, 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(11, 10, 11, 10), Team.sharded);
+
+        assertTrue(network.boundaryInputs.contains(input(AreaProbe.refOf(inside), NetworkSide.west)));
+    }
+
+    @Test
+    void anOutsideProducerCanContinueIntoASelectedFactory(){
+        for(int x = 9; x <= 10; x++) for(int y = 9; y <= 10; y++) world.tile(x, y).setFloor((Floor)Blocks.sand);
+        place(Blocks.mechanicalDrill, 9, 9, 0);
+        Building target = place(Blocks.siliconSmelter, 11, 9, 0);
+
+        AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(11, 9, 12, 10), Team.sharded);
+        SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(target), sand);
+
+        assertFalse(trace.complete);
+        assertFalse(trace.noRouteProven);
+        assertEquals(List.of(input(AreaProbe.refOf(target), NetworkSide.west)), trace.boundaryContinuations);
+        assertTrue(trace.producers().isEmpty(), "the outside drill is a continuation, not an in-area endpoint");
+    }
+
+    @Test
+    void anUnsupportedNeighborIsAnInterruptionRatherThanADeadEndOrGuessedEdge(){
+        Building unknown = place(Blocks.armoredConveyor, 10, 10, 0);
+        Building inside = place(Blocks.conveyor, 11, 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(11, 10, 11, 10), Team.sharded);
+
+        assertTrue(network.graph.edges.stream().noneMatch(edge -> edge.from.building.equals(AreaProbe.refOf(unknown))
+            || edge.to.building.equals(AreaProbe.refOf(unknown))));
+        assertTrue(network.unsupportedConnections.stream().anyMatch(connection ->
+            connection.port.equals(input(AreaProbe.refOf(inside), NetworkSide.west))
+                && connection.transport.equals(AreaProbe.refOf(unknown))
+                && connection.direction == NetworkInterruption.Direction.incoming));
+        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
+    }
+
+    @Test
+    void aConfiguredIncomingBridgeOutsideTheSelectionIsAnInputContinuation(){
+        Building source = place(Blocks.itemBridge, 8, 10, 0);
+        Building target = place(Blocks.itemBridge, 12, 10, 0);
+        source.configure(target.tile.pos());
+        ((ItemBridge.ItemBridgeBuild)target).incoming.add(source.tile.pos());
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(12, 10, 12, 10), Team.sharded);
+
+        assertTrue(network.boundaryInputs.contains(input(AreaProbe.refOf(target), NetworkSide.west)));
+        assertTrue(network.graph.ports.stream().noneMatch(port -> port.building.equals(AreaProbe.refOf(source))),
+            "the probe must not pull the remote source into the selected area");
+    }
+
+    @Test
+    void drillsExposeTheirDominantItemAsAProductWithoutAddingAProductionRate(){
+        world.tile(10, 10).setFloor((Floor)Blocks.sand);
+        Building drill = place(Blocks.mechanicalDrill, 10, 10, 0);
+
+        FactorySnapshot snapshot = MindustryFactoryProbe.probe(drill);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+
+        assertEquals(List.of("sand"), snapshot.producedItems.stream().map(item -> item.id).toList());
+        assertTrue(snapshot.outputs.isEmpty(), "drill capability is not relabeled as a rate measurement");
+        assertTrue(network.resources.stream().anyMatch(item -> item.id.equals("sand")));
+    }
+
+    @Test
+    void aRealDrillCanBeTracedToAMissingCrafterInput(){
+        world.tile(9, 9).setFloor((Floor)Blocks.sand);
+        world.tile(10, 9).setFloor((Floor)Blocks.sand);
+        world.tile(9, 10).setFloor((Floor)Blocks.sand);
+        world.tile(10, 10).setFloor((Floor)Blocks.sand);
+        Building drill = place(Blocks.mechanicalDrill, 9, 9, 0);
+        Building firstBelt = place(Blocks.conveyor, 11, 9, 0);
+        Building secondBelt = place(Blocks.conveyor, 12, 9, 0);
+        Building thirdBelt = place(Blocks.conveyor, 13, 9, 0);
+        Building smelter = place(Blocks.siliconSmelter, 14, 9, 0);
+        AreaSelection selection = AreaSelection.of(8, 8, 16, 13);
+
+        AreaDiagnosticResult area = AreaProbe.scan(selection, Team.sharded);
+        SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(smelter), sand);
+
+        assertEquals(1, trace.producers().size(), "products="
+            + area.entries.stream().map(entry -> entry.ref + "=" + (entry.snapshot == null ? "null" : entry.snapshot.producedItems)).toList()
+            + " edges=" + area.network.graph.edges.stream().map(edge -> edge.from.building + ":" + edge.from.side + ">"
+                + edge.to.building + ":" + edge.to.side).toList());
+        assertEquals(AreaProbe.refOf(drill), trace.producers().get(0).building);
+        assertTrue(trace.producers().get(0).path.ports().stream().anyMatch(port -> port.building.equals(AreaProbe.refOf(firstBelt))));
+        assertTrue(trace.producers().get(0).path.ports().stream().anyMatch(port -> port.building.equals(AreaProbe.refOf(secondBelt))));
+        assertTrue(trace.producers().get(0).path.ports().stream().anyMatch(port -> port.building.equals(AreaProbe.refOf(thirdBelt))));
+        assertTrue(trace.complete);
+        assertFalse(trace.noRouteProven);
+    }
+
+    @Test
+    void aDisabledReachableDrillRemainsAProducerWithItsDiagnostic(){
+        for(int x = 9; x <= 10; x++){
+            for(int y = 10; y <= 11; y++) world.tile(x, y).setFloor((Floor)Blocks.sand);
+            for(int y = 12; y <= 13; y++) world.tile(x, y).setFloor((Floor)Blocks.sand);
+        }
+        Building operating = place(Blocks.mechanicalDrill, 9, 10, 0);
+        Building disabled = place(Blocks.mechanicalDrill, 9, 12, 0);
+        disabled.enabled = false;
+        place(Blocks.conveyor, 11, 10, 0);
+        place(Blocks.conveyor, 12, 10, 0);
+        place(Blocks.conveyor, 13, 10, 0);
+        place(Blocks.conveyor, 11, 12, 0);
+        place(Blocks.conveyor, 12, 12, 0);
+        place(Blocks.conveyor, 13, 12, 0);
+        place(Blocks.conveyor, 14, 12, 3);
+        Building smelter = place(Blocks.siliconSmelter, 14, 10, 0);
+
+        AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 8, 17, 15), Team.sharded);
+        SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(smelter), sand);
+
+        assertEquals(Set.of(AreaProbe.refOf(operating), AreaProbe.refOf(disabled)),
+            new HashSet<>(trace.producers().stream().map(endpoint -> endpoint.building).toList()));
+        assertEquals(2, trace.producers().size());
+        assertEquals(DiagnosticReason.disabled, trace.producers().stream()
+            .filter(endpoint -> endpoint.building.equals(AreaProbe.refOf(disabled)))
+            .findFirst().orElseThrow().diagnostic.reason());
+    }
+
+    @Test
     void ductBridgesArePartialUntilTheirRemoteIngressIsModeled(){
         Building source = place(Blocks.ductBridge, 8, 10, 0);
         Building target = place(Blocks.ductBridge, 12, 10, 0);
@@ -356,6 +485,18 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void unknownItemConsumingTransportIsTopologyIncompleteNotDiagnosisIncomplete(){
+        Building unknown = place(ModdedBlocks.unknownTransport, 10, 10, 0);
+        AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+        SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(unknown), sand);
+
+        assertTrue(trace.targetUsesItem);
+        assertFalse(trace.diagnosticsIncomplete);
+        assertTrue(trace.topologyIncomplete);
+        assertFalse(trace.noRouteProven);
+    }
+
+    @Test
     void plastaniumConveyorsAreExplicitlyPartialUntilTheirBatchModesAreModeled(){
         Building conveyor = place(Blocks.plastaniumConveyor, 10, 10, 0);
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
@@ -373,6 +514,59 @@ class MindustryNetworkProbeTest{
         for(ResourceRef resource : network.resources) resources.add(resource.id);
 
         assertEquals(Set.of("copper", "lead", "graphite"), resources);
+    }
+
+    @Test
+    void conventionalModdedCrafterCanBeTracedAsAProducer(){
+        Building source = place(ModdedBlocks.conventional, 10, 10, 0);
+        place(Blocks.conveyor, 11, 10, 0);
+        Building target = place(ModdedBlocks.traceConsumer, 12, 10, 0);
+        AreaSelection selection = AreaSelection.of(8, 8, 14, 12);
+
+        AreaDiagnosticResult area = AreaProbe.scan(selection, Team.sharded);
+        SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(target),
+            new ResourceRef(ResourceKind.item, "graphite", "Graphite"));
+
+        assertEquals(List.of(AreaProbe.refOf(source)), trace.producers().stream().map(endpoint -> endpoint.building).toList());
+    }
+
+    @Test
+    void multipleOutputCrafterRoutesOnlyItsDeclaredProducts(){
+        Building source = place(ModdedBlocks.yieldScaled, 10, 10, 0);
+        Building belt = place(Blocks.conveyor, 11, 10, 0);
+        Building target = place(ModdedBlocks.traceConsumer, 12, 10, 0);
+
+        AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 8, 14, 12), Team.sharded);
+        SupplyTrace copperTrace = TraceAnalyzer.output(area, AreaProbe.refOf(source), copper);
+        SupplyTrace graphiteTrace = TraceAnalyzer.output(area, AreaProbe.refOf(source),
+            new ResourceRef(ResourceKind.item, "graphite", "Graphite"));
+        NetworkEdge sourceEdge = area.network.graph.edges.stream()
+            .filter(edge -> edge.from.building.equals(AreaProbe.refOf(source))
+                && edge.to.building.equals(AreaProbe.refOf(belt)))
+            .findFirst().orElseThrow();
+
+        assertTrue(sourceEdge.items.allows(new ResourceRef(ResourceKind.item, "graphite", "Graphite")));
+        assertTrue(sourceEdge.items.allows(new ResourceRef(ResourceKind.item, "silicon", "Silicon")));
+        assertFalse(sourceEdge.items.allows(copper));
+        assertTrue(copperTrace.endpoints.isEmpty());
+        assertEquals(List.of(AreaProbe.refOf(target)), graphiteTrace.endpoints.stream()
+            .map(endpoint -> endpoint.building).toList());
+    }
+
+    @Test
+    void nonCrafterItemConsumerCanBeTracedFromItsMissingInput(){
+        for(int x = 9; x <= 10; x++) for(int y = 9; y <= 10; y++) world.tile(x, y).setFloor((Floor)Blocks.oreCoal);
+        Building source = place(Blocks.mechanicalDrill, 9, 9, 0);
+        place(Blocks.conveyor, 11, 9, 0);
+        Building target = place(ModdedBlocks.coalConsumer, 12, 9, 0);
+
+        AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 8, 14, 12), Team.sharded);
+        SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(target),
+            new ResourceRef(ResourceKind.item, "coal", "Coal"));
+
+        assertTrue(trace.targetUsesItem);
+        assertFalse(trace.diagnosticsIncomplete);
+        assertEquals(List.of(AreaProbe.refOf(source)), trace.producers().stream().map(endpoint -> endpoint.building).toList());
     }
 
     @Test

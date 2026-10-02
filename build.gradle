@@ -83,7 +83,7 @@ tasks.named("test"){
     dependsOn "extractMindustryAssets"
     classpath += files(mindustryAssetsDir.map{ it.dir("assets") })
     //the benchmark is a measurement, not a check; it would only make an ordinary test run slower
-    useJUnitPlatform{ excludeTags "area-benchmark", "network-benchmark" }
+    useJUnitPlatform{ excludeTags "area-benchmark", "network-benchmark", "trace-benchmark" }
     testLogging{
         events = ["failed"]
         exceptionFormat = "full"
@@ -114,6 +114,21 @@ tasks.register("networkBenchmark", Test){
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath + files(mindustryAssetsDir.map{ it.dir("assets") })
     useJUnitPlatform{ includeTags "network-benchmark" }
+    testLogging{
+        showStandardStreams = true
+        events = ["failed", "standard_out"]
+        exceptionFormat = "full"
+    }
+    outputs.upToDateWhen{ false }
+}
+
+tasks.register("traceBenchmark", Test){
+    group = "verification"
+    description = "Measures resource-specific trace queries through 50, 250, 1000 and 4000 transport blocks."
+    dependsOn "extractMindustryAssets"
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath + files(mindustryAssetsDir.map{ it.dir("assets") })
+    useJUnitPlatform{ includeTags "trace-benchmark" }
     testLogging{
         showStandardStreams = true
         events = ["failed", "standard_out"]

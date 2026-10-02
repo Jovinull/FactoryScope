@@ -7,7 +7,9 @@ import arc.scene.event.*;
 import arc.scene.ui.layout.*;
 import factoryscope.*;
 import factoryscope.area.*;
+import factoryscope.model.ResourceRef;
 import factoryscope.probe.*;
+import factoryscope.trace.*;
 import mindustry.*;
 import mindustry.game.*;
 import mindustry.game.EventType.*;
@@ -43,6 +45,7 @@ public final class FactoryScopeUI{
     private static NetworkOverlay networkOverlay;
     private static NetworkViewOverlay networkView;
     private static Table hint;
+    private static TraceRequest pendingTrace;
     private static boolean initialized;
 
     private FactoryScopeUI(){
@@ -54,6 +57,7 @@ public final class FactoryScopeUI{
         initialized = true;
 
         panel = new FactoryScopePanel();
+        panel.setOnTrace(FactoryScopeUI::traceInput);
         areaDialog = new AreaDiagnosticsDialog(
             FactoryScopeUI::startPicking, FactoryScopeUI::inspect, FactoryScopeUI::startLocating);
         buildToggle();
@@ -114,6 +118,7 @@ public final class FactoryScopeUI{
     }
 
     private static void stopPicking(){
+        pendingTrace = null;
         if(picker != null){
             picker.remove();
             picker = null;
@@ -160,6 +165,8 @@ public final class FactoryScopeUI{
     }
 
     private static void pickArea(AreaSelection selection){
+        TraceRequest request = pendingTrace;
+        pendingTrace = null;
         stopPicking();
         stopLocating();
         if(areaDialog == null || !Vars.state.isGame()) return;
@@ -171,6 +178,10 @@ public final class FactoryScopeUI{
 
         try{
             areaDialog.show(area, AreaProbe.scan(area, viewerTeam()));
+            if(request != null){
+                if(panel != null && panel.isShown()) panel.hide();
+                areaDialog.showTrace(request.target, request.item);
+            }
         }catch(Exception e){
             FsLog.warnOnce("area-scan", "could not analyse the selected area", e);
             Vars.ui.showInfoToast(FsBundle.get("area.scan-failed"), 3f);
@@ -198,6 +209,20 @@ public final class FactoryScopeUI{
         locate = new LocateOverlay(ref, build, FactoryScopeUI::returnToReport, FactoryScopeUI::stopLocating);
     }
 
+    static void locateFromNetwork(BuildingRef ref, Runnable onReturn){
+        stopLocating();
+        Building build = AreaProbe.resolve(ref);
+        if(build == null){
+            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+            if(onReturn != null) onReturn.run();
+            return;
+        }
+        locate = new LocateOverlay(ref, build, () -> {
+            stopLocating();
+            if(onReturn != null) onReturn.run();
+        }, FactoryScopeUI::stopLocating);
+    }
+
     private static void stopLocating(){
         if(locate != null){
             locate.remove();
@@ -219,15 +244,21 @@ public final class FactoryScopeUI{
         networkOverlay = network == null ? null : new NetworkOverlay(network, item);
     }
 
+    static void showNetworkOverlay(factoryscope.network.ItemNetwork network, factoryscope.model.ResourceRef item,
+                                   SupplyTrace trace){
+        networkOverlay = network == null ? null : new NetworkOverlay(network, item, trace);
+    }
+
     static void stopNetworkOverlay(){
         networkOverlay = null;
     }
 
     static void viewNetworkInWorld(factoryscope.network.ItemNetwork network, factoryscope.model.ResourceRef item,
+                                   SupplyTrace trace,
                                    Runnable onReturn, Runnable onDismiss){
         stopNetworkView();
-        showNetworkOverlay(network, item);
-        networkView = new NetworkViewOverlay(item, () -> {
+        showNetworkOverlay(network, item, trace);
+        networkView = new NetworkViewOverlay(item, trace, () -> {
             stopNetworkView();
             onReturn.run();
         }, () -> {
@@ -285,8 +316,25 @@ public final class FactoryScopeUI{
         if(areaDialog != null && areaDialog.showing()) areaDialog.refresh();
     }
 
+    private static void traceInput(Building build, ResourceRef item){
+        if(build == null || item == null || areaDialog == null) return;
+        BuildingRef ref = AreaProbe.refOf(build);
+        AreaDiagnosticResult held = areaDialog.showing() ? areaDialog.heldResult() : null;
+        if(held != null && held.entries.stream().anyMatch(entry -> entry.ref.equals(ref))){
+            if(panel != null && panel.isShown()) panel.hide();
+            areaDialog.showTrace(ref, item);
+            return;
+        }
+
+        pendingTrace = new TraceRequest(ref, item);
+        if(panel != null && panel.isShown()) panel.hide();
+        startPicking();
+        Vars.ui.showInfoToast(FsBundle.get("trace.select-area"), 4f);
+    }
+
     /** Drops every transient reference; safe to call at any time. */
     public static void reset(){
+        pendingTrace = null;
         stopPicking();
         stopLocating();
         stopNetworkView();
@@ -294,5 +342,8 @@ public final class FactoryScopeUI{
         if(panel != null && panel.isShown()) panel.hide();
         if(areaDialog != null) areaDialog.clear();
         FsLog.reset();
+    }
+
+    private record TraceRequest(BuildingRef target, ResourceRef item){
     }
 }

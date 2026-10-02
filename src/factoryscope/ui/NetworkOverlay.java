@@ -3,18 +3,33 @@ package factoryscope.ui;
 import arc.graphics.g2d.*;
 import factoryscope.model.*;
 import factoryscope.network.*;
+import factoryscope.trace.*;
 import mindustry.*;
 import mindustry.graphics.*;
+
+import java.util.*;
 
 /** World-space drawing for structural routes. It is inert unless Network view asks for it. */
 final class NetworkOverlay{
     private static final int MAX_DRAWN_EDGES = 750;
     private final ItemNetwork network;
     private final ResourceRef item;
+    private final SupplyTrace trace;
+    private final Set<NetworkEdge> highlighted = Collections.newSetFromMap(new IdentityHashMap<>());
 
     NetworkOverlay(ItemNetwork network, ResourceRef item){
+        this(network, item, null);
+    }
+
+    NetworkOverlay(ItemNetwork network, ResourceRef item, SupplyTrace trace){
         this.network = network;
         this.item = item;
+        this.trace = trace;
+        if(trace != null){
+            for(TraceEndpoint endpoint : trace.endpoints){
+                endpoint.path.addEdgesTo(highlighted);
+            }
+        }
     }
 
     void draw(){
@@ -24,10 +39,12 @@ final class NetworkOverlay{
             if(drawn >= MAX_DRAWN_EDGES || (item != null && !edge.items.allows(item))) continue;
             float x1 = worldX(edge.from), y1 = worldY(edge.from);
             float x2 = worldX(edge.to), y2 = worldY(edge.to);
-            Draw.color(edge.conditional ? Pal.lightOrange : Pal.accent);
-            Lines.stroke(edge.conditional ? 1.4f : 2f);
+            boolean selected = trace == null || highlighted.contains(edge);
+            Draw.color(edge.conditional ? Pal.lightOrange : selected ? Pal.accent : Pal.gray);
+            Draw.alpha(selected ? 1f : 0.3f);
+            Lines.stroke(edge.conditional ? 1.4f : selected ? 2.4f : 1f);
             Lines.line(x1, y1, x2, y2);
-            arrow(x1, y1, x2, y2);
+            if(selected) arrow(x1, y1, x2, y2);
             drawn++;
         }
         Draw.color(Pal.accent);
@@ -37,6 +54,36 @@ final class NetworkOverlay{
             Lines.stroke(2f);
             Lines.line(x, y, x + dx, y + dy);
             Fill.circle(x + dx, y + dy, 2.5f);
+        }
+        for(NetworkPort port : network.boundaryInputs){
+            float x = worldX(port), y = worldY(port);
+            float dx = -port.side.dx * Vars.tilesize * 0.3f, dy = -port.side.dy * Vars.tilesize * 0.3f;
+            Lines.stroke(2f);
+            Lines.line(x, y, x + dx, y + dy);
+            Fill.circle(x + dx, y + dy, 2.5f);
+        }
+        if(trace != null){
+            Draw.color(Pal.lightOrange);
+            for(TraceEndpoint endpoint : trace.endpoints){
+                float x = (endpoint.building.tileX + 0.5f) * Vars.tilesize;
+                float y = (endpoint.building.tileY + 0.5f) * Vars.tilesize;
+                Lines.stroke(2f);
+                Lines.circle(x, y, Vars.tilesize * 0.35f);
+            }
+            Draw.color(Pal.remove);
+            for(var building : trace.structuralDeadEnds){
+                float x = (building.tileX + 0.5f) * Vars.tilesize;
+                float y = (building.tileY + 0.5f) * Vars.tilesize;
+                Lines.stroke(2f);
+                Lines.line(x - 3f, y - 3f, x + 3f, y + 3f);
+                Lines.line(x - 3f, y + 3f, x + 3f, y - 3f);
+            }
+            for(NetworkInterruption interruption : trace.unsupportedInterruptions){
+                float x = worldX(interruption.port), y = worldY(interruption.port);
+                Lines.stroke(2f);
+                Lines.line(x - 3f, y - 3f, x + 3f, y + 3f);
+                Lines.line(x - 3f, y + 3f, x + 3f, y - 3f);
+            }
         }
         Draw.reset();
     }

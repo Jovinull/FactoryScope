@@ -65,6 +65,8 @@ public final class FactorySnapshot{
 
     public final List<ResourceState> inputs;
     public final List<OutputState> outputs;
+    /** Items this building can produce structurally, including conventional producers without a rate model. */
+    public final List<ResourceRef> producedItems;
     /** Null when the block does not consume power. */
     public final PowerState power;
 
@@ -86,6 +88,9 @@ public final class FactorySnapshot{
         this.craftTimeSeconds = b.craftTimeSeconds;
         this.inputs = List.copyOf(b.inputs);
         this.outputs = List.copyOf(b.outputs);
+        List<ResourceRef> products = new ArrayList<>(b.producedItems);
+        products.sort(Comparator.comparing(ResourceRef::key));
+        this.producedItems = List.copyOf(new LinkedHashSet<>(products));
         this.power = b.power;
     }
 
@@ -132,6 +137,7 @@ public final class FactorySnapshot{
         private float craftTimeSeconds = -1f;
         private final List<ResourceState> inputs = new ArrayList<>();
         private final List<OutputState> outputs = new ArrayList<>();
+        private final List<ResourceRef> producedItems = new ArrayList<>();
         private PowerState power;
 
         private Builder(String blockName){
@@ -211,6 +217,13 @@ public final class FactorySnapshot{
 
         public Builder output(OutputState state){
             this.outputs.add(state);
+            if(state.kind == ResourceKind.item) this.producedItems.add(state.ref());
+            return this;
+        }
+
+        public Builder producedItem(ResourceRef item){
+            if(item.kind != ResourceKind.item) throw new IllegalArgumentException("only items can be structural products");
+            this.producedItems.add(item);
             return this;
         }
 

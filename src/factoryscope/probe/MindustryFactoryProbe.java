@@ -70,6 +70,9 @@ public final class MindustryFactoryProbe{
         addInputs(build, block, snapshot, frameTicks, timeScale);
         if(block.consPower != null) snapshot.power(readPower(build, block.consPower));
         if(crafter) addCrafterProduction(build, (GenericCrafter)block, snapshot, frameTicks, timeScale);
+        if(build instanceof Drill.DrillBuild drill && drill.dominantItem != null){
+            snapshot.producedItem(new ResourceRef(ResourceKind.item, drill.dominantItem.name, drill.dominantItem.localizedName));
+        }
 
         return snapshot.build();
     }

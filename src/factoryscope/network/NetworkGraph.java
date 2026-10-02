@@ -63,6 +63,14 @@ public final class NetworkGraph{
         return Collections.unmodifiableSet(visited);
     }
 
+    public List<NetworkEdge> outgoing(NetworkPort port){
+        return outgoing.getOrDefault(port, List.of());
+    }
+
+    public List<NetworkEdge> incoming(NetworkPort port){
+        return incoming.getOrDefault(port, List.of());
+    }
+
     /** Weak components are for summaries only; item travel always uses directed reachability. */
     public List<Set<NetworkPort>> weakComponents(){
         Map<NetworkPort, Set<NetworkPort>> adjacent = new TreeMap<>();

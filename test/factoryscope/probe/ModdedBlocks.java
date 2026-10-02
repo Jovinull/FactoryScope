@@ -16,10 +16,12 @@ import mindustry.world.meta.*;
  */
 final class ModdedBlocks{
     static GenericCrafter conventional;
+    static GenericCrafter traceConsumer;
     static GenericCrafter boosted;
     static AttributeCrafter yieldScaled;
     static GenericCrafter exotic;
     static Block oddBuilding;
+    static Block coalConsumer;
     static Block unknownTransport;
     static ItemBridge crossTypeBridge;
     static ItemBridge otherCrossTypeBridge;
@@ -37,6 +39,10 @@ final class ModdedBlocks{
             outputItem = new ItemStack(Items.graphite, 2);
             consumeItems(new ItemStack(Items.copper, 3), new ItemStack(Items.lead, 1));
             consumePower(1f);
+        }};
+
+        traceConsumer = new GenericCrafter("fs-test-trace-consumer"){{
+            consumeItems(new ItemStack(Items.graphite, 1));
         }};
 
         boosted = new GenericCrafter("fs-test-boosted"){{
@@ -67,6 +73,7 @@ final class ModdedBlocks{
         }};
 
         oddBuilding = new OddBlock("fs-test-odd");
+        coalConsumer = new ItemConsumerBlock("fs-test-item-consumer", Items.coal);
         unknownTransport = new UnknownTransportBlock("fs-test-unknown-transport");
         crossTypeBridge = new ItemBridge("fs-test-cross-type-bridge"){{
             linkSameType = false;
@@ -110,6 +117,20 @@ final class ModdedBlocks{
         }
     }
 
+    static class ItemConsumerBlock extends Block{
+        ItemConsumerBlock(String name, Item item){
+            super(name);
+            update = true;
+            solid = true;
+            hasItems = true;
+            consumeItem(item, 1);
+            buildType = (Prov<Building>)ItemConsumerBuild::new;
+        }
+
+        class ItemConsumerBuild extends Building{
+        }
+    }
+
     static class UnknownTransportBlock extends Block{
         UnknownTransportBlock(String name){
             super(name);
@@ -117,6 +138,7 @@ final class ModdedBlocks{
             group = BlockGroup.transportation;
             solid = true;
             update = true;
+            consumeItem(Items.sand, 1);
             buildType = UnknownTransportBuild::new;
         }
 

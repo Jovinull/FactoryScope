@@ -15,6 +15,8 @@ import mindustry.ui.*;
 import mindustry.ui.dialogs.*;
 import mindustry.world.meta.*;
 
+import java.util.function.BiConsumer;
+
 /**
  * The diagnostic window.
  *
@@ -29,6 +31,7 @@ public final class FactoryScopePanel extends BaseDialog{
     private final Interval timer = new Interval();
     private Table body;
     private Building target;
+    private BiConsumer<Building, ResourceRef> onTrace;
 
     public FactoryScopePanel(){
         super("");
@@ -47,6 +50,10 @@ public final class FactoryScopePanel extends BaseDialog{
             if(timer.get(REFRESH_TICKS)) rebuild();
         });
         hidden(() -> target = null);
+    }
+
+    void setOnTrace(BiConsumer<Building, ResourceRef> onTrace){
+        this.onTrace = onTrace;
     }
 
     public void inspect(Building build){
@@ -200,6 +207,12 @@ public final class FactoryScopePanel extends BaseDialog{
                 row.add(amountText(input)).color(Pal.lightishGray).right().padRight(8f);
             }
             row.add(satisfactionText(input)).color(satisfactionColor(input)).right();
+            if(target != null && onTrace != null && !input.optional && input.kind == ResourceKind.item
+                && input.contentId != null && input.missing()){
+                row.button(FsBundle.ref("trace.open"), Icon.list, Styles.flatt,
+                    () -> onTrace.accept(target, input.ref()))
+                    .height(34f).padLeft(6f).name("factoryscope-trace-input-" + input.contentId);
+            }
         }).growX().padBottom(2f).row();
 
         if(!input.recognised){
