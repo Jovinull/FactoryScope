@@ -1042,6 +1042,13 @@ public class AcceptanceHarness extends Mod{
         queue(this::closeAnyDialog);
 
         scenario("world change clears the PowerScope snapshot and electrical overlay");
+        int lifecycleX = rx(), lifecycleY = ry();
+        queue(() -> {
+            clearRegion();
+            placeAt(Blocks.solarPanel, lifecycleX + 3, lifecycleY + 3);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(lifecycleX + 1, lifecycleY + 1, lifecycleX + 5, lifecycleY + 5));
         queue(() -> check("the refreshed area report is available for the lifecycle check",
             FactoryScopeUI.areaReport() != null && Core.scene.find("factoryscope-area-power") != null));
         queue(() -> clickNamed("factoryscope-area-power"));
@@ -1520,6 +1527,17 @@ public class AcceptanceHarness extends Mod{
             System.arraycopy(entry, 1, args, 0, args.length);
             String text = FsBundle.format(entry[0], args);
             check("'" + entry[0] + "' formats", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
+        }
+        String oneMember = FsBundle.format("power.members", 1, 1);
+        String locale = String.valueOf(Core.bundle.getLocale()).toLowerCase(java.util.Locale.ROOT);
+        if(locale.startsWith("pt")){
+            check("single-member PowerScope counts use neutral Portuguese wording",
+                oneMember.startsWith("1 na ") && oneMember.endsWith("1 na rede")
+                    && !oneMember.contains("membros") && !oneMember.contains("selecionados"), oneMember);
+        }else{
+            check("single-member PowerScope counts avoid plural agreement errors",
+                oneMember.contains("selected") && oneMember.contains("in grid")
+                    && !oneMember.contains("visible members"), oneMember);
         }
     }
 
