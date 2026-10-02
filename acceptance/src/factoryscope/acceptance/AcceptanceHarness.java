@@ -967,15 +967,16 @@ public class AcceptanceHarness extends Mod{
 
         scenario("the Area Power view keeps multiple engine grids separate");
         int x1 = rx(), y1 = ry(), x2 = rx() + 40, y2 = ry() + 12;
+        Building[] gridProducers = new Building[2];
         //The single-building Power dialog is stacked over its diagnostic panel. Let its close fade
         //finish before dismissing that panel, so the synthetic drag reaches the world picker.
         queue(() -> {});
         queue(() -> {});
         queue(() -> {
             clearRegion();
-            placeAt(Blocks.solarPanel, rx() + 2, ry() + 2);
+            gridProducers[0] = placeAt(Blocks.solarPanel, rx() + 2, ry() + 2);
             placeAt(Blocks.battery, rx() + 3, ry() + 2);
-            placeAt(Blocks.solarPanel, rx() + 34, ry() + 10);
+            gridProducers[1] = placeAt(Blocks.solarPanel, rx() + 10, ry() + 2);
         });
         queue(this::closeAnyDialog);
         queue(this::armPicker);
@@ -1026,12 +1027,22 @@ public class AcceptanceHarness extends Mod{
             "dialog=" + (Core.scene.getDialog() == null ? "none" : Core.scene.getDialog().getClass().getSimpleName())
                 + ", report=" + (FactoryScopeUI.powerReport() == null ? "none" : FactoryScopeUI.powerReport().grids.size())
                 + ", overlay=" + (Core.scene.find("factoryscope-power-viewing") != null)));
+        queue(() -> {
+            Building connector = placeAt(Blocks.powerNode, x1 + 6, y1 + 2);
+            if(connector != null){
+                connector.configureAny(gridProducers[0].pos());
+                connector.configureAny(gridProducers[1].pos());
+            }
+            check("a newly placed PowerNode merges the two live engine grids",
+                connector != null && gridProducers[0].power.graph == gridProducers[1].power.graph
+                    && connector.power.graph == gridProducers[0].power.graph);
+        });
         queue(() -> clickNamed("factoryscope-power-refresh"));
         queue(() -> {
             refreshedPowerSnapshot = FactoryScopeUI.powerReport();
-            check("Refresh rebuilds the held area and power snapshots together",
+            check("Refresh replaces the stale two-grid snapshot with the merged engine grid",
                 FactoryScopeUI.areaReportHeld() && refreshedPowerSnapshot != null
-                    && refreshedPowerSnapshot.grids.size() == 2);
+                    && refreshedPowerSnapshot.grids.size() == 1);
         });
         queue(() -> capture("power-area-refresh"));
         queue(() -> clickNamed("factoryscope-power-back"));
