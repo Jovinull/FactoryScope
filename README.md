@@ -20,8 +20,9 @@ never modifies the state it inspects.
 - **Item network topology.** Open Network from an area report to see directed structural routes, remote
   item-bridge links, boundary continuations, and item-specific sorter paths. These routes are not current flow.
 
-It counts observations and maps static item topology. It does not use that topology to identify which
-machine caused a shortage; see [what it does not support](#what-it-does-not-support).
+An area report is a snapshot of diagnostic observations; Network maps static item topology. Neither
+reports item movement over time or identifies which machine caused a shortage; see
+[what it does not support](#what-it-does-not-support).
 
 ## Single-building diagnostics
 
@@ -56,8 +57,8 @@ machine caused a shortage; see [what it does not support](#what-it-does-not-supp
 - **Full production modelling outside `GenericCrafter`.** That covers the conventional crafting blocks on
   both planets. Drills, pumps, generators, unit factories and the rest are inspected — inputs, power,
   efficiency, verdict — but get no production rates, and the panel says so.
-- **Measured throughput.** Every rate is derived from the current game state at the instant you look. It
-  is labelled as such and never presented as an observed average.
+- **Current production estimates.** Every rate is derived from the current game state at the instant you
+  look. It is not an observed average of item movement.
 - **History, alerts, or recommendations.**
 
 Fog of war is respected, and an area selection queries only your own team's index, so it can never
@@ -69,8 +70,8 @@ from Android players are welcome on the issue tracker.
 
 ## Requirements
 
-**Mindustry v8, build 159.7.** The dependency is pinned to that release and the mod declares
-`minGameVersion: 159.7`.
+**Mindustry v8, build 160 or later.** The dependency is pinned to release `v160.5`; the mod declares
+`minGameVersion: 160`.
 
 The mod is marked client-side only, so it takes no part in the multiplayer mod handshake: you can join a
 vanilla server with FactoryScope installed, and the server does not need to have it.
@@ -96,7 +97,7 @@ Restart Mindustry afterwards.
 2. Press the FactoryScope button in the bottom-left corner of the HUD.
 3. Then either:
    - **click or tap a building** to diagnose that one, or
-   - **drag a rectangle** to diagnose everything of yours inside it *(0.2 development)*.
+   - **drag a rectangle** to diagnose everything of yours inside it.
 4. Read the report. The single-building panel keeps refreshing while it is open; an area report is a
    snapshot with a Refresh button.
 5. Close it with the close button or the usual back gesture.
@@ -149,17 +150,22 @@ Open an issue at <https://github.com/Jovinull/FactoryScope/issues>. A useful rep
 Mindustry build, the block you inspected, what FactoryScope said, what you expected instead, and the
 relevant part of `last_log.txt` from your Mindustry data folder.
 
-## Roadmap
+## Project status
 
-- v0.3 — production network graph: follow what actually feeds what
-- v0.4 — throughput monitoring: measure movement over time instead of deriving it
-- v0.5 — bottleneck and root-cause analysis, which the three above are prerequisites for
+- **0.1 complete:** single-building diagnostics.
+- **0.2 complete:** area diagnostics, issue aggregation, and affected-building navigation.
+- **0.3 complete:** static, item-aware network topology inside a selected area.
 
-None of it is implemented.
+The next planned major feature is **Network-Aware Diagnostics / Supply Trace**: use known topology to
+trace potential item routes without claiming that items currently travel along them.
+
+Exact per-edge throughput is deferred. Mindustry 160.5 exposes no public transfer event that identifies
+the source building, destination building, and item for a successful transfer. Inventory changes and
+block-level flow averages cannot prove which route carried the items.
 
 ## Notes for contributors
 
-- [docs/mindustry-notes.md](docs/mindustry-notes.md) — the parts of the v159.7 source the diagnosis
+- [docs/mindustry-notes.md](docs/mindustry-notes.md) — the parts of the v160.5 source the diagnosis
   depends on, including the order in which the game decides efficiency and why a couple of formulas are
   reimplemented rather than called. Read it before changing anything under `analysis/` or `probe/`.
 - [docs/architecture.md](docs/architecture.md) — how the pieces fit, why the area feature reuses the

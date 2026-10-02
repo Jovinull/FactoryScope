@@ -106,3 +106,16 @@ function Get-MindustryLauncher{
     }
     return $null
 }
+
+function Get-MindustryJarLauncher{
+    param([Parameter(Mandatory = $true)][string]$JarPath)
+
+    $java = Get-Command 'java.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if(-not $java){ return $null }
+
+    return [pscustomobject]@{
+        Kind = 'java'
+        Path = $java.Source
+        Arguments = @('-jar', ('"' + [IO.Path]::GetFullPath($JarPath) + '"'))
+    }
+}

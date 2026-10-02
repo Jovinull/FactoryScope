@@ -21,7 +21,7 @@ import mindustry.world.modules.*;
  * inspection is driven by {@code block.consumers} rather than by a list of known blocks, so modded
  * crafters built on the standard consumers are analysed the same way vanilla ones are.
  *
- * <p>All formulas here were taken from the Mindustry v159.7 sources; the reasoning behind the
+ * <p>All formulas here were taken from the Mindustry v160.5 sources; the reasoning behind the
  * non-obvious ones is in {@code docs/mindustry-notes.md}.
  */
 public final class MindustryFactoryProbe{
@@ -276,6 +276,8 @@ public final class MindustryFactoryProbe{
      */
     private static void addCrafterProduction(Building build, GenericCrafter crafter,
                                              FactorySnapshot.Builder snapshot, float frameTicks, float timeScale){
+        GenericCrafter.GenericCrafterBuild crafterBuild = build instanceof GenericCrafter.GenericCrafterBuild current
+            ? current : null;
         float craftTime = crafter.craftTime;
         snapshot.craftTimeSeconds(craftTime / ProductionRates.TICKS_PER_SECOND);
 
@@ -288,12 +290,13 @@ public final class MindustryFactoryProbe{
 
         if(crafter.outputItems != null){
             for(ItemStack stack : crafter.outputItems){
+                float amount = crafterBuild == null ? stack.amount : crafterBuild.scaleOutput(stack.amount);
                 int stored = build.items == null ? 0 : build.items.get(stack.item);
                 //mirrors GenericCrafterBuild.shouldConsume(): a cycle cannot start if its result would overflow
-                boolean full = stored + stack.amount > crafter.itemCapacity;
+                boolean full = stored + amount > crafter.itemCapacity;
                 blocked |= full;
                 snapshot.output(new OutputState(ResourceKind.item, stack.item.localizedName, stack.item.name,
-                    stack.amount * craftsNominal, stack.amount * craftsNow,
+                    amount * craftsNominal, amount * craftsNow,
                     stored, crafter.itemCapacity, full));
             }
         }

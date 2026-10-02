@@ -1,6 +1,6 @@
-# Mindustry 159.7 item topology notes
+# Mindustry 160.5 item topology notes
 
-These notes describe static routing only. They are based on the `v159.7` source, not block tooltips.
+These notes describe static routing only. They are based on the `v160.5` source, not block tooltips.
 They intentionally do not use `acceptItem`: that method includes inventory and receiver state and is
 not a safe topology query.
 
@@ -25,7 +25,10 @@ than measuring which one is currently chosen.
 ## Bridges
 
 Item bridges use their configured link, not proximity. A valid remote edge must be derived from the
-stored link and must remain team-safe. An unlinked or broken target has no remote topology edge.
+stored link and must remain team-safe. `ItemBridge.linkValid()` also checks the configured range and,
+in v160, whether the bridge permits links to other bridge block types. Each endpoint applies its own
+`linkSameType` setting, so FactoryScope checks both blocks before adding a remote edge. An unlinked or
+broken target has no remote topology edge.
 
 Directional Duct Bridges are explicitly unsupported in 0.3. Their remote ingress and local fallback
 behaviour cannot be represented by the same ports as a normal Duct without inventing a local route, so
@@ -50,3 +53,17 @@ unsupported transport rather than approximating them as ordinary conveyors.
 The graph is item-only. Liquid conduits and payload logistics are outside 0.3. Ducts are item
 transport, but their direction and bridge rules are kept in the Mindustry adapter rather than assumed
 from conveyor code.
+
+## 159.7 to 160.5 compatibility check
+
+- Conveyor's source change is visual-only; its forward item handoff is unchanged.
+- Junction, Sorter, Inverted Sorter, and the supported gate routing code have no relevant transfer
+  change in the compared releases.
+- Router now keeps its output-rotation cycle per item. This changes runtime destination choice, not the
+  set of structurally possible adjacent outputs represented by the graph.
+- Duct adds cached previous/next and cap state for rendering; the item handoff direction remains the
+  same.
+- Item bridges add `linkSameType`; the adapter delegates validation to the engine's `linkValid()` so
+  configured cross-type links are represented only when the engine allows them.
+- Mass Drivers, armored transport, Stack Conveyors, Duct Bridges, and Unloaders remain explicitly
+  unsupported; this migration does not broaden their topology claims.

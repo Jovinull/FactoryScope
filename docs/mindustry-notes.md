@@ -1,8 +1,20 @@
-# Mindustry v159.7 notes
+# Mindustry v160.5 notes
 
-Findings from reading the v159.7 sources that FactoryScope depends on. They are recorded here because
+Findings from reading the v160.5 sources that FactoryScope depends on. They are recorded here because
 none of them is obvious from the API surface, and getting any of them wrong produces a diagnosis that
 looks plausible and is wrong.
+
+## Mindustry 160 crafter outputs
+
+`GenericCrafterBuild.scaleOutput(amount)` is now the engine's item-output quantity per craft. It is
+used both by `craft()` and the output-capacity check in `shouldConsume()`. FactoryScope uses the same
+method for theoretical/current item rates and for identifying a full output buffer. `AttributeCrafter`
+keeps `outputScale` separate from its speed multiplier; for example, Mindustry's Silicon Crucible
+scales both craft speed and item yield.
+
+Liquid output remains `output.amount * getProgressIncrease(1f)` per frame. `getProgressIncrease()` uses
+the scaled amount when throttling against liquid capacity, but the actual liquid quantity is not passed
+through `scaleOutput()`. Do not apply item-yield scaling to liquid amounts.
 
 ## How efficiency is actually decided
 
@@ -188,8 +200,9 @@ tree unconditionally, so `Groups.build.intersect(...)` is not an option; iterati
 would be a full scan of every building on the map for every selection.
 
 The engine's own rectangle query for buildings is `BlockIndexer.eachBlock(Team, Rect, pred, cons)`, which
-reads `team.data().buildingTree`, a real `QuadTree<Building>` maintained by `addIndex`/`removeIndex` on
-`TileChangeEvent`. Being rooted at one team's index is why an area selection cannot see another team's
+reads `team.data().buildingTree`, a real `QuadTree<Building>` maintained as buildings are placed, removed,
+and change teams. In 160, `BuildingComp.changeTeam()` reindexes the tile and refreshes proximity after the
+team changes. Being rooted at one team's index is why an area selection cannot see another team's
 buildings at all: they are never visited, not filtered out afterwards. The method also skips
 `block.privileged`, which keeps world processors out of the results.
 

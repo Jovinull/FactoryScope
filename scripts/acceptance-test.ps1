@@ -17,6 +17,7 @@
 [CmdletBinding()]
 param(
     [string]$MindustryPath,
+    [string]$MindustryJar,
     [string]$ModJar,
     [switch]$SkipBuild,
     [switch]$KeepSandbox,
@@ -51,6 +52,8 @@ if(-not $SkipBuild){
     }
 }
 
+if($MindustryPath -and $MindustryJar){ throw 'Pass either -MindustryPath or -MindustryJar, not both.' }
+
 foreach($jar in @($modJar, $harnessJar)){
     if(-not (Test-Path -LiteralPath $jar)){ throw "expected jar not found: $jar" }
 }
@@ -74,13 +77,22 @@ if($running.Count -gt 0){
 }
 
 Write-Step 'Locating Mindustry'
-$gamePath = Find-MindustryInstall -Hint $MindustryPath
-if(-not $gamePath){
-    throw 'No Mindustry installation found. Pass -MindustryPath with the folder containing Mindustry.exe.'
+$gameBuild = '160.5'
+if($MindustryJar){
+    $gamePath = [IO.Path]::GetFullPath($MindustryJar)
+    if(-not (Test-Path -LiteralPath $gamePath)){ throw "Mindustry jar not found: $gamePath" }
+    $launcher = Get-MindustryJarLauncher -JarPath $gamePath
+    if(-not $launcher){ throw 'java.exe was not found on PATH.' }
+    Write-Host "    jar:     $gamePath"
+}else{
+    $gamePath = Find-MindustryInstall -Hint $MindustryPath
+    if(-not $gamePath){
+        throw 'No Mindustry installation found. Pass -MindustryPath with the folder containing Mindustry.exe or -MindustryJar with an official client jar.'
+    }
+    $launcher = Get-MindustryLauncher -InstallPath $gamePath
+    if(-not $launcher){ throw "No launcher found under $gamePath" }
+    Write-Host "    install: $gamePath"
 }
-$launcher = Get-MindustryLauncher -InstallPath $gamePath
-if(-not $launcher){ throw "No launcher found under $gamePath" }
-Write-Host "    install: $gamePath"
 
 $arguments = @($launcher.Arguments)
 if($Capture){
@@ -111,13 +123,15 @@ Copy-Item -LiteralPath $harnessJar -Destination $sandboxMods -Force
 # The Steam desktop jar enables Steam solely from this classpath resource. Running it as a Steam client
 # also imports subscribed Workshop mods, which is outside the sandbox. The release modifier keeps the
 # same client code while skipping Steam initialization and its Workshop inventory.
-Set-Content -LiteralPath (Join-Path $sandbox 'version.properties') -Value @(
-    'number=8',
-    'build=159.7',
-    'modifier=release',
-    'type=official',
-    'commitHash=unknown'
-) -Encoding ascii
+if(-not $MindustryJar){
+    Set-Content -LiteralPath (Join-Path $sandbox 'version.properties') -Value @(
+        'number=8',
+        "build=$gameBuild",
+        'modifier=release',
+        'type=official',
+        'commitHash=unknown'
+    ) -Encoding ascii
+}
 
 $logFile = Join-Path $sandboxData 'last_log.txt'
 Write-Step "Running the acceptance suite in $sandbox"

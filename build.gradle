@@ -15,7 +15,7 @@ sourceSets{
 
 ext{
     //pinned stable Mindustry release; the game API is not stable across major builds, so avoid "latest"/"be" here
-    mindustryVersion = "v159.7"
+    mindustryVersion = "v160.5"
     junitVersion = "5.11.4"
     isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
     sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")

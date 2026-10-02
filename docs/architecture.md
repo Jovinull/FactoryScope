@@ -160,3 +160,8 @@ runtime receiver availability without removing any structurally possible route.
 Graphs stay area-scoped. A direct friendly connection leaving the selection becomes a boundary continuation
 and is not recursively explored. Unrecognised item transport is omitted and marks the graph partial rather
 than inventing neighbour edges.
+
+The graph describes possible structure, not current item movement. Mindustry 160.5 exposes no public event
+that reports a successful transfer together with its source, destination, and item. Its building flow
+averages aggregate item-module additions and cannot attribute those additions to graph edges. Exact
+per-edge throughput therefore remains deferred; see [the throughput research](throughput.md).

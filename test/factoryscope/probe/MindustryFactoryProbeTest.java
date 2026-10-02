@@ -2,10 +2,12 @@ package factoryscope.probe;
 
 import factoryscope.analysis.*;
 import factoryscope.model.*;
+import arc.util.Time;
 import mindustry.content.*;
 import mindustry.game.*;
 import mindustry.gen.*;
 import mindustry.world.*;
+import mindustry.world.blocks.production.AttributeCrafter;
 import org.junit.jupiter.api.*;
 
 import static mindustry.Vars.*;
@@ -59,6 +61,66 @@ class MindustryFactoryProbeTest{
         assertEquals(1.5f, silicon.theoreticalPerSecond, TOLERANCE);
         assertEquals(0f, silicon.expectedPerSecond, TOLERANCE, "a starved smelter produces nothing");
         assertEquals(40f / 60f, snapshot.craftTimeSeconds, TOLERANCE);
+    }
+
+    @Test
+    void attributeCrafterYieldBoostIsIncludedInOutputRates(){
+        Building build = place(ModdedBlocks.yieldScaled, 4, 4);
+        AttributeCrafter.AttributeCrafterBuild crafter = (AttributeCrafter.AttributeCrafterBuild)build;
+        AttributeCrafter block = (AttributeCrafter)build.block;
+        crafter.attrsum = 1f;
+        crafter.applyBoost(1.5f, 60f);
+        crafter.updateConsumption();
+
+        FactorySnapshot snapshot = MindustryFactoryProbe.probe(build);
+        float graphitePerCraft = crafter.scaleOutput(2f);
+        float siliconPerCraft = crafter.scaleOutput(1f);
+        float actualCraftsPerSecond = ProductionRates.perSecondFromProgress(
+            crafter.getProgressIncrease(block.craftTime), Time.delta);
+
+        assertTrue(graphitePerCraft > 2f, "the fixture must exercise the engine's output yield boost");
+        assertEquals(1.5f, snapshot.timeScale, TOLERANCE, "the fixture must include overdrive");
+        assertEquals(2, snapshot.outputs.size(), "each configured item output must be reported");
+        assertEquals(graphitePerCraft * ProductionRates.nominalCraftsPerSecond(block.craftTime, snapshot.timeScale),
+            snapshot.outputs.get(0).theoreticalPerSecond, TOLERANCE);
+        assertEquals(graphitePerCraft * actualCraftsPerSecond, snapshot.outputs.get(0).expectedPerSecond, TOLERANCE);
+        assertEquals(siliconPerCraft * ProductionRates.nominalCraftsPerSecond(block.craftTime, snapshot.timeScale),
+            snapshot.outputs.get(1).theoreticalPerSecond, TOLERANCE);
+        assertEquals(siliconPerCraft * actualCraftsPerSecond, snapshot.outputs.get(1).expectedPerSecond, TOLERANCE);
+    }
+
+    @Test
+    void attributeCrafterYieldBoostIsIncludedInOutputCapacityChecks(){
+        Building build = place(ModdedBlocks.yieldScaled, 4, 4);
+        AttributeCrafter.AttributeCrafterBuild crafter = (AttributeCrafter.AttributeCrafterBuild)build;
+        crafter.attrsum = 1f;
+        build.items.add(Items.graphite, build.block.itemCapacity - 2);
+        build.updateConsumption();
+
+        FactorySnapshot snapshot = MindustryFactoryProbe.probe(build);
+
+        assertTrue(crafter.scaleOutput(2f) > 2f, "the fixture must produce more than the unscaled stack");
+        assertFalse(build.shouldConsume(), "Mindustry must consider the scaled output too large for the free capacity");
+        assertTrue(snapshot.outputBufferFull);
+        assertTrue(snapshot.outputs.get(0).bufferFull);
+        assertFalse(snapshot.outputs.get(1).bufferFull, "the separate output still fits in its own buffer");
+    }
+
+    @Test
+    void siliconCrucibleUsesItsVanillaYieldBoost(){
+        Building build = place(Blocks.siliconCrucible, 4, 4);
+        AttributeCrafter.AttributeCrafterBuild crafter = (AttributeCrafter.AttributeCrafterBuild)build;
+        AttributeCrafter block = (AttributeCrafter)build.block;
+        crafter.attrsum = 1f;
+        crafter.updateConsumption();
+
+        float outputPerCraft = crafter.scaleOutput(block.outputItems[0].amount);
+        float expectedTheoretical = outputPerCraft
+            * ProductionRates.nominalCraftsPerSecond(block.craftTime, build.timeScale());
+        OutputState silicon = MindustryFactoryProbe.probe(build).outputs.get(0);
+
+        assertTrue(block.outputScale > 0f, "Mindustry 160 silicon crucible must exercise scaled output");
+        assertEquals(expectedTheoretical, silicon.theoreticalPerSecond, TOLERANCE);
     }
 
     @Test
