@@ -216,13 +216,52 @@ would otherwise be collected nine times. The centring offset is `-(block.size - 
 division, so it is not symmetric for even sizes — a 2x2 block occupies its own tile and the ones above
 and to the right, never below or left.
 
+## PowerGraph semantics (PowerScope)
+
+`Building.power.graph` is Mindustry's authoritative current electrical component. Its `all`, `producers`,
+`consumers`, and `batteries` collections are the membership source; `graphID` is internal and can change
+when graphs reflow. PowerScope uses object identity only while grouping one probe, then snapshots stable
+FactoryScope `BuildingRef`s. It does not retain the engine graph.
+
+The 160.5 `PowerGraph.getPowerProduced()` and `getPowerNeeded()` getters are not cached totals: they walk
+the current producer/consumer collections and sum `getPowerProduction() * building.delta()` and
+`requestedPower(building) * building.delta()` respectively. The values are frame-integrated; divide by
+`Time.delta` and multiply by 60 to express power per game-second, consistent with FactoryScope's existing
+units. When `Time.delta` is effectively zero, the probe uses the same building getter/request values with
+`timeScale()` instead of dividing by zero.
+
+`getSatisfaction()` reads cached totals from the last graph update. During an ordinary deficit,
+`PowerGraph.update()` calls `useBatteries(...)` and adds the battery contribution to
+`lastPowerProduced` before distributing coverage, so satisfaction represents delivered grid coverage
+and can remain 100% while generator output is below demand. PowerScope separately snapshots generation,
+demand, satisfaction, and current enabled battery storage/capacity; it never relabels discharge as
+generation.
+
+`getPowerBalance()` is the raw mean of a 60-sample window. The update records generation minus demand
+plus the Power Diode adjustment before it consumes batteries. It is an engine rolling balance, not a
+per-wire transfer or battery drain rate. `getLastScaledPowerIn/Out` and `getLastCapacity` are cached
+update-time values with different semantics; they are not interchangeable with the current aggregate
+getters.
+
+When the team cheat-power rule is active, the engine sets consumer status and the last needed/produced
+values to synthetic 1.0 and returns early. Other cached graph fields may be stale. PowerScope therefore
+labels the graph cheat-powered and suppresses aggregate metrics rather than presenting stale numbers.
+
+`Building.getPowerConnections(...)` is the engine-established connection view for ordinary networks,
+including proximity, team/conducting rules, and explicit PowerNode links. BeamNode dynamically maintains
+its own established links; do not clone PowerNode range logic. The overlay draws these ordinary
+connections as undirected membership only.
+
+PowerDiode is exceptional: it does not merge the two `PowerGraph`s. Its fixed back-to-front relation
+transfers energy conditionally according to the battery percentages/capacities of the two separate grids.
+PowerScope keeps it as a separate conditional cross-grid relation and does not invent a transfer amount.
+
+See [PowerScope semantics](power-scope.md) and its real-engine battery tests before changing this adapter.
+
 ## Other notes towards later milestones
 
 - Any area walk has to skip buildings where `efficiencyTracked` is false, or a wall-heavy base will fill
   the results with blocks that have no efficiency to report.
-- `PowerGraph` exposes cached totals (`getLastPowerProduced`, `getLastScaledPowerIn`, `getLastCapacity`)
-  that cost nothing to read. A power-network view can be built on those without traversing the graph,
-  which is the only reason per-frame power inspection is affordable.
 - `InputHandler.panCamera(Vec2)` is the game's own way of moving the view to a position; it touches the
   camera only, and on desktop sets the flag that stops the camera snapping back to the player unit.
 - `Trigger.drawOver` fires inside `Renderer.draw` while sorted drawing is active, so a mod can draw in

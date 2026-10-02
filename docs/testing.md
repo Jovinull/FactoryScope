@@ -42,6 +42,15 @@ and dead-end wording. An even-sized skipped multiblock fixture checks terminal a
 Mindustry's asymmetric footprint. `TraceWordingTest` prevents causal or prescriptive language from
 entering either trace bundle.
 
+PowerScope is tested in `power/PowerGridAnalyzerTest` as a pure domain analyzer and in
+`probe/MindustryPowerProbeTest` against real v160.5 PowerGraph, PowerNode, BeamNode, Power Diode,
+battery, and modded-generator behavior. `PowerGridBatteryIntegrationTest` runs actual engine grid updates
+to prove that battery discharge can keep delivered satisfaction high while generation remains below
+demand, and that an empty battery does not. The client acceptance path opens PowerScope from both a
+single-building inspector and Area Diagnostics, checks separate grids and battery role separation,
+exercises a real BeamNode connection and a directional Power Diode between separate grids, then uses
+Refresh and the electrical-connection overlay.
+
 ## 2. Acceptance suite
 
 ```
@@ -137,6 +146,7 @@ is only available with `-MindustryPath` or automatic install discovery.
 gradlew areaBenchmark
 gradlew networkBenchmark
 gradlew traceBenchmark
+gradlew powerBenchmark
 ```
 
 Prints what one area analysis costs at 50, 250, 1000 and 4000 buildings, split into spatial collection,
@@ -146,6 +156,10 @@ wall-clock threshold in a test suite fails on a loaded machine and passes on a f
 maintainer to ignore it. A regression shows up as a number that moved.
 
 It is excluded from `gradlew test` by a JUnit tag, so an ordinary test run is not slowed by it.
+
+`powerBenchmark` measures engine-graph grouping, immutable snapshot/connection capture, and a lightweight
+PowerScope presentation model for connected 50/250/1000/4000-node PowerNode grids. Timing is reported,
+not gated.
 
 ## Artifact checks
 

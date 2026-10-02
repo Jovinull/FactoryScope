@@ -32,6 +32,7 @@ public final class FactoryScopePanel extends BaseDialog{
     private Table body;
     private Building target;
     private BiConsumer<Building, ResourceRef> onTrace;
+    private Cons<Building> onInspectPower;
 
     public FactoryScopePanel(){
         super("");
@@ -54,6 +55,10 @@ public final class FactoryScopePanel extends BaseDialog{
 
     void setOnTrace(BiConsumer<Building, ResourceRef> onTrace){
         this.onTrace = onTrace;
+    }
+
+    void setOnInspectPower(Cons<Building> onInspectPower){
+        this.onInspectPower = onInspectPower;
     }
 
     public void inspect(Building build){
@@ -101,7 +106,7 @@ public final class FactoryScopePanel extends BaseDialog{
         if(snapshot.hasKnownProduction()) buildProduction(snapshot);
         if(!snapshot.inputs.isEmpty()) buildInputs(snapshot);
         if(!snapshot.outputs.isEmpty()) buildBuffers(snapshot);
-        if(snapshot.power != null) buildPower(snapshot.power);
+        if(snapshot.power != null || target.power != null) buildPower(snapshot.power);
         buildNotes(snapshot);
     }
 
@@ -243,27 +248,39 @@ public final class FactoryScopePanel extends BaseDialog{
     private void buildPower(PowerState power){
         section("section.power");
         panel(table -> {
-            value(table, FsBundle.get("label.satisfaction"),
-                Numbers.percent(power.satisfaction), Diagnostics.efficiencyColor(power.satisfaction));
-            if(power.buffered){
-                table.add(FsBundle.get("panel.buffered-power")).color(Pal.gray).left().row();
+            if(power == null){
+                table.labelWrap(FsBundle.get("power.grid-member")).color(Pal.lightishGray).growX().row();
+            }else if(power.buffered){
+                value(table, FsBundle.get("label.buffered-power"),
+                    Numbers.percent(power.satisfaction), Pal.lightishGray);
             }else{
-                value(table, FsBundle.get("label.demand"),
+                value(table, FsBundle.get("label.satisfaction"),
+                    Numbers.percent(power.satisfaction), Diagnostics.efficiencyColor(power.satisfaction));
+                value(table, FsBundle.get("label.power-usage-nominal"),
                     FsBundle.format("value.power-rate", Numbers.rate(power.usagePerSecond)), Pal.lightishGray);
             }
-            value(table, FsBundle.get("label.grid-production"),
-                FsBundle.format("value.power-rate", Numbers.rate(power.graphProducedPerSecond)), Pal.lightishGray);
-            value(table, FsBundle.get("label.grid-demand"),
-                FsBundle.format("value.power-rate", Numbers.rate(power.graphNeededPerSecond)), Pal.lightishGray);
-            if(power.balanceReliable){
+            if(power != null && power.hasGridMetrics){
+                value(table, FsBundle.get("label.grid-production"),
+                    FsBundle.format("value.power-rate", Numbers.rate(power.gridGenerationPerSecond)), Pal.lightishGray);
+                value(table, FsBundle.get("label.grid-demand"),
+                    FsBundle.format("value.power-rate", Numbers.rate(power.gridDemandPerSecond)), Pal.lightishGray);
+            }else if(power != null){
+                table.labelWrap(FsBundle.get("power.metrics-unavailable")).color(Pal.lightOrange).growX().row();
+            }
+            if(power != null && power.hasGridMetrics && power.balanceReliable){
                 value(table, FsBundle.get("label.grid-balance"),
                     FsBundle.format("value.power-rate", Numbers.signedRate(power.graphBalancePerSecond)),
                     power.graphBalancePerSecond < 0f ? Pal.remove : BlockStatus.active.color);
             }
-            if(power.hasBatteries()){
+            if(power != null && power.hasGridMetrics && power.hasBatteries()){
                 value(table, FsBundle.get("label.batteries"),
                     FsBundle.format("value.of", Numbers.amount(power.batteryStored), Numbers.amount(power.batteryCapacity)),
                     Pal.lightishGray);
+            }
+            if(target != null && target.power != null && onInspectPower != null){
+                table.button(FsBundle.ref("power.inspect-grid"), Icon.power, () -> {
+                    if(target != null) onInspectPower.get(target);
+                }).height(38f).padTop(6f).name("factoryscope-inspect-power-grid").row();
             }
         });
     }

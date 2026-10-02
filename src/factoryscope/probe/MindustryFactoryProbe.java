@@ -5,6 +5,7 @@ import factoryscope.*;
 import factoryscope.analysis.*;
 import factoryscope.model.*;
 import mindustry.*;
+import mindustry.game.Team;
 import mindustry.gen.*;
 import mindustry.type.*;
 import mindustry.world.*;
@@ -43,6 +44,16 @@ public final class MindustryFactoryProbe{
     }
 
     public static FactorySnapshot probe(Building build){
+        Team viewer = Vars.player == null ? (build == null ? null : build.team) : Vars.player.team();
+        return probe(build, true, viewer);
+    }
+
+    /** Area snapshots omit graph aggregates; PowerScope captures each shared graph once separately. */
+    static FactorySnapshot probeForArea(Building build){
+        return probe(build, false, null);
+    }
+
+    private static FactorySnapshot probe(Building build, boolean includeGridMetrics, Team viewer){
         Block block = build.block;
         float frameTicks = Math.max(Time.delta, MIN_FRAME_TICKS);
         float timeScale = build.timeScale();
@@ -68,7 +79,12 @@ public final class MindustryFactoryProbe{
                 build.efficiency, build.potentialEfficiency, gateOpen));
 
         addInputs(build, block, snapshot, frameTicks, timeScale);
-        if(block.consPower != null) snapshot.power(readPower(build, block.consPower));
+        if(block.consPower != null){
+            PowerGraph graph = build.power == null ? null : build.power.graph;
+            boolean visibleGraph = includeGridMetrics && graph != null
+                && PowerGraphMetrics.completelyVisible(graph, viewer);
+            snapshot.power(readPower(build, block.consPower, visibleGraph));
+        }
         if(crafter) addCrafterProduction(build, (GenericCrafter)block, snapshot, frameTicks, timeScale);
         if(build instanceof Drill.DrillBuild drill && drill.dominantItem != null){
             snapshot.producedItem(new ResourceRef(ResourceKind.item, drill.dominantItem.name, drill.dominantItem.localizedName));
@@ -249,23 +265,40 @@ public final class MindustryFactoryProbe{
 
     // ------------------------------------------------------------------ power
 
-    private static PowerState readPower(Building build, ConsumePower consume){
+    private static PowerState readPower(Building build, ConsumePower consume, boolean includeGridMetrics){
         if(build.power == null){
-            return new PowerState(0f, 0f, consume.buffered, 0f, 0f, 0f, false, 0f, 0f);
+            return new PowerState(0f, 0f, consume.buffered, 0f, 0f, 0f, false, 0f, 0f, false);
         }
 
         PowerGraph graph = build.power.graph;
-        float perSecond = ProductionRates.TICKS_PER_SECOND;
-        return new PowerState(
-            build.power.status,
-            ProductionRates.perTickToPerSecond(consume.usage, build.timeScale()),
-            consume.buffered,
-            graph == null ? 0f : graph.getLastScaledPowerIn() * perSecond,
-            graph == null ? 0f : graph.getLastScaledPowerOut() * perSecond,
-            graph == null ? 0f : graph.getPowerBalance() * perSecond,
-            graph != null && graph.hasPowerBalanceSamples(),
-            graph == null ? 0f : graph.getLastPowerStored(),
-            graph == null ? 0f : graph.getLastCapacity());
+        boolean hasMetrics = includeGridMetrics && graph != null && !PowerGraphMetrics.cheatPowered(graph);
+        try{
+            float generation = hasMetrics ? PowerGraphMetrics.generationPerSecond(graph) : 0f;
+            float demand = hasMetrics ? PowerGraphMetrics.demandPerSecond(graph) : 0f;
+            float balance = hasMetrics ? PowerGraphMetrics.balancePerSecond(graph) : 0f;
+            boolean balanceReliable = hasMetrics && PowerGraphMetrics.balanceReliable(graph);
+            float stored = hasMetrics ? PowerGraphMetrics.batteryStored(graph) : 0f;
+            float capacity = hasMetrics ? PowerGraphMetrics.batteryCapacity(graph) : 0f;
+            hasMetrics = hasMetrics && PowerGraphMetrics.finiteMetrics(
+                generation, demand, build.power.status, balance, stored, capacity);
+            return new PowerState(
+                build.power.status,
+                ProductionRates.perTickToPerSecond(consume.usage, build.timeScale()),
+                consume.buffered,
+                hasMetrics ? generation : 0f,
+                hasMetrics ? demand : 0f,
+                hasMetrics ? balance : 0f,
+                hasMetrics && balanceReliable,
+                hasMetrics ? stored : 0f,
+                hasMetrics ? capacity : 0f,
+                hasMetrics);
+        }catch(Exception e){
+            FsLog.warnOnce("power-state:" + build.block.name,
+                "could not read power graph state for " + describe(build), e);
+            return new PowerState(build.power.status,
+                ProductionRates.perTickToPerSecond(consume.usage, build.timeScale()), consume.buffered,
+                0f, 0f, 0f, false, 0f, 0f, false);
+        }
     }
 
     // ------------------------------------------------------------------ production

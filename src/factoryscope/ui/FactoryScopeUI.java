@@ -9,6 +9,7 @@ import factoryscope.*;
 import factoryscope.area.*;
 import factoryscope.model.ResourceRef;
 import factoryscope.probe.*;
+import factoryscope.power.PowerGridReport;
 import factoryscope.trace.*;
 import mindustry.*;
 import mindustry.game.*;
@@ -29,9 +30,9 @@ import mindustry.ui.*;
  * rules for telling one from the other.
  *
  * <h2>Navigation</h2>
- * At most two things are open at once, in one shape only: an area report, with either a building panel
- * stacked over it or a locate marker standing in its place. There is no history stack, and everything
- * transient is dropped when the world changes.
+ * Reports are snapshots with bounded navigation: single-building PowerScope returns to its inspector,
+ * and area PowerScope returns to its area report. There is no general history stack, and transient state
+ * is dropped when the world changes.
  */
 public final class FactoryScopeUI{
     private static final float BUTTON_SIZE = 48f;
@@ -40,13 +41,17 @@ public final class FactoryScopeUI{
 
     private static FactoryScopePanel panel;
     private static AreaDiagnosticsDialog areaDialog;
+    private static PowerDialog powerDialog;
     private static InspectionOverlay picker;
     private static LocateOverlay locate;
     private static NetworkOverlay networkOverlay;
     private static NetworkViewOverlay networkView;
+    private static PowerOverlay powerOverlay;
+    private static PowerViewOverlay powerView;
     private static Table hint;
     private static TraceRequest pendingTrace;
     private static boolean initialized;
+    private static boolean powerFromArea;
 
     private FactoryScopeUI(){
     }
@@ -58,8 +63,11 @@ public final class FactoryScopeUI{
 
         panel = new FactoryScopePanel();
         panel.setOnTrace(FactoryScopeUI::traceInput);
+        panel.setOnInspectPower(FactoryScopeUI::inspectPowerGrid);
+        powerDialog = new PowerDialog();
         areaDialog = new AreaDiagnosticsDialog(
             FactoryScopeUI::startPicking, FactoryScopeUI::inspect, FactoryScopeUI::startLocating);
+        powerDialog.setOnViewWorld(FactoryScopeUI::viewPowerInWorld);
         buildToggle();
 
         //the selection rectangle and the locate marker belong to the world, not to the scene, so they
@@ -148,6 +156,7 @@ public final class FactoryScopeUI{
         if(picker != null) picker.drawWorld();
         if(locate != null) locate.drawWorld();
         if(networkOverlay != null) networkOverlay.draw();
+        if(powerOverlay != null) powerOverlay.draw();
     }
 
     // ------------------------------------------------------------------ selection
@@ -291,6 +300,67 @@ public final class FactoryScopeUI{
         return true;
     }
 
+    private static void inspectPowerGrid(Building build){
+        if(powerDialog == null || build == null || build.power == null) return;
+        powerFromArea = false;
+        BuildingRef ref = AreaProbe.refOf(build);
+        powerDialog.show(MindustryPowerProbe.scan(build, viewerTeam()), () -> {
+            Building current = AreaProbe.resolve(ref);
+            if(current == null || !MindustryFactoryProbe.canInspect(current, viewerTeam())){
+                Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+                powerDialog.clearReport();
+                return;
+            }
+            powerDialog.refresh(MindustryPowerProbe.scan(current, viewerTeam()));
+        }, FactoryScopeUI::inspect, FactoryScopeUI::locatePowerMember, null);
+    }
+
+    static void showAreaPower(factoryscope.power.PowerGridReport report, Runnable refreshArea){
+        if(powerDialog == null) return;
+        powerFromArea = true;
+        if(areaDialog != null) areaDialog.hide();
+        powerDialog.show(report, () -> {
+            if(refreshArea != null) refreshArea.run();
+            AreaDiagnosticResult refreshed = areaDialog == null ? null : areaDialog.heldResult();
+            if(refreshed != null) powerDialog.refresh(refreshed.power);
+        }, FactoryScopeUI::inspect, FactoryScopeUI::locatePowerMember, () -> {
+            powerFromArea = false;
+            if(areaDialog != null) areaDialog.reopen();
+        });
+    }
+
+    private static void locatePowerMember(BuildingRef ref){
+        if(powerDialog != null) powerDialog.hide();
+        locateFromNetwork(ref, () -> {
+            if(powerDialog != null) powerDialog.reopen();
+        });
+    }
+
+    private static void viewPowerInWorld(){
+        if(powerDialog == null || powerDialog.report() == null) return;
+        stopPowerView();
+        PowerGridReport report = powerDialog.report();
+        powerOverlay = new PowerOverlay(report);
+        powerView = new PowerViewOverlay(() -> {
+            stopPowerView();
+            powerDialog.reopen();
+        }, () -> {
+            boolean returnToArea = powerFromArea;
+            powerFromArea = false;
+            stopPowerView();
+            powerDialog.clearReport();
+            if(returnToArea && areaDialog != null) areaDialog.clear();
+        });
+    }
+
+    private static void stopPowerView(){
+        powerOverlay = null;
+        if(powerView != null){
+            powerView.remove();
+            powerView = null;
+        }
+    }
+
     /** The building the diagnostic panel is currently showing, or null. */
     public static Building inspected(){
         return panel == null ? null : panel.inspected();
@@ -299,6 +369,11 @@ public final class FactoryScopeUI{
     /** The area report on screen right now, or null. */
     public static AreaDiagnosticResult areaReport(){
         return areaDialog == null ? null : areaDialog.result();
+    }
+
+    /** Immutable power-grid snapshot currently held by PowerScope, or null when no report is open. */
+    public static PowerGridReport powerReport(){
+        return powerDialog == null ? null : powerDialog.report();
     }
 
     /** True when a report is being held for the player to come back to, whether on screen or not. */
@@ -339,8 +414,11 @@ public final class FactoryScopeUI{
         stopLocating();
         stopNetworkView();
         stopNetworkOverlay();
+        stopPowerView();
         if(panel != null && panel.isShown()) panel.hide();
         if(areaDialog != null) areaDialog.clear();
+        if(powerDialog != null) powerDialog.clearReport();
+        powerFromArea = false;
         FsLog.reset();
     }
 

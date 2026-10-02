@@ -7,6 +7,7 @@ import mindustry.type.*;
 import mindustry.world.*;
 import mindustry.world.blocks.distribution.ItemBridge;
 import mindustry.world.blocks.production.*;
+import mindustry.world.blocks.power.PowerGenerator;
 import mindustry.world.consumers.*;
 import mindustry.world.meta.*;
 
@@ -26,6 +27,8 @@ final class ModdedBlocks{
     static ItemBridge crossTypeBridge;
     static ItemBridge otherCrossTypeBridge;
     static ItemBridge sameTypeBridge;
+    static PowerGenerator moddedGenerator;
+    static Block moddedPowerConsumer;
 
     private ModdedBlocks(){
     }
@@ -86,6 +89,12 @@ final class ModdedBlocks{
         sameTypeBridge = new ItemBridge("fs-test-same-type-bridge"){{
             range = 6;
         }};
+        moddedGenerator = new PowerGenerator("fs-test-generator"){{
+            powerProduction = 0.25f;
+            canOverdrive = true;
+        }};
+
+        moddedPowerConsumer = new PowerConsumerBlock("fs-test-power-consumer");
     }
 
     /** A consumer type FactoryScope has never heard of, with a satisfaction the test can steer. */
@@ -128,6 +137,18 @@ final class ModdedBlocks{
         }
 
         class ItemConsumerBuild extends Building{
+        }
+    }
+
+    static class PowerConsumerBlock extends Block{
+        PowerConsumerBlock(String name){
+            super(name);
+            update = true;
+            consumePower(2f);
+            buildType = (Prov<Building>)PowerConsumerBuild::new;
+        }
+
+        class PowerConsumerBuild extends Building{
         }
     }
 

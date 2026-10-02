@@ -9,32 +9,35 @@ package factoryscope.model;
 public final class PowerState{
     /** Fraction of requested power the grid is currently delivering, from {@code PowerModule.status}. */
     public final float satisfaction;
-    /** What this building asks for, per second. */
+    /** Nominal non-buffered power use at this building's time scale, not the grid's current total demand. */
     public final float usagePerSecond;
     /** Whether the consumer charges an internal buffer instead of drawing continuously. */
     public final boolean buffered;
-    public final float graphProducedPerSecond;
-    public final float graphNeededPerSecond;
-    /** Averaged grid balance per second; negative means the grid is running a deficit. */
+    public final float gridGenerationPerSecond;
+    public final float gridDemandPerSecond;
+    /** Engine-windowed grid balance per second; includes PowerDiode transfer adjustments. */
     public final float graphBalancePerSecond;
     /** True when enough samples exist for {@link #graphBalancePerSecond} to be meaningful. */
     public final boolean balanceReliable;
     public final float batteryStored;
     public final float batteryCapacity;
+    /** False for cheat-powered grids or when an engine metric could not be read safely. */
+    public final boolean hasGridMetrics;
 
     public PowerState(float satisfaction, float usagePerSecond, boolean buffered,
-                      float graphProducedPerSecond, float graphNeededPerSecond,
+                      float gridGenerationPerSecond, float gridDemandPerSecond,
                       float graphBalancePerSecond, boolean balanceReliable,
-                      float batteryStored, float batteryCapacity){
+                      float batteryStored, float batteryCapacity, boolean hasGridMetrics){
         this.satisfaction = satisfaction;
         this.usagePerSecond = usagePerSecond;
         this.buffered = buffered;
-        this.graphProducedPerSecond = graphProducedPerSecond;
-        this.graphNeededPerSecond = graphNeededPerSecond;
+        this.gridGenerationPerSecond = gridGenerationPerSecond;
+        this.gridDemandPerSecond = gridDemandPerSecond;
         this.graphBalancePerSecond = graphBalancePerSecond;
         this.balanceReliable = balanceReliable;
         this.batteryStored = batteryStored;
         this.batteryCapacity = batteryCapacity;
+        this.hasGridMetrics = hasGridMetrics;
     }
 
     public boolean hasBatteries(){
