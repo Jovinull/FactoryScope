@@ -344,6 +344,13 @@ public final class FactoryScopeUI{
         FsLog.reset();
     }
 
-    private record TraceRequest(BuildingRef target, ResourceRef item){
+    private static final class TraceRequest{
+        final BuildingRef target;
+        final ResourceRef item;
+
+        TraceRequest(BuildingRef target, ResourceRef item){
+            this.target = target;
+            this.item = item;
+        }
     }
 }
