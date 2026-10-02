@@ -325,6 +325,7 @@ public class AcceptanceHarness extends Mod{
         singlePanelSupplyTrace();
         traceCompletenessScenarios();
         outputTraceBoundary();
+        outputTraceDeadEnd();
         tinyDragIsAClick();
         mixedProblems();
         itemNetworkView();
@@ -725,6 +726,36 @@ public class AcceptanceHarness extends Mod{
                 !dialogShows(FsBundle.get("trace.no-in-area-producer")));
         });
         queue(() -> capture("supply-trace-output-boundary"));
+        queue(this::closeAnyDialog);
+    }
+
+    void outputTraceDeadEnd(){
+        int x = rx() + 2, y = ry() + 2;
+        scenario("an output trace distinguishes a known dead end from a missing route");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            target = placeAt(Blocks.graphitePress, x, y);
+            placeAt(Blocks.conveyor, x + 2, y, 0);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x - 1, y - 1, x + 3, y + 1));
+        queue(() -> check("the output dead-end selection produced an area report", FactoryScopeUI.areaReport() != null));
+        queue(() -> clickNamed("factoryscope-area-network"));
+        queue(() -> clickNamed("factoryscope-network-item-graphite"));
+        queue(() -> clickNamed("factoryscope-network-building", 0));
+        queue(() -> clickNamed("factoryscope-network-trace-output"));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            SupplyTrace trace = report == null ? null : TraceAnalyzer.output(report, AreaProbe.refOf(target),
+                new ResourceRef(ResourceKind.item, "graphite", "Graphite"));
+            check("the route ends at the reachable conveyor", trace != null
+                && trace.structuralDeadEnds.stream().anyMatch(ref -> ref.blockId.equals("conveyor")));
+            check("a known output dead end is not reported as no structural route", trace != null
+                && !trace.noRouteProven && !dialogShows(FsBundle.get("trace.no-downstream")));
+            check("the output trace describes the missing in-area consumer", dialogShows(FsBundle.get("trace.no-consumer")));
+        });
+        queue(() -> capture("supply-trace-output-dead-end"));
         queue(this::closeAnyDialog);
     }
 

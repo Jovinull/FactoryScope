@@ -36,6 +36,11 @@ unsupported transport, Junction channels and cycle termination. `probe/Mindustry
 places a real Mindustry drill, conveyor and crafter to verify that a mined item can be traced as a
 structural product without inventing a production rate. It also covers a non-crafter item consumer, a
 multi-output AttributeCrafter's exact product constraints, and a producer outside the selected area.
+Trace regressions cover local completeness when unrelated transport/diagnostic probes are skipped,
+separate no-endpoint versus no-route findings, multiple producer/dead-end branches, and output boundary
+and dead-end wording. An even-sized skipped multiblock fixture checks terminal adjacency against
+Mindustry's asymmetric footprint. `TraceWordingTest` prevents causal or prescriptive language from
+entering either trace bundle.
 
 ## 2. Acceptance suite
 
