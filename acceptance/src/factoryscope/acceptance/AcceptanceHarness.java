@@ -16,6 +16,7 @@ import factoryscope.analysis.*;
 import factoryscope.area.*;
 import factoryscope.model.*;
 import factoryscope.probe.*;
+import factoryscope.power.*;
 import factoryscope.trace.*;
 import factoryscope.ui.*;
 import mindustry.content.*;
@@ -59,6 +60,7 @@ public class AcceptanceHarness extends Mod{
 
     Building upper, lower, target, producer, disabledProducer, disabledRouteBreak;
     AreaDiagnosticResult traceSnapshotBeforeRefresh;
+    PowerGridReport refreshedPowerSnapshot;
     int baselineElements;
     final Seq<Building> patch = new Seq<>();
     final Seq<AreaSelection> bounds = new Seq<>();
@@ -330,6 +332,7 @@ public class AcceptanceHarness extends Mod{
         tinyDragIsAClick();
         mixedProblems();
         itemNetworkView();
+        powerScopeScenarios();
         healthyArea();
         emptyArea();
         configurableBlocks();
@@ -353,6 +356,7 @@ public class AcceptanceHarness extends Mod{
         queue(this::restoreLayout);
         queue(this::checkAreaLocalization);
         queue(this::checkTraceLocalization);
+        queue(this::checkPowerLocalization);
         repeatedAreaUse(6);
         areaWorldChange();
     }
@@ -929,6 +933,113 @@ public class AcceptanceHarness extends Mod{
         queue(() -> renderer.targetscale = renderer.camerascale = 1.5f);
     }
 
+    void powerScopeScenarios(){
+        scenario("a single-building diagnostic opens its complete PowerGraph snapshot");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            target = placeAt(Blocks.solarPanel, rx() + 5, ry() + 5);
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> check("a power-capable building offers grid inspection",
+            Core.scene.find("factoryscope-inspect-power-grid") != null));
+        queue(() -> clickNamed("factoryscope-inspect-power-grid"));
+        queue(() -> {
+            PowerGridReport report = FactoryScopeUI.powerReport();
+            check("single-building PowerScope opened", Core.scene.find("factoryscope-power-dialog") != null);
+            check("the selected generator belongs to one engine grid", report != null && report.grids.size() == 1,
+                report == null ? "no report" : "grids " + report.grids.size());
+            check("the generator is discovered by PowerGraph membership",
+                report != null && report.grids.get(0).snapshot.producers.stream()
+                    .anyMatch(member -> member.ref.equals(AreaProbe.refOf(target))));
+        });
+        queue(() -> clickNamed("factoryscope-power-refresh"));
+        queue(() -> check("PowerScope refresh keeps a valid snapshot",
+            FactoryScopeUI.powerReport() != null && FactoryScopeUI.powerReport().grids.size() == 1));
+        queue(() -> capture("power-single-building"));
+        queue(() -> clickNamed("factoryscope-power-back"));
+        queue(() -> check("single-building PowerScope Return restores its inspector",
+            FactoryScopeUI.inspected() == target && FactoryScopeUI.powerReport() == null));
+        queue(this::closeAnyDialog);
+
+        scenario("the Area Power view keeps multiple engine grids separate");
+        int x1 = rx(), y1 = ry(), x2 = rx() + 40, y2 = ry() + 12;
+        //The single-building Power dialog is stacked over its diagnostic panel. Let its close fade
+        //finish before dismissing that panel, so the synthetic drag reaches the world picker.
+        queue(() -> {});
+        queue(() -> {});
+        queue(() -> {
+            clearRegion();
+            placeAt(Blocks.solarPanel, rx() + 2, ry() + 2);
+            placeAt(Blocks.battery, rx() + 3, ry() + 2);
+            placeAt(Blocks.solarPanel, rx() + 34, ry() + 10);
+        });
+        queue(this::closeAnyDialog);
+        queue(this::armPicker);
+        queue(() -> dragTiles(x1, y1, x2, y2));
+        queue(() -> check("the area selection opened diagnostics before PowerScope",
+            FactoryScopeUI.areaReport() != null && Core.scene.find("factoryscope-area-power") != null));
+        queue(() -> clickNamed("factoryscope-area-power"));
+        queue(() -> {
+            PowerGridReport report = FactoryScopeUI.powerReport();
+            check("the area Power view opened", Core.scene.find("factoryscope-power-dialog") != null);
+            check("two disconnected engine PowerGraphs remain two reports",
+                report != null && report.grids.size() == 2,
+                report == null ? "no report" : "grids " + report.grids.size());
+            check("the battery remains distinct from generator membership",
+                report != null && report.grids.stream().flatMap(grid -> grid.snapshot.batteries.stream())
+                    .anyMatch(member -> member.ref.blockId.equals(Blocks.battery.name))
+                    && report.grids.stream().flatMap(grid -> grid.snapshot.producers.stream())
+                    .noneMatch(member -> member.ref.blockId.equals(Blocks.battery.name)));
+            check("the selection scope is explicit for each whole-grid summary",
+                report != null && report.grids.stream().allMatch(grid -> grid.snapshot.selectedMemberCount > 0));
+        });
+        queue(() -> capture("power-area-multiple-grids"));
+        queue(() -> {
+            Scl.setProduct(2f);
+            Core.scene.resize(1280, 720);
+        });
+        queue(() -> {
+            ScrollPane pane = findPane(Core.scene.getDialog());
+            if(pane != null){
+                pane.setScrollPercentY(0f);
+                pane.updateVisualScroll();
+            }
+            checkFits("PowerScope at 1280x720 @ 2.0x");
+        });
+        queue(() -> Core.scene.resize(Core.graphics.getWidth(), Core.graphics.getHeight()));
+        queue(() -> capture("power-area-high-ui-scale"));
+        queue(this::restoreLayout);
+        queue(() -> check("PowerScope remains open after high-scale layout validation",
+            FactoryScopeUI.powerReport() != null && Core.scene.find("factoryscope-power-dialog") != null));
+        queue(() -> clickNamed("factoryscope-power-view-world"));
+        queue(() -> check("PowerScope world view marks electrical connections without flow claims",
+            Core.scene.find("factoryscope-power-viewing") != null
+                && Core.scene.find("factoryscope-power-return") != null));
+        queue(() -> clickNamed("factoryscope-power-return"));
+        queue(() -> check("return restores the same PowerScope report",
+            Core.scene.find("factoryscope-power-dialog") != null
+                && FactoryScopeUI.powerReport() != null && FactoryScopeUI.powerReport().grids.size() == 2,
+            "dialog=" + (Core.scene.getDialog() == null ? "none" : Core.scene.getDialog().getClass().getSimpleName())
+                + ", report=" + (FactoryScopeUI.powerReport() == null ? "none" : FactoryScopeUI.powerReport().grids.size())
+                + ", overlay=" + (Core.scene.find("factoryscope-power-viewing") != null)));
+        queue(() -> clickNamed("factoryscope-power-refresh"));
+        queue(() -> {
+            refreshedPowerSnapshot = FactoryScopeUI.powerReport();
+            check("Refresh rebuilds the held area and power snapshots together",
+                FactoryScopeUI.areaReportHeld() && refreshedPowerSnapshot != null
+                    && refreshedPowerSnapshot.grids.size() == 2);
+        });
+        queue(() -> capture("power-area-refresh"));
+        queue(() -> clickNamed("factoryscope-power-back"));
+        queue(() -> check("PowerScope Return restores the held Area Diagnostics report",
+            Core.scene.find("factoryscope-area-power") != null && FactoryScopeUI.areaReport() != null
+                && FactoryScopeUI.areaReport().power == refreshedPowerSnapshot
+                && FactoryScopeUI.powerReport() == null));
+        queue(this::closeAnyDialog);
+    }
+
     void healthyArea(){
         int x1 = rx(), y1 = ry(), x2 = rx() + 14, y2 = ry() + 6;
 
@@ -1364,6 +1475,32 @@ public class AcceptanceHarness extends Mod{
             {"trace.unsupported-at", "Armored Conveyor", "123", "61"}, {"trace.endpoints", "2"},
             {"trace.dead-ends", "3"}, {"trace.dead-end", "Conveyor", "123", "61"}, {"trace.input-action", "Sand"},
             {"trace.output-action", "Silicon"}}){
+            Object[] args = new Object[entry.length - 1];
+            System.arraycopy(entry, 1, args, 0, args.length);
+            String text = FsBundle.format(entry[0], args);
+            check("'" + entry[0] + "' formats", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
+        }
+    }
+
+    void checkPowerLocalization(){
+        scenarioNow("every PowerScope string resolves in the active locale");
+        Seq<String> keys = Seq.with("power.title", "power.open", "power.inspect-grid", "power.grid-member", "power.scope-note",
+            "power.no-grid", "power.grids", "power.grid", "power.status", "power.selected-members",
+            "power.members", "power.extends-outside", "power.satisfaction", "power.generation", "power.demand",
+            "power.balance", "power.balance-collecting", "power.battery", "power.generators", "power.consumers",
+            "power.batteries", "power.generator-list", "power.consumer-list", "power.battery-list", "power.inspect",
+            "power.metrics-unavailable", "power.battery-reserves", "power.generator-problems", "power.generator-summary",
+            "power.diodes", "power.diode-link", "power.diode-unmeasured", "power.diode-no-batteries",
+            "power.visibility-incomplete", "power.view-world", "power.viewing", "power.state.cheatPowered",
+            "power.state.unavailable", "power.state.noCurrentDemand", "power.state.underpowered", "power.state.noGeneration",
+            "power.state.generationBelowDemand", "power.state.surplus", "power.state.balanced");
+        for(String key : keys){
+            String text = FsBundle.get(key);
+            check("'" + key + "' resolves", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
+        }
+        for(String[] entry : new String[][]{
+            {"power.grid", "2"}, {"power.members", "3", "8"}, {"power.generator-problems", "2"},
+            {"power.generator-summary", "3", "2", "1", "0"}, {"power.diode-link", "Power Diode", "1", "2"}}){
             Object[] args = new Object[entry.length - 1];
             System.arraycopy(entry, 1, args, 0, args.length);
             String text = FsBundle.format(entry[0], args);

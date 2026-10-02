@@ -70,6 +70,8 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
             .size(250f, 64f).name("factoryscope-area-select");
         buttons.button(FsBundle.ref("network.open"), Icon.list, this::openNetwork)
             .size(180f, 64f).name("factoryscope-area-network");
+        buttons.button(FsBundle.ref("power.open"), Icon.power, this::openPower)
+            .size(170f, 64f).name("factoryscope-area-power");
         addCloseButton();
     }
 
@@ -154,6 +156,10 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
 
     private void openNetwork(){
         if(result != null && result.network != null) networkDialog.show(result);
+    }
+
+    private void openPower(){
+        if(result != null) FactoryScopeUI.showAreaPower(result.power, this::refresh);
     }
 
     private void viewNetworkInWorld(){
