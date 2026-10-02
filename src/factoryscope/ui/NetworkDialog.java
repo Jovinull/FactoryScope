@@ -262,9 +262,13 @@ final class NetworkDialog extends BaseDialog{
                 .color(Pal.lightOrange).wrap().padTop(8f).row();
         }
         for(NetworkInterruption interruption : trace.unsupportedInterruptions){
-            body.add(FsBundle.format("trace.unsupported-at", interruption.transport.blockName,
-                interruption.transport.tileX, interruption.transport.tileY))
-                .color(Pal.lightOrange).wrap().padTop(4f).row();
+            body.table(row -> {
+                row.add(FsBundle.format("trace.unsupported-at", interruption.transport.blockName,
+                    interruption.transport.tileX, interruption.transport.tileY))
+                    .color(Pal.lightOrange).growX().left().wrap().minWidth(0f);
+                row.button(Icon.zoomSmall, Styles.emptyi, () -> locate(interruption.transport)).size(34f)
+                    .tooltip(FsBundle.ref("area.locate")).name("factoryscope-trace-unsupported-locate");
+            }).growX().padTop(4f).row();
         }
         if(trace.diagnosticsIncomplete){
             body.add(FsBundle.get("trace.incomplete-diagnostics")).color(Pal.lightOrange).wrap().padTop(6f).row();

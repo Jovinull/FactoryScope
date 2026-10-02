@@ -163,6 +163,7 @@ public class AcceptanceHarness extends Mod{
         });
 
         areaScenarios();
+        unsupportedTraceLocate();
 
         actions.add(this::finish);
         pump();
@@ -690,6 +691,36 @@ public class AcceptanceHarness extends Mod{
                 && !dialogShows(FsBundle.get("trace.no-route")));
         });
         queue(() -> capture("supply-trace-unsupported"));
+        queue(this::closeAnyDialog);
+    }
+
+    void unsupportedTraceLocate(){
+        int x = rx() + 5, y = ry() + 4;
+        scenario("an unsupported transport interruption can be located and returned to");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            placeAt(Blocks.armoredConveyor, x - 1, y, 1);
+            target = placeAt(Blocks.siliconSmelter, x, y);
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> dragTiles(x - 1, y, x + 1, y + 1));
+        queue(() -> check("the unsupported route opens Supply Trace",
+            Core.scene.find("factoryscope-trace-unsupported-locate") != null));
+        queue(() -> {
+            if(Core.scene.find("factoryscope-trace-unsupported-locate") != null){
+                clickNamed("factoryscope-trace-unsupported-locate");
+            }
+        });
+        queue(() -> check("Locate marks the unsupported transport and keeps a return path",
+            FactoryScopeUI.locating() && Core.scene.find("factoryscope-locate-return") != null));
+        queue(() -> {
+            if(Core.scene.find("factoryscope-locate-return") != null) clickNamed("factoryscope-locate-return");
+        });
+        queue(() -> check("return from the unsupported transport restores its trace",
+            !FactoryScopeUI.locating() && Core.scene.find("factoryscope-trace-back") != null));
         queue(this::closeAnyDialog);
     }
 
