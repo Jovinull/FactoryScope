@@ -948,6 +948,8 @@ public class AcceptanceHarness extends Mod{
         queue(() -> {
             PowerGridReport report = FactoryScopeUI.powerReport();
             check("single-building PowerScope opened", Core.scene.find("factoryscope-power-dialog") != null);
+            check("PowerScope states that this building view reports the complete engine grid",
+                dialogShows(FsBundle.get("power.scope-note")));
             check("the selected generator belongs to one engine grid", report != null && report.grids.size() == 1,
                 report == null ? "no report" : "grids " + report.grids.size());
             check("the generator is discovered by PowerGraph membership",
