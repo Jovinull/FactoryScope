@@ -242,19 +242,24 @@ class MindustryPowerProbeTest{
 
     @Test
     void graphSnapshotUsesEngineRateAndBatteryValuesAndAccountsForOverdriveOnce(){
-        Building solar = place(Blocks.solarPanel, 8, 8);
+        Building generator = place(ModdedBlocks.moddedGenerator, 8, 8);
+        ((mindustry.world.blocks.power.PowerGenerator.GeneratorBuild)generator).productionEfficiency = 1f;
         Building battery = place(Blocks.battery, 9, 8);
-        solar.applyBoost(1.75f, 60f);
+        generator.applyBoost(1.75f, 60f);
+        assertEquals(1.75f, generator.timeScale(), 0.001f, "the fixture must actually be overdriven");
         battery.power.status = 0.25f;
         float frame = arc.util.Time.delta;
+        generator.power.graph.update();
 
-        PowerGridSnapshot grid = MindustryPowerProbe.scan(List.of(solar, battery), Team.sharded)
+        PowerGridSnapshot grid = MindustryPowerProbe.scan(List.of(generator, battery), Team.sharded)
             .grids.get(0).snapshot;
 
-        assertEquals(solar.power.graph.getPowerProduced() / frame * 60f, grid.generationPerSecond, 0.001f);
-        assertEquals(solar.power.graph.getPowerNeeded() / frame * 60f, grid.demandPerSecond, 0.001f);
-        assertEquals(solar.power.graph.getBatteryStored(), grid.batteryStored, 0.001f);
-        assertEquals(solar.power.graph.getTotalBatteryCapacity(), grid.batteryCapacity, 0.001f);
+        assertEquals(generator.power.graph.getPowerProduced() / frame * 60f, grid.generationPerSecond, 0.001f);
+        assertNotEquals(generator.getPowerProduction() * 60f, grid.generationPerSecond, 0.001f,
+            "the engine graph rate must include the generator's overdrive exactly once");
+        assertEquals(generator.power.graph.getPowerNeeded() / frame * 60f, grid.demandPerSecond, 0.001f);
+        assertEquals(generator.power.graph.getBatteryStored(), grid.batteryStored, 0.001f);
+        assertEquals(generator.power.graph.getTotalBatteryCapacity(), grid.batteryCapacity, 0.001f);
     }
 
     private static Building place(Block block, int x, int y){

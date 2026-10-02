@@ -90,6 +90,7 @@ final class ModdedBlocks{
         }};
         moddedGenerator = new PowerGenerator("fs-test-generator"){{
             powerProduction = 0.25f;
+            canOverdrive = true;
         }};
     }
 
