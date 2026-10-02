@@ -162,11 +162,11 @@ relevant part of `last_log.txt` from your Mindustry data folder.
 - **0.1 complete:** single-building diagnostics.
 - **0.2 complete:** area diagnostics, issue aggregation, and affected-building navigation.
 - **0.3 complete:** static, item-aware network topology inside a selected area.
-- **0.4 development:** network-aware diagnostics and Supply Trace.
+- **0.4 complete:** network-aware diagnostics and Supply Trace.
 
 Supply Trace correlates known topology with existing per-building diagnostics. It does not observe item
-movement or prove quantitative supply sufficiency. The next planned work has no promised date; possible
-areas include power analysis, liquid networks, schematics, and more advanced evidence-based diagnosis.
+movement or prove quantitative supply sufficiency. Future work has no promised date; possible areas
+include power analysis, liquid networks, and schematic analysis.
 
 Exact per-edge throughput is deferred. Mindustry 160.5 exposes no public transfer event that identifies
 the source building, destination building, and item for a successful transfer. Inventory changes and
