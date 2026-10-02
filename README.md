@@ -19,9 +19,13 @@ never modifies the state it inspects.
   press Refresh. Nothing is polled in the background.
 - **Item network topology.** Open Network from an area report to see directed structural routes, remote
   item-bridge links, boundary continuations, and item-specific sorter paths. These routes are not current flow.
+- **Supply Trace.** From a missing item in the building inspector, trace supported structural routes to
+  reachable producers and see their existing diagnostic state. Traces distinguish known dead ends,
+  area boundaries, storage endpoints, and transport the topology does not fully model.
 
-An area report is a snapshot of diagnostic observations; Network maps static item topology. Neither
-reports item movement over time or identifies which machine caused a shortage; see
+An area report is a snapshot of diagnostic observations; Network maps static item topology, and Supply
+Trace correlates that topology with the same diagnostic snapshots. Trace does not measure item movement
+or prove that a reachable producer is supplying enough material; see
 [what it does not support](#what-it-does-not-support).
 
 ## Single-building diagnostics
@@ -49,7 +53,9 @@ reports item movement over time or identifies which machine caused a shortage; s
 - **Measured logistics.** Network routes are structural possibility only: no transfer sampling,
   throughput, bottleneck, or root-cause analysis. An area report can say that eight buildings are short
   of sand because it counted eight buildings that each report a sand shortage. It cannot say that sand
-  production is the cause, and it does not pretend to.
+  production is the cause, and it does not pretend to. Supply Trace finds structurally reachable
+  producers and reports their current diagnostics, but it does not establish that they are supplying a
+  consumer or that their output is quantitatively sufficient.
 - **Some transport families.** Armored conveyors and ducts, Plastanium Stack Conveyors, Duct Bridges,
   Mass Drivers, unloaders, and unknown modded transport are marked as incomplete topology rather than
   being approximated. Item bridges, ordinary conveyors, junctions, routers, sorters, gates, ducts, and
@@ -155,9 +161,11 @@ relevant part of `last_log.txt` from your Mindustry data folder.
 - **0.1 complete:** single-building diagnostics.
 - **0.2 complete:** area diagnostics, issue aggregation, and affected-building navigation.
 - **0.3 complete:** static, item-aware network topology inside a selected area.
+- **0.4 development:** network-aware diagnostics and Supply Trace.
 
-The next planned major feature is **Network-Aware Diagnostics / Supply Trace**: use known topology to
-trace potential item routes without claiming that items currently travel along them.
+Supply Trace correlates known topology with existing per-building diagnostics. It does not observe item
+movement or prove quantitative supply sufficiency. The next planned work has no promised date; possible
+areas include power analysis, liquid networks, schematics, and more advanced evidence-based diagnosis.
 
 Exact per-edge throughput is deferred. Mindustry 160.5 exposes no public transfer event that identifies
 the source building, destination building, and item for a successful transfer. Inventory changes and

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0 - Unreleased
+
+### Added
+
+- Supply Trace correlates an item's structural network routes with reachable producers and their
+  existing building diagnostics.
+- Missing item inputs can be traced from the single-building inspector. Area Network details can trace
+  both inputs and outputs.
+- Traces distinguish known route endings, selected-area boundaries, storage endpoints, and unsupported
+  transport; representative paths are shown without enumerating every possible route.
+
+### Not in this release
+
+Supply Trace does not observe item movement or establish quantitative supply sufficiency. It does not
+attribute a shortage to a producer or recommend changes. Exact per-edge throughput remains deferred.
+
 ## 0.3.1 - 2026-10-01
 
 ### Fixed

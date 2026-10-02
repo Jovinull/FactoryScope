@@ -30,6 +30,13 @@ For area diagnostics specifically:
 The headless boot downloads the Mindustry `assets.jar` once and unpacks the non-sprite part of it into
 `build/mindustry-assets`; that is why the first `gradlew test` is slower than the rest.
 
+Trace coverage includes `trace/TraceAnalyzerTest`, which exercises pure item-aware forward/reverse
+traversal, unique endpoints, deterministic representative paths, storage distinction, boundaries,
+unsupported transport, Junction channels and cycle termination. `probe/MindustryNetworkProbeTest` also
+places a real Mindustry drill, conveyor and crafter to verify that a mined item can be traced as a
+structural product without inventing a production rate. It also covers a non-crafter item consumer, a
+multi-output AttributeCrafter's exact product constraints, and a producer outside the selected area.
+
 ## 2. Acceptance suite
 
 ```
@@ -86,6 +93,14 @@ The suite drives the real overlay end to end. It does not call an internal "sele
 method, for the same reason the single-building test does not call `inspect(building)`: that would skip
 the code most likely to be wrong.
 
+The Supply Trace acceptance path uses the real building inspector, starts area selection from a missing
+item, follows Sand from a real Drill through three real conveyors to a Silicon Smelter, opens the
+producer's diagnostics, and returns to the trace and Network. The harness also resolves every trace
+string and formatted label in the active locale. It checks that Network and Supply Trace remain
+scrollable at 1280x720 with 2x UI scale and that endpoint rows use the available width after Refresh.
+Captures include the normal trace and the same trace at high UI scale. A separate complete Mindustry
+headless integration fixture independently checks the same structural path.
+
 Results are written to the game log as `[HARNESS]` lines; `scripts/acceptance-test.ps1` reads them and
 turns them into an exit code. Your saves, settings and installed mods are never touched.
 
@@ -116,10 +131,12 @@ is only available with `-MindustryPath` or automatic install discovery.
 ```
 gradlew areaBenchmark
 gradlew networkBenchmark
+gradlew traceBenchmark
 ```
 
 Prints what one area analysis costs at 50, 250, 1000 and 4000 buildings, split into spatial collection,
-probing, diagnosis, aggregation and building the report model. It asserts nothing about time: a
+probing, diagnosis, aggregation and building the report model. The network and trace benchmarks measure
+graph construction and reverse tracing at the same sizes. They assert nothing about time: a
 wall-clock threshold in a test suite fails on a loaded machine and passes on a fast one, which teaches a
 maintainer to ignore it. A regression shows up as a number that moved.
 

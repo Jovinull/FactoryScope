@@ -165,3 +165,30 @@ The graph describes possible structure, not current item movement. Mindustry 160
 that reports a successful transfer together with its source, destination, and item. Its building flow
 averages aggregate item-module additions and cannot attribute those additions to graph edges. Exact
 per-edge throughput therefore remains deferred; see [the throughput research](throughput.md).
+
+## Supply Trace
+
+`TraceAnalyzer` receives one `AreaDiagnosticResult`, a target `BuildingRef`, and an item `ResourceRef`.
+It walks the existing directed graph in reverse for an input or forward for an output, applying the
+graph's item constraints at every edge. It returns unique producer, consumer, and storage endpoints,
+one deterministic shortest representative path per endpoint, plus any reached boundary or unsupported
+connection. It does not enumerate all possible paths.
+
+Producer and consumer identity comes from item metadata already recorded in each `FactorySnapshot`, so
+standard item consumers are not restricted to crafter classes. Multi-output crafter routes retain their
+declared product set. A drill's dominant mined item is recorded as a structural product, not as a
+production rate. Producer condition comes from that same entry's `DiagnosticResult`. Storage is kept
+distinct from production. No trace finding turns a producer's diagnostic state into a cause of the
+target's condition.
+
+A no-route conclusion is emitted only when the target snapshot and all area diagnostics are available,
+the target actually consumes or produces the requested item, the target's item ports are modeled, and
+the selected topology has no boundary, unsupported transport, or interruption. Missing target ports and
+missing diagnostic snapshots are reported as different kinds of incomplete evidence. This test is
+intentionally conservative: any unsupported transport in the selection makes the trace incomplete,
+even if the unsupported block does not appear on the representative route. Area boundaries and
+unsupported transport can coexist with reachable endpoints; each fact remains visible rather than
+forcing the result into a single status.
+
+Refresh rebuilds the area diagnostics and topology together, then recomputes an open trace against that
+new snapshot. World changes discard the area report and trace.
