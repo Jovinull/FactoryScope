@@ -84,6 +84,20 @@ class MindustryPowerProbeTest{
     }
 
     @Test
+    void anEnemyPowerGraphNeverEntersTheVisibleReport(){
+        Building friendly = place(Blocks.solarPanel, 5, 5, Team.sharded);
+        Building enemy = place(Blocks.solarPanel, 35, 35, Team.crux);
+
+        PowerGridReport report = MindustryPowerProbe.scan(List.of(friendly, enemy), Team.sharded);
+
+        assertEquals(1, report.grids.size());
+        PowerGridSnapshot grid = report.grids.get(0).snapshot;
+        assertEquals(1, grid.selectedMemberCount);
+        assertTrue(grid.members.stream().allMatch(member -> member.ref.teamId == Team.sharded.id));
+        assertFalse(grid.members.stream().anyMatch(member -> member.ref.equals(AreaProbe.refOf(enemy))));
+    }
+
+    @Test
     void areaScanIncludesOnePowerSnapshotForTheIntersectedGrid(){
         Building solar = place(Blocks.solarPanel, 8, 8);
         place(Blocks.battery, 9, 8);
@@ -242,7 +256,11 @@ class MindustryPowerProbeTest{
     }
 
     private static Building place(Block block, int x, int y){
-        world.tile(x, y).setBlock(block, Team.sharded, 0);
+        return place(block, x, y, Team.sharded);
+    }
+
+    private static Building place(Block block, int x, int y, Team team){
+        world.tile(x, y).setBlock(block, team, 0);
         Building build = world.tile(x, y).build;
         assertNotNull(build, "failed to place " + block.name);
         if(build.block.update) build.updateConsumption();

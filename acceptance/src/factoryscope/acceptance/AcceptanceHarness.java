@@ -1040,6 +1040,19 @@ public class AcceptanceHarness extends Mod{
                 && FactoryScopeUI.areaReport().power == refreshedPowerSnapshot
                 && FactoryScopeUI.powerReport() == null));
         queue(this::closeAnyDialog);
+
+        scenario("world change clears the PowerScope snapshot and electrical overlay");
+        queue(() -> check("the refreshed area report is available for the lifecycle check",
+            FactoryScopeUI.areaReport() != null && Core.scene.find("factoryscope-area-power") != null));
+        queue(() -> clickNamed("factoryscope-area-power"));
+        queue(() -> clickNamed("factoryscope-power-view-world"));
+        queue(() -> check("the electrical overlay is active before world change",
+            Core.scene.find("factoryscope-power-viewing") != null));
+        queue(() -> Events.fire(new WorldLoadEvent()));
+        queue(() -> check("world change releases the grid report, area report and overlay",
+            FactoryScopeUI.powerReport() == null && FactoryScopeUI.areaReport() == null
+                && !FactoryScopeUI.areaReportHeld() && Core.scene.getDialog() == null
+                && Core.scene.find("factoryscope-power-viewing") == null));
     }
 
     void healthyArea(){
