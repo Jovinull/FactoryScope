@@ -123,6 +123,8 @@ class MindustryPowerProbeTest{
         assertEquals(1, report.grids.size());
         assertTrue(report.grids.get(0).snapshot.connections.contains(
             new PowerConnection(AreaProbe.refOf(solar), AreaProbe.refOf(node))));
+        assertEquals(1, report.grids.get(0).snapshot.connections.size(),
+            "reciprocal engine connections represent one physical electrical link");
     }
 
     @Test
