@@ -1209,6 +1209,53 @@ public class AcceptanceHarness extends Mod{
         queue(() -> clickNamed("factoryscope-power-back"));
         queue(this::closeAnyDialog);
 
+        scenario("PowerScope presents a selected Power Diode as a conditional link between separate grids");
+        int diodeX = rx(), diodeY = ry();
+        Building[] diodeFixture = new Building[3];
+        queue(() -> {
+            clearRegion();
+            diodeFixture[0] = placeAt(Blocks.battery, diodeX + 4, diodeY + 5);
+            diodeFixture[1] = placeAt(Blocks.diode, diodeX + 5, diodeY + 5);
+            diodeFixture[2] = placeAt(Blocks.battery, diodeX + 6, diodeY + 5);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(diodeX + 2, diodeY + 3, diodeX + 8, diodeY + 7));
+        queue(() -> check("the area selection includes both diode endpoint grids and the diode",
+            FactoryScopeUI.areaReport() != null && FactoryScopeUI.areaReport().power != null));
+        queue(() -> clickNamed("factoryscope-area-power"));
+        queue(() -> {
+            PowerGridReport report = FactoryScopeUI.powerReport();
+            boolean separate = report != null && report.grids.size() == 2;
+            PowerDiodeLink link = report == null || report.diodeLinks.size() != 1
+                ? null : report.diodeLinks.get(0);
+            boolean direction = link != null && link.fromGrid != link.toGrid
+                && report.grids.get(link.fromGrid).snapshot.members.stream()
+                    .anyMatch(member -> member.ref.equals(AreaProbe.refOf(diodeFixture[0])))
+                && report.grids.get(link.toGrid).snapshot.members.stream()
+                    .anyMatch(member -> member.ref.equals(AreaProbe.refOf(diodeFixture[2])));
+            check("the Power Diode remains a relation, not a merged PowerGraph",
+                separate && diodeFixture[0].power.graph != diodeFixture[2].power.graph
+                    && report.grids.stream().noneMatch(grid -> grid.snapshot.members.stream()
+                        .anyMatch(member -> member.ref.equals(AreaProbe.refOf(diodeFixture[1])))));
+            check("the displayed Power Diode relation follows Mindustry back-to-front direction", direction);
+            check("the Power Diode UI explicitly withholds current activity and transfer amount",
+                link != null && link.batteryState == PowerDiodeBatteryState.bothEndpointsHaveCapacity
+                    && dialogShows(FsBundle.get("power.diodes"))
+                    && dialogShows(FsBundle.format("power.diode-link", link.diode.blockName,
+                        link.fromGrid + 1, link.toGrid + 1))
+                    && dialogShows(FsBundle.get("power.diode-unmeasured")));
+        });
+        queue(() -> {
+            ScrollPane pane = findPane(Core.scene.getDialog());
+            if(pane != null){
+                pane.setScrollPercentY(1f);
+                pane.updateVisualScroll();
+            }
+        });
+        queue(() -> capture("power-diode-cross-grid"));
+        queue(() -> clickNamed("factoryscope-power-back"));
+        queue(this::closeAnyDialog);
+
         scenario("world change clears the PowerScope snapshot and electrical overlay");
         int lifecycleX = rx(), lifecycleY = ry();
         queue(() -> {
