@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 - 2026-10-02
+
+### Fixed
+
+- Supply Trace can locate an unsupported transport interruption and return to the same trace.
+
 ## 0.4.0 - 2026-10-02
 
 ### Added

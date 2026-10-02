@@ -21,8 +21,9 @@ logic. Storage remains a storage endpoint, never a producer merely because it ma
 ## Interpreting a result
 
 An input trace may show reachable in-area producers, storage endpoints, a continuation at the area
-boundary, and interruptions at transport that is not fully modeled. These facts can coexist. The trace
-never recursively scans beyond the selection.
+boundary, and interruptions at transport that is not fully modeled. These facts can coexist. An
+interruption identifies its building and can be located without leaving the trace's navigation context.
+The trace never recursively scans beyond the selection.
 
 A complete trace conclusion requires a target snapshot with the requested item, a modeled target port,
 available diagnostics for buildings that can affect the traversed item-specific subgraph, and no
