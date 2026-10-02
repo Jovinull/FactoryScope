@@ -77,7 +77,7 @@ if($running.Count -gt 0){
 }
 
 Write-Step 'Locating Mindustry'
-$gameBuild = '159.7'
+$gameBuild = '160.5'
 if($MindustryJar){
     $gamePath = [IO.Path]::GetFullPath($MindustryJar)
     if(-not (Test-Path -LiteralPath $gamePath)){ throw "Mindustry jar not found: $gamePath" }

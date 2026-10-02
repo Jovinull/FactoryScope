@@ -1,6 +1,17 @@
 # Changelog
 
-## 0.3.0 - Unreleased
+## 0.3.1 - Unreleased
+
+### Fixed
+
+- Item production rates and output-buffer diagnostics now account for Mindustry 160's dynamically scaled
+  crafter outputs, including Attribute Crafters such as the Silicon Crucible.
+
+### Changed
+
+- Requires Mindustry v8 build 160 or later; built and tested against v160.5.
+
+## 0.3.0 - 2026-09-02
 
 ### Added
 
