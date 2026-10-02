@@ -52,6 +52,11 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
 
         title.setText(FsBundle.get("area.title"));
         networkDialog.setOnViewWorld(this::viewNetworkInWorld);
+        networkDialog.setOnRefresh(this::refresh);
+        networkDialog.setOnLocate(ref -> {
+            hide();
+            FactoryScopeUI.locateFromNetwork(ref, networkDialog::reopen);
+        });
         //a column rather than the full width of the window: a count pinned to the far edge of a 4K
         //display is a long way from the label it belongs to
         cont.pane(outer -> {
@@ -101,6 +106,14 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         return isShown() ? result : null;
     }
 
+    AreaDiagnosticResult heldResult(){
+        return result;
+    }
+
+    void showTrace(BuildingRef target, ResourceRef item){
+        if(result != null && result.network != null) networkDialog.showTrace(result, target, item);
+    }
+
     public AreaSelection selection(){
         return selection;
     }
@@ -121,6 +134,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
             return;
         }
         result = AreaProbe.scan(selection, viewerTeam());
+        networkDialog.refresh(result);
         rebuild();
     }
 
@@ -128,7 +142,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     public void clear(){
         selection = null;
         result = null;
-        networkDialog.hide();
+        networkDialog.clearReport();
         if(body != null) body.clear();
         if(isShown()) hide();
     }
@@ -139,13 +153,13 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     }
 
     private void openNetwork(){
-        if(result != null && result.network != null) networkDialog.show(result.network);
+        if(result != null && result.network != null) networkDialog.show(result);
     }
 
     private void viewNetworkInWorld(){
         if(result == null || result.network == null) return;
         hide();
-        FactoryScopeUI.viewNetworkInWorld(result.network, networkDialog.selected(), () -> {
+        FactoryScopeUI.viewNetworkInWorld(result.network, networkDialog.selected(), networkDialog.trace(), () -> {
             show();
             networkDialog.reopen();
         }, this::clear);

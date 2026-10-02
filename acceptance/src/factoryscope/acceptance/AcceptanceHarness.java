@@ -16,6 +16,7 @@ import factoryscope.analysis.*;
 import factoryscope.area.*;
 import factoryscope.model.*;
 import factoryscope.probe.*;
+import factoryscope.trace.*;
 import factoryscope.ui.*;
 import mindustry.content.*;
 import mindustry.core.*;
@@ -26,6 +27,7 @@ import mindustry.maps.*;
 import mindustry.mod.*;
 import mindustry.type.*;
 import mindustry.world.*;
+import mindustry.world.blocks.environment.Floor;
 
 import static mindustry.Vars.*;
 
@@ -55,7 +57,8 @@ public class AcceptanceHarness extends Mod{
     final Seq<Runnable> actions = new Seq<>();
     int checks;
 
-    Building upper, lower, target;
+    Building upper, lower, target, producer, disabledProducer, disabledRouteBreak;
+    AreaDiagnosticResult traceSnapshotBeforeRefresh;
     int baselineElements;
     final Seq<Building> patch = new Seq<>();
     final Seq<AreaSelection> bounds = new Seq<>();
@@ -319,6 +322,10 @@ public class AcceptanceHarness extends Mod{
         dragDirections();
         multiTileEdge();
         singleClickStillInspects();
+        singlePanelSupplyTrace();
+        traceCompletenessScenarios();
+        outputTraceBoundary();
+        outputTraceDeadEnd();
         tinyDragIsAClick();
         mixedProblems();
         itemNetworkView();
@@ -344,6 +351,7 @@ public class AcceptanceHarness extends Mod{
         crowdedAtUiScale(2f);
         queue(this::restoreLayout);
         queue(this::checkAreaLocalization);
+        queue(this::checkTraceLocalization);
         repeatedAreaUse(6);
         areaWorldChange();
     }
@@ -462,6 +470,293 @@ public class AcceptanceHarness extends Mod{
             check("the single-building panel opened", FactoryScopeUI.inspected() == target);
             check("no area report was opened by a click", FactoryScopeUI.areaBounds() == null);
         });
+    }
+
+    void singlePanelSupplyTrace(){
+        scenario("a missing item can be traced from single-building diagnostics");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            for(int x = rx() + 2; x <= rx() + 3; x++){
+                for(int y = ry() + 3; y <= ry() + 4; y++){
+                    Tile tile = world.tile(x, y);
+                    tile.setFloor((Floor)Blocks.sand);
+                    tile.clearOverlay();
+                }
+            }
+            producer = placeAt(Blocks.mechanicalDrill, rx() + 2, ry() + 3);
+            placeAt(Blocks.conveyor, rx() + 4, ry() + 3);
+            placeAt(Blocks.conveyor, rx() + 5, ry() + 3);
+            placeAt(Blocks.conveyor, rx() + 6, ry() + 3);
+            target = placeAt(Blocks.siliconSmelter, rx() + 7, ry() + 3);
+
+            for(int x = rx() + 2; x <= rx() + 3; x++){
+                for(int y = ry() + 5; y <= ry() + 6; y++){
+                    Tile tile = world.tile(x, y);
+                    tile.setFloor((Floor)Blocks.sand);
+                    tile.clearOverlay();
+                }
+            }
+            disabledProducer = placeAt(Blocks.mechanicalDrill, rx() + 2, ry() + 5);
+            disabledProducer.enabled = false;
+            placeAt(Blocks.conveyor, rx() + 4, ry() + 5);
+            placeAt(Blocks.conveyor, rx() + 5, ry() + 5);
+            disabledRouteBreak = placeAt(Blocks.conveyor, rx() + 6, ry() + 5);
+            placeAt(Blocks.conveyor, rx() + 7, ry() + 5, 3);
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> {
+            check("a missing item offers Supply Trace", Core.scene.find("factoryscope-trace-input-sand") != null);
+            check("single-building diagnostics remains open", FactoryScopeUI.inspected() == target);
+        });
+        queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> {
+            check("Trace asks for an area when none is active", FactoryScopeUI.picking());
+            check("the single-building panel leaves room for the area selection", FactoryScopeUI.inspected() == null);
+        });
+        queue(() -> dragTiles(rx() + 2, ry() + 2, rx() + 7, ry() + 7));
+        queue(() -> {
+            check("the Supply Trace opens after area selection", Core.scene.find("factoryscope-trace-back") != null);
+            check("the trace keeps the analyzed area available", FactoryScopeUI.areaReportHeld()
+                && FactoryScopeUI.areaReport() != null && FactoryScopeUI.areaReport().network != null);
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            ResourceRef sand = new ResourceRef(ResourceKind.item, "sand", "Sand");
+            AreaEntry drillEntry = report == null ? null : report.entries.stream()
+                .filter(entry -> entry.ref.equals(AreaProbe.refOf(producer))).findFirst().orElse(null);
+            check("the area snapshot recognizes the drill's mined item",
+                drillEntry != null && drillEntry.snapshot != null && drillEntry.snapshot.producedItems.contains(sand),
+                drillEntry == null || drillEntry.snapshot == null ? "no drill snapshot"
+                    : drillEntry.snapshot.producedItems.toString());
+            SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(target), sand);
+            check("the area topology reaches the drill for Sand",
+                trace != null && trace.producers().stream().anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer))),
+                trace == null ? "no trace" : "complete=" + trace.complete + " targetUsesItem=" + trace.targetUsesItem
+                    + " diagnosticsIncomplete=" + trace.diagnosticsIncomplete + " edges=" + report.network.graph.edges.size());
+            check("each reachable Sand producer appears once",
+                trace != null && trace.producers().size() == 2
+                    && trace.producers().stream().map(endpoint -> endpoint.building).distinct().count() == 2,
+                trace == null ? "no trace" : trace.producers().stream().map(endpoint -> endpoint.building.toString()).toList().toString());
+            TraceEndpoint disabled = trace == null ? null : trace.producers().stream()
+                .filter(endpoint -> endpoint.building.equals(AreaProbe.refOf(disabledProducer))).findFirst().orElse(null);
+            check("the disabled reachable producer retains its diagnostic state",
+                disabled != null && disabled.diagnostic != null && disabled.diagnostic.reason() == DiagnosticReason.disabled);
+            check("the real drill is listed as a reachable Sand producer",
+                Core.scene.find("factoryscope-trace-endpoint-" + producer.tile.x + "-" + producer.tile.y) != null);
+            check("the disabled producer is also listed in the trace",
+                Core.scene.find("factoryscope-trace-endpoint-" + disabledProducer.tile.x + "-" + disabledProducer.tile.y) != null);
+            TraceEndpoint active = trace == null ? null : trace.producers().stream()
+                .filter(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer))).findFirst().orElse(null);
+            check("the operating source retains its diagnostic state",
+                active != null && active.diagnostic != null && active.diagnostic.reason() != DiagnosticReason.disabled);
+            check("the trace displays that producer's diagnostic label",
+                active != null && active.diagnostic != null
+                    && dialogShows(AreaText.status(AreaStatus.of(active.diagnostic.reason()))));
+            check("the trace annotates a disabled reachable producer",
+                dialogShows(FsBundle.get("area.status.disabled")));
+            check("the reachable producer can be inspected",
+                Core.scene.find("factoryscope-trace-inspect") != null);
+        });
+        queue(() -> capture("supply-trace-producer"));
+        queue(() -> {
+            disabledRouteBreak.tile.remove();
+            check("the selected route segment was removed before Refresh", disabledRouteBreak.tile.build == null);
+        });
+        queue(() -> {
+            AreaDiagnosticResult beforeRefresh = FactoryScopeUI.areaReport();
+            traceSnapshotBeforeRefresh = beforeRefresh;
+            SupplyTrace trace = beforeRefresh == null ? null
+                : TraceAnalyzer.input(beforeRefresh, AreaProbe.refOf(target), new ResourceRef(ResourceKind.item, "sand", "Sand"));
+            check("the open trace remains a snapshot until Refresh", trace != null && trace.producers().size() == 2,
+                trace == null ? "no snapshot" : trace.producers().stream().map(endpoint -> endpoint.building.toString()).toList().toString());
+        });
+        queue(() -> clickNamed("factoryscope-network-refresh"));
+        queue(() -> {
+            AreaDiagnosticResult refreshed = FactoryScopeUI.areaReport();
+            check("Refresh replaces the area report snapshot", refreshed != traceSnapshotBeforeRefresh,
+                refreshed == null ? "report missing" : "same report instance");
+            SupplyTrace trace = refreshed == null ? null
+                : TraceAnalyzer.input(refreshed, AreaProbe.refOf(target), new ResourceRef(ResourceKind.item, "sand", "Sand"));
+            check("Refresh rebuilds the trace after a route is removed", trace != null && trace.producers().size() == 1,
+                trace == null ? "no refreshed trace" : trace.producers().stream()
+                    .map(endpoint -> endpoint.building + " path=" + endpoint.path.ports().stream()
+                        .map(port -> port.building + "/" + port.side + "/" + port.channel).toList()).toList().toString());
+            check("Refresh removes the no-longer-reachable producer row",
+                Core.scene.find("factoryscope-trace-endpoint-" + disabledProducer.tile.x + "-" + disabledProducer.tile.y) == null);
+        });
+        queue(() -> {
+            Scl.setProduct(2f);
+            Core.scene.resize(1280, 720);
+        });
+        queue(() -> {
+            ScrollPane pane = findPane(Core.scene.getDialog());
+            if(pane != null){
+                pane.setScrollPercentY(0f);
+                pane.updateVisualScroll();
+            }
+            checkFits("Supply Trace at 1280x720 @ 2.0x");
+            Element endpoint = Core.scene.find("factoryscope-trace-endpoint-" + producer.tile.x + "-" + producer.tile.y);
+            float minimumRowWidth = (Core.scene.getWidth() / Scl.scl() - 40f) * 0.85f;
+            check("Supply Trace uses the available width at 2.0x",
+                endpoint != null && endpoint.getWidth() >= minimumRowWidth,
+                endpoint == null ? "producer row missing" : "row width " + endpoint.getWidth() + ", expected at least " + minimumRowWidth);
+        });
+        queue(() -> Core.scene.resize(Core.graphics.getWidth(), Core.graphics.getHeight()));
+        queue(() -> capture("supply-trace-high-ui-scale"));
+        queue(this::restoreLayout);
+        queue(() -> clickNamed("factoryscope-trace-inspect"));
+        queue(() -> check("Inspect opens diagnostics for the reachable drill", FactoryScopeUI.inspected() == producer));
+        queue(this::closeAnyDialog);
+        queue(() -> check("closing producer diagnostics returns to the same trace",
+            Core.scene.find("factoryscope-trace-back") != null));
+        queue(() -> clickNamed("factoryscope-trace-back"));
+        queue(() -> check("return from Supply Trace restores the Network view",
+            Core.scene.find("factoryscope-network-dialog") != null));
+        queue(this::closeAnyDialog);
+    }
+
+    void traceCompletenessScenarios(){
+        int x = rx() + 7, boundaryX = rx() + 12, unsupportedX = rx() + 17, y = ry() + 3;
+        ResourceRef sand = new ResourceRef(ResourceKind.item, "sand", "Sand");
+
+        scenario("Supply Trace proves no route only for a complete isolated target");
+        queue(this::closeAnyDialog);
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            target = placeAt(Blocks.siliconSmelter, x, y);
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> check("the isolated target offers an item trace",
+            Core.scene.find("factoryscope-trace-input-sand") != null));
+        queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> dragTiles(x, y, x + 1, y + 1));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(target), sand);
+            check("a complete isolated input proves no structural route", trace != null && trace.noRouteProven);
+            check("the UI reports no route", dialogShows(FsBundle.get("trace.no-route")));
+            check("the isolated target has no boundary continuation", trace != null && trace.boundaryContinuations.isEmpty());
+        });
+        queue(() -> capture("supply-trace-no-route"));
+        queue(this::closeAnyDialog);
+
+        scenario("Supply Trace preserves an incoming area boundary");
+        queue(this::closeAnyDialog);
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            placeAt(Blocks.conveyor, boundaryX - 1, y, 0);
+            target = placeAt(Blocks.siliconSmelter, boundaryX, y);
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> dragTiles(boundaryX, y, boundaryX + 1, y + 1));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(target), sand);
+            check("the route is marked as continuing outside the selection",
+                trace != null && !trace.boundaryContinuations.isEmpty()
+                    && dialogShows(FsBundle.format("trace.boundary-one", trace.boundaryContinuations.size())));
+            check("a boundary is not shown as no route", trace != null && !trace.noRouteProven
+                && !dialogShows(FsBundle.get("trace.no-route")));
+            check("the boundary is not reported as a structural dead end", trace != null && trace.structuralDeadEnds.isEmpty());
+        });
+        queue(() -> capture("supply-trace-boundary"));
+        queue(this::closeAnyDialog);
+
+        scenario("Supply Trace marks an unsupported transport interruption");
+        queue(this::closeAnyDialog);
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            placeAt(Blocks.armoredConveyor, unsupportedX - 1, y, 1);
+            target = placeAt(Blocks.siliconSmelter, unsupportedX, y);
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> dragTiles(unsupportedX - 1, y, unsupportedX + 1, y + 1));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(target), sand);
+            check("the unsupported transport makes the trace incomplete",
+                trace != null && !trace.complete && !trace.unsupportedInterruptions.isEmpty());
+            check("the UI reports unsupported topology", dialogShows(FsBundle.get("trace.unsupported-area-one")));
+            check("unsupported topology is not shown as a dead end or no route", trace != null
+                && !trace.noRouteProven && trace.structuralDeadEnds.isEmpty()
+                && !dialogShows(FsBundle.get("trace.no-route")));
+        });
+        queue(() -> capture("supply-trace-unsupported"));
+        queue(this::closeAnyDialog);
+    }
+
+    void outputTraceBoundary(){
+        int x = rx() + 2, y = ry() + 2;
+        scenario("an output trace describes an outside continuation as having no in-area consumer");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            target = placeAt(Blocks.graphitePress, x, y);
+            placeAt(Blocks.conveyor, x + 2, y);
+            placeAt(Blocks.conveyor, x + 3, y);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x - 1, y - 1, x + 2, y + 2));
+        queue(() -> check("the output-trace selection produced an area report", FactoryScopeUI.areaReport() != null));
+        queue(() -> clickNamed("factoryscope-area-network"));
+        queue(() -> check("the produced item is available as a Network filter",
+            Core.scene.find("factoryscope-network-item-graphite") != null));
+        queue(() -> clickNamed("factoryscope-network-item-graphite"));
+        queue(() -> clickNamed("factoryscope-network-building", 0));
+        queue(() -> check("the producer exposes an output trace action",
+            Core.scene.find("factoryscope-network-trace-output") != null));
+        queue(() -> clickNamed("factoryscope-network-trace-output"));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            SupplyTrace trace = report == null ? null : TraceAnalyzer.output(report, AreaProbe.refOf(target),
+                new ResourceRef(ResourceKind.item, "graphite", "Graphite"));
+            check("the structural output path reaches the area boundary",
+                trace != null && !trace.boundaryContinuations.isEmpty() && trace.endpoints.isEmpty());
+            check("the boundary uses consumer wording for an output trace",
+                dialogShows(FsBundle.get("trace.no-in-area-consumer")));
+            check("the boundary does not claim there is no producer",
+                !dialogShows(FsBundle.get("trace.no-in-area-producer")));
+        });
+        queue(() -> capture("supply-trace-output-boundary"));
+        queue(this::closeAnyDialog);
+    }
+
+    void outputTraceDeadEnd(){
+        int x = rx() + 2, y = ry() + 2;
+        scenario("an output trace distinguishes a known dead end from a missing route");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            target = placeAt(Blocks.graphitePress, x, y);
+            placeAt(Blocks.conveyor, x + 2, y, 0);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x - 1, y - 1, x + 3, y + 1));
+        queue(() -> check("the output dead-end selection produced an area report", FactoryScopeUI.areaReport() != null));
+        queue(() -> clickNamed("factoryscope-area-network"));
+        queue(() -> clickNamed("factoryscope-network-item-graphite"));
+        queue(() -> clickNamed("factoryscope-network-building", 0));
+        queue(() -> clickNamed("factoryscope-network-trace-output"));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            SupplyTrace trace = report == null ? null : TraceAnalyzer.output(report, AreaProbe.refOf(target),
+                new ResourceRef(ResourceKind.item, "graphite", "Graphite"));
+            check("the route ends at the reachable conveyor", trace != null
+                && trace.structuralDeadEnds.stream().anyMatch(ref -> ref.blockId.equals("conveyor")));
+            check("a known output dead end is not reported as no structural route", trace != null
+                && !trace.noRouteProven && !dialogShows(FsBundle.get("trace.no-downstream")));
+            check("the output trace describes the missing in-area consumer", dialogShows(FsBundle.get("trace.no-consumer")));
+        });
+        queue(() -> capture("supply-trace-output-dead-end"));
+        queue(this::closeAnyDialog);
     }
 
     /** A press that wanders a few pixels is a click, not a one-tile area report. */
@@ -820,6 +1115,29 @@ public class AcceptanceHarness extends Mod{
             check("the picker was cleared on world load", !FactoryScopeUI.picking());
         });
 
+        scenario("a world change clears an open Supply Trace");
+        queue(this::closeAnyDialog);
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            target = placeAt(Blocks.siliconSmelter, rx() + 3, ry() + 3);
+            placeAt(Blocks.conveyor, rx() + 2, ry() + 3);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(rx() + 1, ry() + 2, rx() + 5, ry() + 6));
+        queue(() -> clickNamed("factoryscope-area-network"));
+        queue(() -> clickNamed("factoryscope-network-item-sand"));
+        queue(() -> clickNamed("factoryscope-network-building", 1));
+        queue(() -> check("the selected factory exposes its item trace",
+            Core.scene.find("factoryscope-network-trace-input") != null));
+        queue(() -> clickNamed("factoryscope-network-trace-input"));
+        queue(() -> check("the Supply Trace is open before the world change",
+            Core.scene.getDialog() != null && Core.scene.find("factoryscope-trace-back") != null));
+        queue(() -> Events.fire(new WorldLoadEvent()));
+        queue(() -> check("world change releases the trace and its area snapshot",
+            FactoryScopeUI.areaReport() == null && !FactoryScopeUI.areaReportHeld()
+                && FactoryScopeUI.areaBounds() == null && Core.scene.getDialog() == null));
+
         scenario("a world change during a selection cancels it");
         queue(this::armPicker);
         queue(() -> check("the picker is armed", FactoryScopeUI.picking()));
@@ -992,6 +1310,34 @@ public class AcceptanceHarness extends Mod{
         }
 
         Log.info(TAG + " locale @ -> area.title = '@'", Core.bundle.getLocale(), FsBundle.get("area.title"));
+    }
+
+    void checkTraceLocalization(){
+        scenarioNow("every Supply Trace string resolves in the active locale");
+        Seq<String> keys = Seq.with("network.open", "network.title", "network.static-note", "network.resource",
+            "trace.open", "trace.select-area", "trace.title", "trace.output-title", "trace.target",
+            "trace.target-missing", "trace.no-route", "trace.no-downstream", "trace.no-producer",
+            "trace.no-consumer", "trace.no-in-area-producer", "trace.no-in-area-consumer",
+            "trace.boundary-one", "trace.boundary-many", "trace.boundary-at",
+            "trace.unsupported-area-one", "trace.unsupported-area-many", "trace.unsupported-at", "trace.incomplete-diagnostics", "trace.endpoints",
+            "trace.incomplete-target-topology",
+            "trace.no-in-area-producer", "trace.dead-ends", "trace.dead-end", "trace.storage", "trace.inspect",
+            "trace.viewing", "trace.conditional-path", "trace.back-network", "trace.input-action", "trace.output-action");
+        for(String key : keys){
+            String text = FsBundle.get(key);
+            check("'" + key + "' resolves", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
+        }
+        for(String[] entry : new String[][]{
+            {"trace.target", "Silicon Smelter"}, {"trace.boundary-many", "3"},
+            {"trace.boundary-at", "123", "61"}, {"trace.unsupported-area-many", "2"},
+            {"trace.unsupported-at", "Armored Conveyor", "123", "61"}, {"trace.endpoints", "2"},
+            {"trace.dead-ends", "3"}, {"trace.dead-end", "Conveyor", "123", "61"}, {"trace.input-action", "Sand"},
+            {"trace.output-action", "Silicon"}}){
+            Object[] args = new Object[entry.length - 1];
+            System.arraycopy(entry, 1, args, 0, args.length);
+            String text = FsBundle.format(entry[0], args);
+            check("'" + entry[0] + "' formats", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
+        }
     }
 
 
@@ -1423,9 +1769,18 @@ public class AcceptanceHarness extends Mod{
     }
 
     void clickNamed(String name){
-        Element element = Core.scene.find(name);
+        clickNamed(name, 0);
+    }
+
+    void clickNamed(String name, int occurrence){
+        Element[] found = {null};
+        int[] matches = {0};
+        walk(Core.scene.root, element -> {
+            if(found[0] == null && name.equals(element.name) && matches[0]++ == occurrence) found[0] = element;
+        });
+        Element element = found[0];
         if(element == null){
-            check("an element named " + name + " exists", false);
+            check("element " + name + " exists at index " + occurrence, false);
             return;
         }
         Vec2 stage = element.localToStageCoordinates(new Vec2(element.getWidth() / 2f, element.getHeight() / 2f));
@@ -1452,9 +1807,13 @@ public class AcceptanceHarness extends Mod{
      * once, and a helper that swept a margin would quietly demolish the neighbour placed a moment ago.
      */
     Building placeAt(Block block, int x, int y){
+        return placeAt(block, x, y, 0);
+    }
+
+    Building placeAt(Block block, int x, int y, int rotation){
         Tile tile = world.tile(x, y);
         if(tile == null) return null;
-        tile.setBlock(block, Team.sharded, 0);
+        tile.setBlock(block, Team.sharded, rotation);
         return tile.build;
     }
 

@@ -5,8 +5,8 @@ import java.util.*;
 /**
  * Outcome of analysing one snapshot.
  *
- * <p>The MVP interface only emphasises {@link #primary}, but every finding is retained so later
- * versions can show a factory with more than one bottleneck.
+ * <p>The interface emphasises {@link #primary}, but every finding is retained so other views can show
+ * more than one observed production issue.
  */
 public final class DiagnosticResult{
     public final Finding primary;

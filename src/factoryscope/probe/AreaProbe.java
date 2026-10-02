@@ -68,19 +68,26 @@ public final class AreaProbe{
     public static AreaDiagnosticResult scan(AreaSelection selection, Team viewer){
         Seq<Building> buildings = collect(selection, viewer);
         List<AreaEntry> entries = new ArrayList<>(buildings.size);
+        List<BuildingRef> skipped = new ArrayList<>();
+        Map<BuildingRef, FactorySnapshot> snapshots = new HashMap<>();
 
         for(Building build : buildings){
+            BuildingRef ref = refOf(build);
             try{
                 FactorySnapshot snapshot = MindustryFactoryProbe.probe(build);
-                entries.add(new AreaEntry(refOf(build), snapshot.support, FactoryAnalyzer.analyze(snapshot)));
+                snapshots.put(ref, snapshot);
+                entries.add(new AreaEntry(ref, snapshot, FactoryAnalyzer.analyze(snapshot)));
             }catch(Exception e){
                 //one hostile block must not cost the player the whole report
+                skipped.add(ref);
                 FsLog.warnOnce("area:" + build.block.name,
                     "could not analyse " + MindustryFactoryProbe.describe(build), e);
             }
         }
 
-        return AreaAnalyzer.analyze(selection, buildings.size, entries).withNetwork(MindustryNetworkProbe.scan(selection, viewer));
+        return AreaAnalyzer.analyze(selection, buildings.size, entries)
+            .withNetwork(MindustryNetworkProbe.scan(selection, viewer, snapshots))
+            .withSkippedBuildings(skipped);
     }
 
     public static BuildingRef refOf(Building build){

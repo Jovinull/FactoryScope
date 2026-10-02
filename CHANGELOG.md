@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.0 - 2026-10-02
+
+### Added
+
+- Supply Trace correlates an item's structural network routes with reachable producers and their
+  existing building diagnostics.
+- Missing item inputs can be traced from the single-building inspector. Area Network details can trace
+  both inputs and outputs.
+- Traces distinguish known route endings, selected-area boundaries, storage endpoints, and unsupported
+  transport; representative paths are shown without enumerating every possible route.
+
+### Fixed
+
+- Trace completeness is scoped to resource-compatible routes instead of unrelated unsupported blocks
+  elsewhere in the selected area.
+- Area-boundary continuations retain the item constraints of adjacent producers and supported transports.
+- Skipped multiblock probes use Mindustry's asymmetric even-sized footprint when checking trace certainty.
+- Known dead ends remain visible alongside reachable producers, and are not described as a disconnected
+  network.
+
+### Not in this release
+
+Supply Trace does not observe item movement or establish quantitative supply sufficiency. It does not
+attribute a shortage to a producer or recommend changes. Exact per-edge throughput remains deferred.
+
 ## 0.3.1 - 2026-10-01
 
 ### Fixed

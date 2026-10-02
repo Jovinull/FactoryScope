@@ -13,24 +13,36 @@ public final class AreaDiagnosticResult{
     public final List<AreaIssueGroup> issues;
     /** Static item topology for this same snapshot area, or null for legacy pure aggregation tests. */
     public final ItemNetwork network;
+    /** Selected buildings for which the per-building probe or analysis did not produce an entry. */
+    public final List<BuildingRef> skippedBuildings;
 
     AreaDiagnosticResult(AreaSelection selection, AreaSummary summary,
                          List<AreaEntry> entries, List<AreaIssueGroup> issues){
-        this(selection, summary, entries, issues, null);
+        this(selection, summary, entries, issues, null, List.of());
     }
 
     private AreaDiagnosticResult(AreaSelection selection, AreaSummary summary,
-                                 List<AreaEntry> entries, List<AreaIssueGroup> issues, ItemNetwork network){
+                                 List<AreaEntry> entries, List<AreaIssueGroup> issues, ItemNetwork network,
+                                 Collection<BuildingRef> skippedBuildings){
         this.selection = selection;
         this.summary = summary;
         this.entries = List.copyOf(entries);
         this.issues = List.copyOf(issues);
         this.network = network;
+        TreeSet<BuildingRef> ordered = new TreeSet<>(Comparator
+            .comparingInt((BuildingRef ref) -> ref.tileX).thenComparingInt(ref -> ref.tileY)
+            .thenComparing(ref -> ref.blockId).thenComparingInt(ref -> ref.teamId));
+        ordered.addAll(skippedBuildings);
+        this.skippedBuildings = List.copyOf(ordered);
     }
 
     /** Adds the adapter result without making the pure area aggregation depend on Mindustry. */
     public AreaDiagnosticResult withNetwork(ItemNetwork network){
-        return new AreaDiagnosticResult(selection, summary, entries, issues, network);
+        return new AreaDiagnosticResult(selection, summary, entries, issues, network, skippedBuildings);
+    }
+
+    public AreaDiagnosticResult withSkippedBuildings(Collection<BuildingRef> skippedBuildings){
+        return new AreaDiagnosticResult(selection, summary, entries, issues, network, skippedBuildings);
     }
 
     public boolean empty(){
