@@ -20,8 +20,9 @@ never modifies the state it inspects.
 - **Item network topology.** Open Network from an area report to see directed structural routes, remote
   item-bridge links, boundary continuations, and item-specific sorter paths. These routes are not current flow.
 - **Supply Trace.** From a missing item in the building inspector, trace supported structural routes to
-  reachable producers and see their existing diagnostic state. Traces distinguish known dead ends,
-  area boundaries, storage endpoints, and transport the topology does not fully model.
+  reachable producers and see their existing diagnostic state. The player selects the area to analyze;
+  traces distinguish known dead ends, area boundaries, storage endpoints, and transport the topology does
+  not fully model.
 
 An area report is a snapshot of diagnostic observations; Network maps static item topology, and Supply
 Trace correlates that topology with the same diagnostic snapshots. Trace does not measure item movement

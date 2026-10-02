@@ -348,6 +348,29 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void aMultiOutputProducerOutsideTheAreaOnlyContinuesItsDeclaredItems(){
+        Building source = place(ModdedBlocks.yieldScaled, 10, 9, 0);
+        Building target = place(Blocks.siliconSmelter, 11, 9, 0);
+
+        AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(11, 9, 11, 9), Team.sharded);
+        SupplyTrace sandTrace = TraceAnalyzer.input(area, AreaProbe.refOf(target), sand);
+
+        assertTrue(source.isValid());
+        assertTrue(area.network.boundaryInputs.contains(input(AreaProbe.refOf(target), NetworkSide.west)),
+            "source=" + source.tile.x + "," + source.tile.y + " size=" + source.block.size
+                + " target=" + target.tile.x + "," + target.tile.y + " size=" + target.block.size
+                + " boundary=" + area.network.boundaryInputs);
+        ItemConstraint boundaryItems = area.network.boundaryInputConstraints.get(input(AreaProbe.refOf(target), NetworkSide.west));
+        assertNotNull(boundaryItems);
+        assertTrue(boundaryItems.allows(new ResourceRef(ResourceKind.item, "graphite", "Graphite")));
+        assertTrue(boundaryItems.allows(new ResourceRef(ResourceKind.item, "silicon", "Silicon")));
+        assertFalse(boundaryItems.allows(sand));
+        assertTrue(sandTrace.boundaryContinuations.isEmpty(), "Graphite and Silicon do not continue Sand");
+        assertTrue(sandTrace.complete);
+        assertTrue(sandTrace.noRouteProven);
+    }
+
+    @Test
     void anUnsupportedNeighborIsAnInterruptionRatherThanADeadEndOrGuessedEdge(){
         Building unknown = place(Blocks.armoredConveyor, 10, 10, 0);
         Building inside = place(Blocks.conveyor, 11, 10, 0);

@@ -45,36 +45,47 @@ public final class TraceAnalyzer{
             ? targetEntry.snapshot.inputs.stream().anyMatch(input -> input.kind == ResourceKind.item && item.equals(input.ref()))
             : targetEntry.snapshot.producedItems.contains(item));
         List<NetworkPort> roots = ports(network.graph, target, direction == TraceDirection.input ? "in" : "out");
-        boolean diagnosticsIncomplete = area.summary.skipped() > 0 || targetEntry == null || targetEntry.snapshot == null;
+        if(!targetUsesItem){
+            return empty(target, item, direction, false, targetEntry == null || targetEntry.snapshot == null, roots.isEmpty());
+        }
         boolean topologyIncomplete = roots.isEmpty();
 
         Search search = direction == TraceDirection.input
             ? reverseSearch(network.graph, roots, item)
             : forwardSearch(network.graph, roots, item);
+        int unlocatedSkipped = Math.max(0, area.summary.skipped() - area.skippedBuildings.size());
+        List<BuildingRef> relevantSkipped = relevantSkipped(area.skippedBuildings, search.visited, target, direction);
+        boolean diagnosticsIncomplete = unlocatedSkipped > 0 || !relevantSkipped.isEmpty()
+            || targetEntry == null || targetEntry.snapshot == null;
 
         Map<BuildingRef, List<NetworkPort>> portsByBuilding = portsByBuilding(network.graph);
         List<TraceEndpoint> endpoints = endpoints(area.entries, network, portsByBuilding, target, item, direction, search);
-        List<NetworkPort> boundaries = relevantBoundaries(network, search.visited, direction);
+        List<NetworkPort> boundaries = relevantBoundaries(network, search.visited, item, direction);
         List<NetworkInterruption> interruptions = relevantInterruptions(network, search.visited, direction);
-        List<BuildingRef> unsupportedInArea = network.unsupportedTransport;
+        List<BuildingRef> unsupportedInArea = relevantUnsupported(network, target, interruptions);
         List<BuildingRef> deadEnds = deadEnds(network.graph, search.visited, target, item, direction, endpoints,
-            boundaries, interruptions);
+            boundaries, interruptions, relevantSkipped, unlocatedSkipped > 0);
 
         boolean complete = !diagnosticsIncomplete && !topologyIncomplete && unsupportedInArea.isEmpty()
             && interruptions.isEmpty() && boundaries.isEmpty();
-        boolean noRouteProven = targetUsesItem && endpoints.isEmpty() && complete;
+        boolean noRouteProven = endpoints.isEmpty() && complete && search.traversedEdges.isEmpty();
 
-        List<NetworkFinding> findings = findings(direction, targetUsesItem, endpoints, boundaries,
-            interruptions, unsupportedInArea, deadEnds, noRouteProven, complete);
+        List<NetworkFinding> findings = findings(direction, targetUsesItem, complete, endpoints, boundaries,
+            unsupportedInArea, deadEnds, noRouteProven);
         return new SupplyTrace(target, item, direction, targetUsesItem, complete, noRouteProven,
-            diagnosticsIncomplete, topologyIncomplete, endpoints, boundaries, interruptions, unsupportedInArea,
+            diagnosticsIncomplete, topologyIncomplete, search.traversedEdges, endpoints, boundaries, interruptions, unsupportedInArea,
             deadEnds, findings);
     }
 
     private static SupplyTrace empty(BuildingRef target, ResourceRef item, TraceDirection direction,
                                      boolean targetUsesItem, boolean diagnosticsIncomplete){
+        return empty(target, item, direction, targetUsesItem, diagnosticsIncomplete, true);
+    }
+
+    private static SupplyTrace empty(BuildingRef target, ResourceRef item, TraceDirection direction,
+                                     boolean targetUsesItem, boolean diagnosticsIncomplete, boolean topologyIncomplete){
         return new SupplyTrace(target, item, direction, targetUsesItem, false, false, diagnosticsIncomplete,
-            true, List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            topologyIncomplete, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     private static AreaEntry findEntry(List<AreaEntry> entries, BuildingRef ref){
@@ -110,7 +121,9 @@ public final class TraceAnalyzer{
         while(!search.pending.isEmpty()){
             NetworkPort current = search.pending.removeFirst();
             for(NetworkEdge edge : graph.incoming(current)){
-                if(!edge.items.allows(item) || !search.visited.add(edge.from)) continue;
+                if(!edge.items.allows(item)) continue;
+                search.traversedEdges.add(edge);
+                if(!search.visited.add(edge.from)) continue;
                 search.nextToTarget.put(edge.from, edge);
                 search.pathRoots.put(edge.from, search.pathRoots.get(current));
                 search.pending.addLast(edge.from);
@@ -132,7 +145,9 @@ public final class TraceAnalyzer{
         while(!search.pending.isEmpty()){
             NetworkPort current = search.pending.removeFirst();
             for(NetworkEdge edge : graph.outgoing(current)){
-                if(!edge.items.allows(item) || !search.visited.add(edge.to)) continue;
+                if(!edge.items.allows(item)) continue;
+                search.traversedEdges.add(edge);
+                if(!search.visited.add(edge.to)) continue;
                 search.fromSource.put(edge.to, edge);
                 search.pathRoots.put(edge.to, search.pathRoots.get(current));
                 search.pending.addLast(edge.to);
@@ -204,10 +219,14 @@ public final class TraceAnalyzer{
     }
 
     private static List<NetworkPort> relevantBoundaries(ItemNetwork network, Set<NetworkPort> visited,
-                                                         TraceDirection direction){
+                                                         ResourceRef item, TraceDirection direction){
         Collection<NetworkPort> candidates = direction == TraceDirection.input ? network.boundaryInputs : network.boundaryPorts;
+        Map<NetworkPort, ItemConstraint> constraints = direction == TraceDirection.input
+            ? network.boundaryInputConstraints : network.boundaryOutputConstraints;
         TreeSet<NetworkPort> result = new TreeSet<>();
-        for(NetworkPort port : candidates) if(visited.contains(port)) result.add(port);
+        for(NetworkPort port : candidates){
+            if(visited.contains(port) && constraints.getOrDefault(port, ItemConstraint.any()).allows(item)) result.add(port);
+        }
         return List.copyOf(result);
     }
 
@@ -222,18 +241,72 @@ public final class TraceAnalyzer{
         return List.copyOf(result);
     }
 
+    private static List<BuildingRef> relevantUnsupported(ItemNetwork network, BuildingRef target,
+                                                           List<NetworkInterruption> interruptions){
+        TreeSet<BuildingRef> result = new TreeSet<>(BUILDING_ORDER);
+        for(BuildingRef ref : network.unsupportedTransport){
+            if(ref.equals(target)) result.add(ref);
+        }
+        for(NetworkInterruption interruption : interruptions) result.add(interruption.transport);
+        return List.copyOf(result);
+    }
+
+    private static List<BuildingRef> relevantSkipped(Collection<BuildingRef> skipped, Set<NetworkPort> visited,
+                                                      BuildingRef target, TraceDirection direction){
+        String terminalChannel = direction == TraceDirection.input ? "in" : "out";
+        TreeSet<BuildingRef> result = new TreeSet<>(BUILDING_ORDER);
+        for(BuildingRef failed : skipped){
+            if(failed.equals(target) || visited.stream().anyMatch(port -> port.building.equals(failed))){
+                result.add(failed);
+                continue;
+            }
+            for(NetworkPort port : visited){
+                if(port.channel.equals(terminalChannel) && port.building.teamId == failed.teamId
+                    && touchesSide(port.building, port.side, failed)){
+                    result.add(failed);
+                    break;
+                }
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static boolean touchesSide(BuildingRef building, NetworkSide side, BuildingRef other){
+        int buildingSize = Math.max(1, building.size);
+        int otherSize = Math.max(1, other.size);
+        int buildingOffset = -(buildingSize - 1) / 2;
+        int otherOffset = -(otherSize - 1) / 2;
+        int minX = building.tileX + buildingOffset, maxX = minX + buildingSize - 1;
+        int minY = building.tileY + buildingOffset, maxY = minY + buildingSize - 1;
+        int otherMinX = other.tileX + otherOffset, otherMaxX = otherMinX + otherSize - 1;
+        int otherMinY = other.tileY + otherOffset, otherMaxY = otherMinY + otherSize - 1;
+        return switch(side){
+            case east -> otherMinX == maxX + 1 && overlaps(minY, maxY, otherMinY, otherMaxY);
+            case west -> otherMaxX + 1 == minX && overlaps(minY, maxY, otherMinY, otherMaxY);
+            case north -> otherMinY == maxY + 1 && overlaps(minX, maxX, otherMinX, otherMaxX);
+            case south -> otherMaxY + 1 == minY && overlaps(minX, maxX, otherMinX, otherMaxX);
+        };
+    }
+
+    private static boolean overlaps(int start, int end, int otherStart, int otherEnd){
+        return start <= otherEnd && otherStart <= end;
+    }
+
     private static List<BuildingRef> deadEnds(NetworkGraph graph, Set<NetworkPort> visited, BuildingRef target,
                                                ResourceRef item, TraceDirection direction, List<TraceEndpoint> endpoints,
-                                               List<NetworkPort> boundaries, List<NetworkInterruption> interruptions){
+                                               List<NetworkPort> boundaries, List<NetworkInterruption> interruptions,
+                                               List<BuildingRef> skipped, boolean hasUnlocatedSkipped){
+        if(hasUnlocatedSkipped) return List.of();
         Set<BuildingRef> endpointRefs = new HashSet<>();
         for(TraceEndpoint endpoint : endpoints) endpointRefs.add(endpoint.building);
         Set<NetworkPort> continuedOutside = new HashSet<>(boundaries);
         for(NetworkInterruption interruption : interruptions) continuedOutside.add(interruption.port);
         TreeSet<BuildingRef> result = new TreeSet<>(BUILDING_ORDER);
-        String terminalChannel = direction == TraceDirection.input ? "in" : "out";
         for(NetworkPort port : visited){
-            if(!port.channel.equals(terminalChannel) || port.building.equals(target) || endpointRefs.contains(port.building)
+            if(port.building.equals(target) || endpointRefs.contains(port.building)
                 || continuedOutside.contains(port)) continue;
+            if(skipped.stream().anyMatch(failed -> failed.equals(port.building)
+                || failed.teamId == port.building.teamId && touchesSide(port.building, port.side, failed))) continue;
             boolean hasContinuation = direction == TraceDirection.input
                 ? graph.incoming(port).stream().anyMatch(edge -> edge.items.allows(item))
                 : graph.outgoing(port).stream().anyMatch(edge -> edge.items.allows(item));
@@ -242,34 +315,29 @@ public final class TraceAnalyzer{
         return List.copyOf(result);
     }
 
-    private static List<NetworkFinding> findings(TraceDirection direction, boolean targetUsesItem,
+    private static List<NetworkFinding> findings(TraceDirection direction, boolean targetUsesItem, boolean complete,
                                                   List<TraceEndpoint> endpoints, List<NetworkPort> boundaries,
-                                                  List<NetworkInterruption> interruptions, List<BuildingRef> unsupported,
-                                                  List<BuildingRef> deadEnds, boolean noRouteProven, boolean complete){
+                                                  List<BuildingRef> unsupported,
+                                                  List<BuildingRef> deadEnds, boolean noRouteProven){
         List<NetworkFinding> result = new ArrayList<>();
-        NetworkFinding.Certainty uncertainty = complete ? NetworkFinding.Certainty.proven : NetworkFinding.Certainty.incomplete;
         if(!boundaries.isEmpty()) result.add(new NetworkFinding(NetworkFinding.Kind.routeContinuesOutsideArea,
             NetworkFinding.Certainty.informational, boundaries.get(0).building));
-        for(NetworkInterruption interruption : interruptions){
+        for(BuildingRef ref : unsupported){
             result.add(new NetworkFinding(NetworkFinding.Kind.unsupportedTransport,
-                NetworkFinding.Certainty.incomplete, interruption.transport));
+                NetworkFinding.Certainty.incomplete, ref));
         }
         for(BuildingRef ref : deadEnds){
-            result.add(new NetworkFinding(NetworkFinding.Kind.structuralDeadEnd, uncertainty, ref));
+            result.add(new NetworkFinding(NetworkFinding.Kind.structuralDeadEnd, NetworkFinding.Certainty.proven, ref));
         }
-        if(endpoints.isEmpty() && targetUsesItem && boundaries.isEmpty()){
-            if(!unsupported.isEmpty() || !interruptions.isEmpty()){
-                result.add(new NetworkFinding(NetworkFinding.Kind.unsupportedTransport,
-                    NetworkFinding.Certainty.incomplete, unsupported.isEmpty() ? interruptions.get(0).transport : unsupported.get(0)));
-            }else if(noRouteProven){
-                result.add(new NetworkFinding(direction == TraceDirection.input
-                    ? NetworkFinding.Kind.noStructuralInputRoute : NetworkFinding.Kind.noStructuralOutputRoute,
-                    NetworkFinding.Certainty.proven, null));
-                if(direction == TraceDirection.input){
-                    result.add(new NetworkFinding(NetworkFinding.Kind.noReachableInAreaProducer,
-                        NetworkFinding.Certainty.proven, null));
-                }
-            }
+        if(noRouteProven){
+            result.add(new NetworkFinding(direction == TraceDirection.input
+                ? NetworkFinding.Kind.noStructuralInputRoute : NetworkFinding.Kind.noStructuralOutputRoute,
+                NetworkFinding.Certainty.proven, null));
+        }
+        if(targetUsesItem && complete && endpoints.isEmpty()){
+            result.add(new NetworkFinding(direction == TraceDirection.input
+                ? NetworkFinding.Kind.noReachableInAreaProducer : NetworkFinding.Kind.noReachableInAreaConsumer,
+                NetworkFinding.Certainty.proven, null));
         }
         for(TraceEndpoint endpoint : endpoints){
             if(endpoint.kind != TraceEndpointKind.producer || endpoint.diagnostic == null) continue;
@@ -289,6 +357,7 @@ public final class TraceAnalyzer{
         final ArrayDeque<NetworkPort> pending = new ArrayDeque<>();
         final Map<NetworkPort, NetworkEdge> nextToTarget = new HashMap<>();
         final Map<NetworkPort, NetworkEdge> fromSource = new HashMap<>();
+        final Set<NetworkEdge> traversedEdges = new TreeSet<>();
         Map<NetworkPort, NetworkEdge> pathEdges = Map.of();
         Map<NetworkPort, NetworkPort> pathRoots = new HashMap<>();
     }

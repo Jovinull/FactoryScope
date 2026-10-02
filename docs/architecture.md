@@ -181,14 +181,15 @@ production rate. Producer condition comes from that same entry's `DiagnosticResu
 distinct from production. No trace finding turns a producer's diagnostic state into a cause of the
 target's condition.
 
-A no-route conclusion is emitted only when the target snapshot and all area diagnostics are available,
-the target actually consumes or produces the requested item, the target's item ports are modeled, and
-the selected topology has no boundary, unsupported transport, or interruption. Missing target ports and
-missing diagnostic snapshots are reported as different kinds of incomplete evidence. This test is
-intentionally conservative: any unsupported transport in the selection makes the trace incomplete,
-even if the unsupported block does not appear on the representative route. Area boundaries and
-unsupported transport can coexist with reachable endpoints; each fact remains visible rather than
-forcing the result into a single status.
+A no-route conclusion is emitted only when the target snapshot and relevant diagnostics are available,
+the target actually consumes or produces the requested item, the target's item ports are modeled, and the
+resource-specific search finds no route to an in-area producer/storage or consumer/storage endpoint.
+Relevant boundary continuations and unsupported interruptions withhold that conclusion. An unrelated
+unsupported block elsewhere in the selection does not invalidate a locally complete trace. Missing target
+ports and missing diagnostic snapshots are reported as different kinds of incomplete evidence. A known
+route that ends at a dead end is reported as such, separately from a conclusion that no in-area endpoint
+is reachable. Area boundaries, unsupported transport, known endpoints, and local dead ends can coexist;
+each fact remains visible rather than forcing the result into a single status.
 
 Refresh rebuilds the area diagnostics and topology together, then recomputes an open trace against that
 new snapshot. World changes discard the area report and trace.

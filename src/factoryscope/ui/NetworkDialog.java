@@ -289,7 +289,7 @@ final class NetworkDialog extends BaseDialog{
             body.add(FsBundle.get(trace.direction == TraceDirection.input
                 ? "trace.no-in-area-producer" : "trace.no-in-area-consumer"))
                 .color(Pal.lightishGray).wrap().padTop(6f).row();
-        }else if(trace.endpoints.isEmpty() && trace.complete){
+        }else if(trace.endpoints.isEmpty() && trace.complete && !trace.noRouteProven){
             body.add(FsBundle.get(trace.direction == TraceDirection.input ? "trace.no-producer" : "trace.no-consumer"))
                 .color(Pal.lightishGray).wrap().padTop(6f).row();
         }

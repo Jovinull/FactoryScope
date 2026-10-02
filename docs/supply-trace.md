@@ -24,12 +24,24 @@ An input trace may show reachable in-area producers, storage endpoints, a contin
 boundary, and interruptions at transport that is not fully modeled. These facts can coexist. The trace
 never recursively scans beyond the selection.
 
-A complete no-route conclusion requires a target snapshot with the requested item, available
-diagnostics for every selected building, and no boundary or unsupported topology that could change the
-conclusion. A target whose item ports are not modeled is distinguished from a building whose diagnostic
-snapshot could not be read. If any of these checks fails, FactoryScope withholds the strong no-route
-finding. The current completeness policy is conservative: any unsupported transport in the selected
-area makes a trace incomplete, even if the block is not on its representative path.
+A complete trace conclusion requires a target snapshot with the requested item, a modeled target port,
+available diagnostics for buildings that can affect the traversed item-specific subgraph, and no
+relevant boundary or unsupported continuation. Unrelated unsupported transport elsewhere in the area
+does not invalidate a local result. If a failed diagnostic probe has no recoverable building identity,
+FactoryScope remains conservative and withholds a complete conclusion. A target whose item ports are not
+modeled is distinguished from a building whose diagnostic snapshot could not be read.
+
+"No supported in-area producer or storage route reaches this input" is reserved for a complete search
+with no compatible topology path to such an endpoint. If a route reaches a known in-area dead end, the
+trace reports that dead end and separately states that no producer or storage endpoint is reachable; it
+does not call the whole structure disconnected. Likewise, an output trace distinguishes the absence of a
+downstream consumer/storage endpoint from the absence of any outgoing structural route. A known local dead
+end can remain proven even when another relevant branch is incomplete.
+
+Boundary continuations are item-aware when the adjacent outside producer or transport semantics are
+known. A multi-output producer only continues the resources declared in its snapshot. A supported
+resource-aware transport projects its configured internal item constraints onto the boundary port.
+Unknown or unreadable evidence must not be turned into a complete no-route claim.
 
 A structural dead end is an in-area known route termination. It is not a suggested repair. A reachable
 producer that is disabled or has another diagnostic problem is an independent current-state observation;

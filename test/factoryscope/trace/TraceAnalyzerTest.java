@@ -131,8 +131,11 @@ class TraceAnalyzerTest{
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(consumer(target, sand)));
 
-        assertTrue(trace.noRouteProven);
+        assertFalse(trace.noRouteProven, "the target reaches a known transport branch even though no source endpoint is reachable");
         assertEquals(List.of(belt), trace.structuralDeadEnds);
+        assertTrue(trace.findings.stream().anyMatch(f -> f.kind == NetworkFinding.Kind.noReachableInAreaProducer
+            && f.certainty == NetworkFinding.Certainty.proven));
+        assertFalse(trace.findings.stream().anyMatch(f -> f.kind == NetworkFinding.Kind.noStructuralInputRoute));
         assertTrue(trace.findings.stream().anyMatch(f -> f.kind == NetworkFinding.Kind.structuralDeadEnd
             && f.certainty == NetworkFinding.Certainty.proven && belt.equals(f.building)));
     }
@@ -162,6 +165,40 @@ class TraceAnalyzerTest{
 
         assertEquals(List.of(producer), trace.producers().stream().map(endpoint -> endpoint.building).toList());
         assertEquals(List.of(deadBelt), trace.structuralDeadEnds);
+        assertEquals(new TreeSet<>(graph.edges), new TreeSet<>(trace.traversedEdges),
+            "the explored trace region includes the known dead-end branch as well as the producer path");
+    }
+
+    @Test
+    void producersAndMultipleDeadEndsSurviveASharedBranchPoint(){
+        BuildingRef first = ref("drill", 1), second = ref("drill", 2), producerBeltA = ref("conveyor", 3),
+            producerBeltB = ref("conveyor", 4), deadBeltA = ref("conveyor", 5), deadBeltB = ref("conveyor", 6),
+            router = ref("router", 7), target = ref("smelter", 8);
+        NetworkPort firstOut = port(first, NetworkSide.east, "out"), secondOut = port(second, NetworkSide.east, "out");
+        NetworkPort paIn = port(producerBeltA, NetworkSide.west, "in"), paOut = port(producerBeltA, NetworkSide.east, "out");
+        NetworkPort pbIn = port(producerBeltB, NetworkSide.west, "in"), pbOut = port(producerBeltB, NetworkSide.east, "out");
+        NetworkPort daIn = port(deadBeltA, NetworkSide.west, "in"), daOut = port(deadBeltA, NetworkSide.east, "out");
+        NetworkPort dbIn = port(deadBeltB, NetworkSide.west, "in"), dbOut = port(deadBeltB, NetworkSide.east, "out");
+        NetworkPort rw = port(router, NetworkSide.west, "in"), rs = port(router, NetworkSide.south, "in"),
+            rn = port(router, NetworkSide.north, "in"), re = port(router, NetworkSide.east, "in"),
+            routerOut = port(router, NetworkSide.east, "out"), targetIn = port(target, NetworkSide.west, "in");
+        NetworkGraph graph = graph(List.of(firstOut, secondOut, paIn, paOut, pbIn, pbOut, daIn, daOut,
+            dbIn, dbOut, rw, rs, rn, re, routerOut, targetIn), List.of(
+            edge(firstOut, paIn, ItemConstraint.any()), edge(paIn, paOut, ItemConstraint.any()), edge(paOut, rw, ItemConstraint.any()),
+            edge(secondOut, pbIn, ItemConstraint.any()), edge(pbIn, pbOut, ItemConstraint.any()), edge(pbOut, rs, ItemConstraint.any()),
+            edge(daIn, daOut, ItemConstraint.any()), edge(daOut, rn, ItemConstraint.any()),
+            edge(dbIn, dbOut, ItemConstraint.any()), edge(dbOut, re, ItemConstraint.any()),
+            edge(rw, routerOut, ItemConstraint.any()), edge(rs, routerOut, ItemConstraint.any()),
+            edge(rn, routerOut, ItemConstraint.any()), edge(re, routerOut, ItemConstraint.any()),
+            edge(routerOut, targetIn, ItemConstraint.any())));
+
+        SupplyTrace trace = input(network(graph), target, sand, List.of(
+            producer(first, sand, DiagnosticReason.active), producer(second, sand, DiagnosticReason.active),
+            consumer(target, sand), limited(producerBeltA), limited(producerBeltB), limited(deadBeltA),
+            limited(deadBeltB), limited(router)));
+
+        assertEquals(List.of(first, second), trace.producers().stream().map(endpoint -> endpoint.building).toList());
+        assertEquals(List.of(deadBeltA, deadBeltB), trace.structuralDeadEnds);
     }
 
     @Test
@@ -217,6 +254,177 @@ class TraceAnalyzerTest{
     }
 
     @Test
+    void oneUnsupportedBuildingCreatesOneFindingEvenWhenSeveralPortsAreInterrupted(){
+        BuildingRef target = ref("smelter", 1), unknown = ref("armored-conveyor", 2);
+        NetworkPort west = port(target, NetworkSide.west, "in"), east = port(target, NetworkSide.east, "in");
+        NetworkInterruption fromWest = new NetworkInterruption(west, unknown, NetworkInterruption.Direction.incoming);
+        NetworkInterruption fromEast = new NetworkInterruption(east, unknown, NetworkInterruption.Direction.incoming);
+        ItemNetwork network = new ItemNetwork(graph(List.of(west, east), List.of()), List.of(), List.of(), List.of(unknown),
+            List.of(fromWest, fromEast), List.of(), List.of(sand));
+
+        SupplyTrace trace = input(network, target, sand, List.of(consumer(target, sand)));
+
+        assertEquals(2, trace.unsupportedInterruptions.size(), "both affected input ports remain visible");
+        assertEquals(1, trace.findings.stream().filter(f -> f.kind == NetworkFinding.Kind.unsupportedTransport
+            && unknown.equals(f.building)).count(), "the same unsupported building is one finding");
+    }
+
+    @Test
+    void unrelatedUnsupportedTransportDoesNotInvalidateALocallyCompleteTrace(){
+        BuildingRef belt = ref("conveyor", 2), target = ref("smelter", 3);
+        BuildingRef unrelated = ref("armored-conveyor", 30);
+        NetworkPort beltIn = port(belt, NetworkSide.west, "in"), beltOut = port(belt, NetworkSide.east, "out");
+        NetworkPort targetIn = port(target, NetworkSide.west, "in");
+        ItemNetwork network = new ItemNetwork(graph(List.of(beltIn, beltOut, targetIn), List.of(
+                edge(beltIn, beltOut, ItemConstraint.any()), edge(beltOut, targetIn, ItemConstraint.any()))),
+            List.of(), List.of(), List.of(unrelated), List.of(), List.of(), List.of(sand));
+
+        SupplyTrace trace = input(network, target, sand, List.of(consumer(target, sand)));
+
+        assertTrue(trace.complete, "an isolated, local-only unsupported block cannot affect this reachable subgraph");
+        assertFalse(trace.noRouteProven);
+        assertTrue(trace.unsupportedInArea.isEmpty());
+        assertTrue(trace.structuralDeadEnds.contains(belt));
+        assertTrue(trace.findings.stream().anyMatch(f -> f.kind == NetworkFinding.Kind.structuralDeadEnd
+            && f.certainty == NetworkFinding.Certainty.proven && belt.equals(f.building)));
+        assertFalse(trace.findings.stream().anyMatch(f -> f.kind == NetworkFinding.Kind.unsupportedTransport));
+    }
+
+    @Test
+    void unrelatedSkippedDiagnosticsDoNotInvalidateACompleteSubgraph(){
+        BuildingRef target = ref("smelter", 3), skipped = ref("modded-crafter", 30);
+        NetworkPort targetIn = port(target, NetworkSide.west, "in");
+        ItemNetwork network = network(graph(List.of(targetIn), List.of()));
+        AreaDiagnosticResult area = AreaAnalyzer.analyze(AREA, 2, List.of(consumer(target, sand)))
+            .withNetwork(network).withSkippedBuildings(List.of(skipped));
+
+        SupplyTrace trace = TraceAnalyzer.input(area, target, sand);
+
+        assertFalse(trace.diagnosticsIncomplete);
+        assertTrue(trace.complete);
+        assertTrue(trace.noRouteProven);
+    }
+
+    @Test
+    void unlocatedSkippedDiagnosticsRemainConservative(){
+        BuildingRef target = ref("smelter", 3);
+        NetworkPort targetIn = port(target, NetworkSide.west, "in");
+        AreaDiagnosticResult area = AreaAnalyzer.analyze(AREA, 2, List.of(consumer(target, sand)))
+            .withNetwork(network(graph(List.of(targetIn), List.of())));
+
+        SupplyTrace trace = TraceAnalyzer.input(area, target, sand);
+
+        assertTrue(trace.diagnosticsIncomplete);
+        assertFalse(trace.complete);
+        assertFalse(trace.noRouteProven);
+    }
+
+    @Test
+    void aSkippedBuildingAtATerminalPortPreventsADeadEndConclusion(){
+        BuildingRef belt = ref("conveyor", 2), target = ref("smelter", 3), skipped = ref("modded-crafter", 1);
+        NetworkPort beltIn = port(belt, NetworkSide.west, "in"), beltOut = port(belt, NetworkSide.east, "out");
+        NetworkPort targetIn = port(target, NetworkSide.west, "in");
+        NetworkGraph graph = graph(List.of(beltIn, beltOut, targetIn), List.of(
+            edge(beltIn, beltOut, ItemConstraint.any()), edge(beltOut, targetIn, ItemConstraint.any())));
+        AreaDiagnosticResult area = AreaAnalyzer.analyze(AREA, 3, List.of(consumer(target, sand), limited(belt)))
+            .withNetwork(network(graph)).withSkippedBuildings(List.of(skipped));
+
+        SupplyTrace trace = TraceAnalyzer.input(area, target, sand);
+
+        assertTrue(trace.diagnosticsIncomplete);
+        assertFalse(trace.complete);
+        assertFalse(trace.noRouteProven);
+        assertTrue(trace.structuralDeadEnds.isEmpty());
+    }
+
+    @Test
+    void aSkippedEvenSizedBuildingUsesMindustrysAsymmetricFootprint(){
+        BuildingRef target = new BuildingRef(10, 10, "smelter", "Smelter", 3, 1);
+        BuildingRef skippedProducer = new BuildingRef(6, 10, "large-mod-crafter", "Large Mod Crafter", 4, 1);
+        NetworkPort targetIn = port(target, NetworkSide.west, "in");
+        AreaDiagnosticResult area = AreaAnalyzer.analyze(AREA, 2, List.of(consumer(target, sand)))
+            .withNetwork(network(graph(List.of(targetIn), List.of())))
+            .withSkippedBuildings(List.of(skippedProducer));
+
+        SupplyTrace trace = TraceAnalyzer.input(area, target, sand);
+
+        assertTrue(trace.diagnosticsIncomplete, "the skipped 4x4 building touches the target's western input");
+        assertFalse(trace.complete);
+        assertFalse(trace.noRouteProven);
+    }
+
+    @Test
+    void itemRequestsForResourcesUnusedByTheTargetProduceNoTraceEndpoints(){
+        BuildingRef source = ref("drill", 1), target = ref("factory", 2), downstream = ref("factory", 3);
+        NetworkPort sourceOut = port(source, NetworkSide.east, "out"), targetIn = port(target, NetworkSide.west, "in"),
+            targetOut = port(target, NetworkSide.east, "out"), downstreamIn = port(downstream, NetworkSide.west, "in");
+        NetworkGraph graph = graph(List.of(sourceOut, targetIn, targetOut, downstreamIn), List.of(
+            edge(sourceOut, targetIn, ItemConstraint.any()), edge(targetOut, downstreamIn, ItemConstraint.any())));
+        AreaDiagnosticResult area = area(network(graph), List.of(
+            producer(source, copper, DiagnosticReason.active), consumer(target, sand), consumer(downstream, lead)));
+
+        SupplyTrace input = TraceAnalyzer.input(area, target, copper);
+        SupplyTrace output = TraceAnalyzer.output(area, target, lead);
+
+        assertFalse(input.targetUsesItem);
+        assertTrue(input.endpoints.isEmpty());
+        assertTrue(input.boundaryContinuations.isEmpty());
+        assertFalse(input.noRouteProven);
+        assertFalse(output.targetUsesItem);
+        assertTrue(output.endpoints.isEmpty());
+        assertTrue(output.boundaryContinuations.isEmpty());
+        assertFalse(output.noRouteProven);
+    }
+
+    @Test
+    void absentTargetSnapshotDiffersFromMissingModeledPorts(){
+        BuildingRef target = ref("factory", 2);
+        NetworkPort targetIn = port(target, NetworkSide.west, "in");
+        ItemNetwork withPort = network(graph(List.of(targetIn), List.of()));
+        AreaDiagnosticResult missingSnapshot = area(withPort, List.of(new AreaEntry(target, SupportLevel.minimal,
+            new DiagnosticResult(List.of(Finding.of(DiagnosticReason.active, Severity.normal))))));
+        FactorySnapshot snapshot = FactorySnapshot.builder(target.blockName).support(SupportLevel.full)
+            .input(ResourceState.of(ResourceKind.item, sand.name).contentId(sand.id).build()).build();
+        AreaDiagnosticResult missingPorts = area(network(graph(List.of(), List.of())), List.of(new AreaEntry(target,
+            snapshot, new DiagnosticResult(List.of(Finding.of(DiagnosticReason.active, Severity.normal))))));
+
+        SupplyTrace absentSnapshot = TraceAnalyzer.input(missingSnapshot, target, sand);
+        SupplyTrace absentPorts = TraceAnalyzer.input(missingPorts, target, sand);
+
+        assertTrue(absentSnapshot.diagnosticsIncomplete);
+        assertFalse(absentSnapshot.topologyIncomplete);
+        assertFalse(absentSnapshot.targetUsesItem);
+        assertFalse(absentPorts.diagnosticsIncomplete);
+        assertTrue(absentPorts.topologyIncomplete);
+        assertTrue(absentPorts.targetUsesItem);
+        assertFalse(absentSnapshot.noRouteProven);
+        assertFalse(absentPorts.noRouteProven);
+    }
+
+    @Test
+    void targetIsNotAnEndpointOrProofOfNoRouteWhenItsOutputLoopsBackToItsInput(){
+        BuildingRef target = ref("modded-processor", 1), belt = ref("conveyor", 2);
+        NetworkPort targetIn = port(target, NetworkSide.west, "in"), targetOut = port(target, NetworkSide.east, "out"),
+            beltIn = port(belt, NetworkSide.west, "in"), beltOut = port(belt, NetworkSide.east, "out");
+        NetworkGraph graph = graph(List.of(targetIn, targetOut, beltIn, beltOut), List.of(
+            edge(targetOut, beltIn, ItemConstraint.any()), edge(beltIn, beltOut, ItemConstraint.any()),
+            edge(beltOut, targetIn, ItemConstraint.any())));
+        FactorySnapshot snapshot = FactorySnapshot.builder(target.blockName).support(SupportLevel.full)
+            .enabled(true).shouldConsume(true).producedItem(sand)
+            .input(ResourceState.of(ResourceKind.item, sand.name).contentId(sand.id).build()).build();
+        AreaDiagnosticResult area = area(network(graph), List.of(new AreaEntry(target, snapshot,
+            new DiagnosticResult(List.of(Finding.of(DiagnosticReason.active, Severity.normal)))), limited(belt)));
+
+        SupplyTrace input = TraceAnalyzer.input(area, target, sand);
+        SupplyTrace output = TraceAnalyzer.output(area, target, sand);
+
+        assertTrue(input.endpoints.isEmpty());
+        assertFalse(input.noRouteProven, "a self-returning cycle is not an external producer route or proof of disconnection");
+        assertTrue(output.endpoints.isEmpty());
+        assertFalse(output.noRouteProven, "the target's input is not a distinct downstream consumer");
+    }
+
+    @Test
     void storageIsASeparateEndpointAndNeverCountedAsAProducer(){
         BuildingRef storage = ref("vault", 1), target = ref("smelter", 2);
         NetworkPort storeOut = port(storage, NetworkSide.east, "out"), targetIn = port(target, NetworkSide.west, "in");
@@ -253,7 +461,10 @@ class TraceAnalyzerTest{
         SupplyTrace rejected = TraceAnalyzer.input(area(network(graph), List.of(
             producer(leadProducer, lead, DiagnosticReason.active), consumer(target, lead))), target, lead);
         assertTrue(rejected.producers().isEmpty());
-        assertTrue(rejected.noRouteProven);
+        assertFalse(rejected.noRouteProven, "a route reaches the Sorter but no in-area source can use the configured item path");
+        assertTrue(rejected.structuralDeadEnds.contains(sorter));
+        assertTrue(rejected.findings.stream().anyMatch(f -> f.kind == NetworkFinding.Kind.noReachableInAreaProducer));
+        assertFalse(rejected.findings.stream().anyMatch(f -> f.kind == NetworkFinding.Kind.noStructuralInputRoute));
     }
 
     @Test
@@ -325,6 +536,48 @@ class TraceAnalyzerTest{
     }
 
     @Test
+    void outputTraceKeepsConsumerAndDeadEndBranchesAndExcludesItsTarget(){
+        BuildingRef target = ref("crafter", 1), router = ref("router", 2), consumer = ref("factory", 3),
+            deadBelt = ref("conveyor", 4);
+        NetworkPort targetOut = port(target, NetworkSide.east, "out"), routerWest = port(router, NetworkSide.west, "in"),
+            routerEast = port(router, NetworkSide.east, "out"), routerNorth = port(router, NetworkSide.north, "out"),
+            consumerIn = port(consumer, NetworkSide.west, "in"), deadIn = port(deadBelt, NetworkSide.west, "in"),
+            deadOut = port(deadBelt, NetworkSide.east, "out");
+        NetworkGraph graph = graph(List.of(targetOut, routerWest, routerEast, routerNorth, consumerIn, deadIn, deadOut), List.of(
+            edge(targetOut, routerWest, ItemConstraint.any()), edge(routerWest, routerEast, ItemConstraint.any()),
+            edge(routerWest, routerNorth, ItemConstraint.any()), edge(routerEast, consumerIn, ItemConstraint.any()),
+            edge(routerNorth, deadIn, ItemConstraint.any()), edge(deadIn, deadOut, ItemConstraint.any())));
+        AreaDiagnosticResult area = area(network(graph), List.of(
+            producer(target, sand, DiagnosticReason.active), consumer(consumer, sand), limited(router), limited(deadBelt)));
+
+        SupplyTrace trace = TraceAnalyzer.output(area, target, sand);
+
+        assertEquals(List.of(consumer), trace.endpoints.stream().map(endpoint -> endpoint.building).toList());
+        assertEquals(List.of(deadBelt), trace.structuralDeadEnds);
+        assertFalse(trace.endpoints.stream().anyMatch(endpoint -> endpoint.building.equals(target)));
+    }
+
+    @Test
+    void outputTraceDistinguishesNoConsumerFromNoStructuralRoute(){
+        BuildingRef target = ref("crafter", 1), belt = ref("conveyor", 2);
+        NetworkPort targetOut = port(target, NetworkSide.east, "out"), beltIn = port(belt, NetworkSide.west, "in"),
+            beltOut = port(belt, NetworkSide.east, "out");
+        NetworkGraph graph = graph(List.of(targetOut, beltIn, beltOut), List.of(
+            edge(targetOut, beltIn, ItemConstraint.any()), edge(beltIn, beltOut, ItemConstraint.any())));
+        SupplyTrace trace = TraceAnalyzer.output(area(network(graph), List.of(
+            producer(target, sand, DiagnosticReason.active), limited(belt))), target, sand);
+
+        assertTrue(trace.complete);
+        assertFalse(trace.noRouteProven);
+        assertTrue(trace.endpoints.isEmpty());
+        assertEquals(List.of(belt), trace.structuralDeadEnds);
+        assertEquals(new TreeSet<>(graph.edges), new TreeSet<>(trace.traversedEdges));
+        assertTrue(trace.findings.stream().anyMatch(f -> f.kind == NetworkFinding.Kind.noReachableInAreaConsumer
+            && f.certainty == NetworkFinding.Certainty.proven));
+        assertFalse(trace.findings.stream().anyMatch(f -> f.kind == NetworkFinding.Kind.noStructuralOutputRoute));
+    }
+
+    @Test
     void outputOverlayCollectsEveryBranchAfterASharedPath(){
         BuildingRef producer = ref("crafter", 1), belt = ref("conveyor", 2), first = ref("factory", 3), second = ref("factory", 4);
         NetworkPort producerOut = port(producer, NetworkSide.east, "out");
@@ -360,6 +613,11 @@ class TraceAnalyzerTest{
             .enabled(true).shouldConsume(true).productionValid(true).efficiency(1f, 1f).blockEfficiencyScale(1f)
             .producedItem(item).build();
         return new AreaEntry(ref, snapshot, new DiagnosticResult(List.of(Finding.of(reason, Severity.normal))));
+    }
+
+    private static AreaEntry limited(BuildingRef ref){
+        FactorySnapshot snapshot = FactorySnapshot.builder(ref.blockName).support(SupportLevel.minimal).build();
+        return new AreaEntry(ref, snapshot, FactoryAnalyzer.analyze(snapshot));
     }
 
     private static AreaEntry consumer(BuildingRef ref, ResourceRef item){

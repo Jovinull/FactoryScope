@@ -11,6 +11,7 @@ public final class NetworkFinding{
         routeContinuesOutsideArea,
         unsupportedTransport,
         noReachableInAreaProducer,
+        noReachableInAreaConsumer,
         reachableProducerDisabled,
         reachableProducerProblem
     }

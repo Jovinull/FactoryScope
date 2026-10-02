@@ -1,6 +1,7 @@
 package factoryscope.area;
 
 import factoryscope.analysis.*;
+import factoryscope.network.*;
 import org.junit.jupiter.api.*;
 
 import java.util.*;
@@ -239,6 +240,18 @@ class AreaAnalyzerTest{
         assertEquals(5, result.summary.selected);
         assertEquals(1, result.summary.analyzed);
         assertEquals(4, result.summary.skipped());
+    }
+
+    @Test
+    void skippedBuildingIdentitySurvivesReportEnrichment(){
+        BuildingRef later = new BuildingRef(8, 4, "modded-crafter", "Modded Crafter", 1, 1);
+        BuildingRef earlier = new BuildingRef(3, 4, "modded-crafter", "Modded Crafter", 1, 1);
+        AreaDiagnosticResult result = AreaAnalyzer.analyze(AREA, 3, List.of(entry(healthy())))
+            .withSkippedBuildings(List.of(later, earlier))
+            .withNetwork(new ItemNetwork(new NetworkGraph(List.of(), List.of()), List.of(), List.of(), List.of()));
+
+        assertEquals(List.of(earlier, later), result.skippedBuildings);
+        assertThrows(UnsupportedOperationException.class, () -> result.skippedBuildings.add(earlier));
     }
 
     @Test

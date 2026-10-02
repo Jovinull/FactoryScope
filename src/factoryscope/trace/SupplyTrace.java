@@ -16,6 +16,8 @@ public final class SupplyTrace{
     public final boolean noRouteProven;
     public final boolean diagnosticsIncomplete;
     public final boolean topologyIncomplete;
+    /** Every resource-compatible edge reached by the directional search, including alternate branches. */
+    public final List<NetworkEdge> traversedEdges;
     public final List<TraceEndpoint> endpoints;
     public final List<NetworkPort> boundaryContinuations;
     public final List<NetworkInterruption> unsupportedInterruptions;
@@ -25,7 +27,8 @@ public final class SupplyTrace{
 
     SupplyTrace(BuildingRef target, ResourceRef item, TraceDirection direction, boolean targetUsesItem,
                 boolean complete, boolean noRouteProven, boolean diagnosticsIncomplete, boolean topologyIncomplete,
-                Collection<TraceEndpoint> endpoints, Collection<NetworkPort> boundaryContinuations,
+                Collection<NetworkEdge> traversedEdges, Collection<TraceEndpoint> endpoints,
+                Collection<NetworkPort> boundaryContinuations,
                 Collection<NetworkInterruption> unsupportedInterruptions, Collection<BuildingRef> unsupportedInArea,
                 Collection<BuildingRef> structuralDeadEnds, Collection<NetworkFinding> findings){
         this.target = target;
@@ -36,6 +39,7 @@ public final class SupplyTrace{
         this.noRouteProven = noRouteProven;
         this.diagnosticsIncomplete = diagnosticsIncomplete;
         this.topologyIncomplete = topologyIncomplete;
+        this.traversedEdges = List.copyOf(traversedEdges);
         this.endpoints = List.copyOf(endpoints);
         this.boundaryContinuations = List.copyOf(boundaryContinuations);
         this.unsupportedInterruptions = List.copyOf(unsupportedInterruptions);

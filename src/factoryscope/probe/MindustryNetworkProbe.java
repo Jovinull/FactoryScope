@@ -36,6 +36,8 @@ public final class MindustryNetworkProbe{
         List<NetworkEdge> edges = new ArrayList<>();
         List<NetworkPort> boundary = new ArrayList<>();
         List<NetworkPort> boundaryInputs = new ArrayList<>();
+        Map<NetworkPort, ItemConstraint> boundaryOutputConstraints = new HashMap<>();
+        Map<NetworkPort, ItemConstraint> boundaryInputConstraints = new HashMap<>();
         List<BuildingRef> unsupported = new ArrayList<>();
         List<NetworkInterruption> interruptions = new ArrayList<>();
         List<BuildingRef> storage = new ArrayList<>();
@@ -94,6 +96,7 @@ public final class MindustryNetworkProbe{
                 }else if(inputSides(neighbor, viewer, itemSinks).contains(side.opposite()) && acceptsTopologyFrom(neighbor, source)){
                     if(targetRef == null){
                         boundary.add(out);
+                        mergeConstraint(boundaryOutputConstraints, out, outputConstraint(source, itemProducts));
                     }else{
                         edges.add(new NetworkEdge(out, input(targetRef, side.opposite()), outputConstraint(source, itemProducts), false));
                     }
@@ -115,16 +118,21 @@ public final class MindustryNetworkProbe{
                     BuildingRef unsupportedRef = refs.getOrDefault(neighbor, AreaProbe.refOf(neighbor));
                     interruptions.add(new NetworkInterruption(input(targetRef, side), unsupportedRef,
                         NetworkInterruption.Direction.incoming));
-                }else if(!refs.containsKey(neighbor)
-                    && (outputSides(neighbor, viewer, itemSources).contains(side.opposite()) || hasItemOutput(neighbor, itemSources))){
-                    boundaryInputs.add(input(targetRef, side));
+                }else if(!refs.containsKey(neighbor)){
+                    ItemConstraint constraint = boundaryInputConstraint(neighbor, side.opposite(), viewer,
+                        itemSources, itemProducts);
+                    if(constraint != null){
+                        NetworkPort port = input(targetRef, side);
+                        boundaryInputs.add(port);
+                        mergeConstraint(boundaryInputConstraints, port, constraint);
+                    }
                 }
             }
         }
 
         addBridgeEdges(edges, boundary, boundaryInputs, buildings, refs, viewer);
         return new ItemNetwork(new NetworkGraph(ports, edges), boundary, boundaryInputs, unsupported,
-            interruptions, storage, resources);
+            interruptions, storage, resources, boundaryOutputConstraints, boundaryInputConstraints);
     }
 
     private static List<Adjacent> adjacent(Building build){
@@ -352,6 +360,40 @@ public final class MindustryNetworkProbe{
         return item == null ? null : new ResourceRef(ResourceKind.item, item.name, item.localizedName);
     }
 
+    private static ItemConstraint boundaryInputConstraint(Building build, NetworkSide outputSide, Team viewer,
+                                                          Set<Building> itemSources,
+                                                          Map<Building, List<ResourceRef>> itemProducts){
+        if(isKnownTransport(build)){
+            if(!outputSides(build, viewer, itemSources).contains(outputSide)) return null;
+            BuildingRef ref = AreaProbe.refOf(build);
+            List<NetworkEdge> internal = new ArrayList<>();
+            addInternal(internal, build, ref, viewer);
+            List<ItemConstraint> constraints = internal.stream()
+                .filter(edge -> edge.to.equals(output(ref, outputSide)))
+                .map(edge -> edge.items).toList();
+            return constraints.isEmpty() ? null : ItemConstraint.anyOf(constraints);
+        }
+
+        if(!isEndpoint(build)) return null;
+
+        List<ResourceRef> products = itemProducts.get(build);
+        if(products == null){
+            try{
+                products = MindustryFactoryProbe.probe(build).producedItems;
+            }catch(Exception ignored){
+                return ItemConstraint.any();
+            }
+        }
+        return products.isEmpty() ? null : ItemConstraint.oneOf(products);
+    }
+
+    private static void mergeConstraint(Map<NetworkPort, ItemConstraint> constraints, NetworkPort port,
+                                        ItemConstraint addition){
+        ItemConstraint existing = constraints.get(port);
+        if(existing == null) constraints.put(port, addition);
+        else constraints.put(port, ItemConstraint.anyOf(List.of(existing, addition)));
+    }
+
     private static ItemConstraint outputConstraint(Building build, Map<Building, List<ResourceRef>> itemProducts){
         List<ResourceRef> products = itemProducts.get(build);
         if(products != null && products.size() == 1) return ItemConstraint.only(products.get(0));
@@ -373,13 +415,4 @@ public final class MindustryNetworkProbe{
         return true;
     }
 
-    private static boolean hasItemOutput(Building build, Set<Building> itemSources){
-        if(itemSources.contains(build)) return true;
-        if(isUnknownTransport(build)) return false;
-        try{
-            return !MindustryFactoryProbe.probe(build).producedItems.isEmpty();
-        }catch(Exception ignored){
-            return false;
-        }
-    }
 }

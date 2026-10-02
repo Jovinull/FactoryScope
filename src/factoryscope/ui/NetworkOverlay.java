@@ -16,6 +16,7 @@ final class NetworkOverlay{
     private final ResourceRef item;
     private final SupplyTrace trace;
     private final Set<NetworkEdge> highlighted = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<NetworkEdge> traversed = Collections.newSetFromMap(new IdentityHashMap<>());
 
     NetworkOverlay(ItemNetwork network, ResourceRef item){
         this(network, item, null);
@@ -26,6 +27,7 @@ final class NetworkOverlay{
         this.item = item;
         this.trace = trace;
         if(trace != null){
+            traversed.addAll(trace.traversedEdges);
             for(TraceEndpoint endpoint : trace.endpoints){
                 endpoint.path.addEdgesTo(highlighted);
             }
@@ -39,23 +41,28 @@ final class NetworkOverlay{
             if(drawn >= MAX_DRAWN_EDGES || (item != null && !edge.items.allows(item))) continue;
             float x1 = worldX(edge.from), y1 = worldY(edge.from);
             float x2 = worldX(edge.to), y2 = worldY(edge.to);
-            boolean selected = trace == null || highlighted.contains(edge);
-            Draw.color(edge.conditional ? Pal.lightOrange : selected ? Pal.accent : Pal.gray);
-            Draw.alpha(selected ? 1f : 0.3f);
-            Lines.stroke(edge.conditional ? 1.4f : selected ? 2.4f : 1f);
+            boolean selected = trace == null || traversed.contains(edge);
+            boolean representative = highlighted.contains(edge);
+            Draw.color(edge.conditional ? Pal.lightOrange : representative || trace == null ? Pal.accent : selected ? Pal.accent : Pal.gray);
+            Draw.alpha(representative || trace == null ? 1f : selected ? 0.55f : 0.25f);
+            Lines.stroke(edge.conditional ? representative ? 2f : 1.4f : representative || trace == null ? 2.4f : selected ? 1.5f : 1f);
             Lines.line(x1, y1, x2, y2);
-            if(selected) arrow(x1, y1, x2, y2);
+            if(trace == null || representative) arrow(x1, y1, x2, y2);
             drawn++;
         }
+        Collection<NetworkPort> outgoingBoundaries = trace == null ? network.boundaryPorts
+            : trace.direction == TraceDirection.output ? trace.boundaryContinuations : List.of();
+        Collection<NetworkPort> incomingBoundaries = trace == null ? network.boundaryInputs
+            : trace.direction == TraceDirection.input ? trace.boundaryContinuations : List.of();
         Draw.color(Pal.accent);
-        for(NetworkPort port : network.boundaryPorts){
+        for(NetworkPort port : outgoingBoundaries){
             float x = worldX(port), y = worldY(port);
             float dx = port.side.dx * Vars.tilesize * 0.3f, dy = port.side.dy * Vars.tilesize * 0.3f;
             Lines.stroke(2f);
             Lines.line(x, y, x + dx, y + dy);
             Fill.circle(x + dx, y + dy, 2.5f);
         }
-        for(NetworkPort port : network.boundaryInputs){
+        for(NetworkPort port : incomingBoundaries){
             float x = worldX(port), y = worldY(port);
             float dx = -port.side.dx * Vars.tilesize * 0.3f, dy = -port.side.dy * Vars.tilesize * 0.3f;
             Lines.stroke(2f);

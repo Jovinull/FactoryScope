@@ -11,6 +11,15 @@
 - Traces distinguish known route endings, selected-area boundaries, storage endpoints, and unsupported
   transport; representative paths are shown without enumerating every possible route.
 
+### Fixed
+
+- Trace completeness is scoped to resource-compatible routes instead of unrelated unsupported blocks
+  elsewhere in the selected area.
+- Area-boundary continuations retain the item constraints of adjacent producers and supported transports.
+- Skipped multiblock probes use Mindustry's asymmetric even-sized footprint when checking trace certainty.
+- Known dead ends remain visible alongside reachable producers, and are not described as a disconnected
+  network.
+
 ### Not in this release
 
 Supply Trace does not observe item movement or establish quantitative supply sufficiency. It does not
