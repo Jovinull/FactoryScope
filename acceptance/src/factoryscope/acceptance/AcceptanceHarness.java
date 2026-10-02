@@ -965,6 +965,112 @@ public class AcceptanceHarness extends Mod{
             FactoryScopeUI.inspected() == target && FactoryScopeUI.powerReport() == null));
         queue(this::closeAnyDialog);
 
+        scenario("PowerScope separates a battery-supported generation deficit from an underpowered grid");
+        int batteryX = rx(), batteryY = ry(), batteryX2 = batteryX + 14, batteryY2 = batteryY + 14;
+        Building[] supportedGrid = new Building[4];
+        mindustry.world.blocks.power.PowerGraph[] supportedGraph = new mindustry.world.blocks.power.PowerGraph[1];
+        queue(() -> {
+            clearRegion();
+            supportedGrid[0] = placeAt(Blocks.solarPanel, batteryX + 3, batteryY + 7);
+            supportedGrid[1] = placeAt(Blocks.battery, batteryX + 7, batteryY + 4);
+            supportedGrid[2] = placeAt(Blocks.siliconSmelter, batteryX + 11, batteryY + 7);
+            supportedGrid[3] = placeAt(Blocks.combustionGenerator, batteryX + 7, batteryY + 11);
+            Building node = placeAt(Blocks.powerNodeLarge, batteryX + 7, batteryY + 7);
+            if(supportedGrid[2] != null){
+                supportedGrid[2].items.add(Items.sand, 30);
+                supportedGrid[2].items.add(Items.coal, 30);
+                supportedGrid[2].updateConsumption();
+            }
+            if(supportedGrid[3] != null) supportedGrid[3].updateConsumption();
+            if(node != null){
+                for(Building endpoint : supportedGrid){
+                    if(endpoint != null) node.configureAny(endpoint.pos());
+                }
+            }
+            if(supportedGrid[1] != null) supportedGrid[1].power.status = 1f;
+            supportedGraph[0] = supportedGrid[0] == null ? null : supportedGrid[0].power.graph;
+            if(supportedGraph[0] != null) supportedGraph[0].update();
+            boolean sameGraph = node != null && supportedGraph[0] != null
+                && node.power.graph == supportedGraph[0]
+                && supportedGrid[0] != null && supportedGrid[1] != null
+                && supportedGrid[2] != null && supportedGrid[3] != null
+                && supportedGrid[0].power.graph == supportedGraph[0]
+                && supportedGrid[1].power.graph == supportedGraph[0]
+                && supportedGrid[2].power.graph == supportedGraph[0]
+                && supportedGrid[3].power.graph == supportedGraph[0];
+            check("the real engine grid has a generation deficit covered by stored battery power",
+                sameGraph && supportedGraph[0].getPowerProduced() < supportedGraph[0].getPowerNeeded()
+                    && supportedGraph[0].getSatisfaction() >= 0.999f
+                    && supportedGrid[1].power.status > 0f,
+                "sameGraph=" + sameGraph + ", produced=" + (supportedGraph[0] == null ? -1f : supportedGraph[0].getPowerProduced())
+                    + ", needed=" + (supportedGraph[0] == null ? -1f : supportedGraph[0].getPowerNeeded())
+                    + ", satisfaction=" + (supportedGraph[0] == null ? -1f : supportedGraph[0].getSatisfaction())
+                    + ", batteryStatus=" + (supportedGrid[1] == null ? -1f : supportedGrid[1].power.status)
+                    + ", members=" + (supportedGraph[0] == null ? -1 : supportedGraph[0].all.size)
+                    + ", producers=" + (supportedGraph[0] == null ? -1 : supportedGraph[0].producers.size)
+                    + ", consumers=" + (supportedGraph[0] == null ? -1 : supportedGraph[0].consumers.size)
+                    + ", batteries=" + (supportedGraph[0] == null ? -1 : supportedGraph[0].batteries.size)
+                    + ", nodeLinks=" + (node == null ? -1 : node.power.links.size)
+                    + ", graphMembers=" + (supportedGraph[0] == null ? "none" : supportedGraph[0].all.toString())
+                    + ", placed=" + java.util.Arrays.stream(supportedGrid).map(build -> build == null ? "null"
+                        : build.block.name + "@" + build.tileX() + "," + build.tileY() + "/power=" + (build.power != null)
+                            + "/same=" + (build.power != null && build.power.graph == supportedGraph[0])
+                            + "/connections=" + (build.power == null ? 0 : build.getPowerConnections(new arc.struct.Seq<>()).size))
+                        .collect(java.util.stream.Collectors.joining("; ")));
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(batteryX + 1, batteryY + 1, batteryX2, batteryY2));
+        queue(() -> check("the battery-supported area exposes PowerScope",
+            FactoryScopeUI.areaReport() != null && Core.scene.find("factoryscope-area-power") != null));
+        queue(() -> clickNamed("factoryscope-area-power"));
+        queue(() -> {
+            PowerGridReport report = FactoryScopeUI.powerReport();
+            PowerGridResult result = report == null || report.grids.isEmpty() ? null : report.grids.get(0);
+            check("PowerScope distinguishes generation below demand while the grid is satisfied",
+                result != null && result.state == PowerGridState.generationBelowDemand
+                    && result.snapshot.generationPerSecond < result.snapshot.demandPerSecond
+                    && result.snapshot.satisfaction >= 0.999f
+                    && result.has(PowerFinding.BATTERY_RESERVES_PRESENT));
+            check("the UI explicitly labels the battery-supported deficit",
+                dialogShows(FsBundle.get("power.battery-reserves")));
+            check("a fuel-starved connected generator retains its FactoryAnalyzer diagnostic",
+                result != null && result.generatorsWithProblems == 1
+                    && result.snapshot.producers.stream().anyMatch(member -> member.ref.equals(AreaProbe.refOf(supportedGrid[3]))
+                        && member.diagnostic != null
+                        && member.diagnostic.reason() == DiagnosticReason.missingItemInput));
+            check("the grid summary reports a generator problem without assigning a cause",
+                result != null && dialogShows(FsBundle.format("power.generator-problems", 1)));
+            check("the generator member list is available for navigation",
+                Core.scene.find("factoryscope-power-list-toggle") != null);
+        });
+        queue(() -> clickNamed("factoryscope-power-list-toggle"));
+        queue(() -> clickNamed("factoryscope-power-locate"));
+        queue(() -> check("Locate opens the generator marker while retaining PowerScope state",
+            FactoryScopeUI.locating() && Core.scene.find("factoryscope-locate-return") != null));
+        queue(() -> clickNamed("factoryscope-locate-return"));
+        queue(() -> check("Return restores the same battery-supported grid snapshot",
+            FactoryScopeUI.powerReport() != null && FactoryScopeUI.powerReport().grids.size() == 1
+                && FactoryScopeUI.powerReport().grids.get(0).state == PowerGridState.generationBelowDemand));
+        queue(this::restoreCamera);
+        queue(() -> {
+            supportedGrid[1].power.status = 0f;
+            supportedGraph[0].update();
+        });
+        queue(() -> clickNamed("factoryscope-power-refresh"));
+        queue(() -> {
+            PowerGridReport report = FactoryScopeUI.powerReport();
+            PowerGridResult result = report == null || report.grids.isEmpty() ? null : report.grids.get(0);
+            check("Refresh reports the now-underpowered grid after its battery is emptied",
+                result != null && result.state == PowerGridState.underpowered
+                    && result.snapshot.satisfaction < 0.999f
+                    && !result.has(PowerFinding.BATTERY_RESERVES_PRESENT));
+            check("an empty battery is not described as reserve support",
+                result != null && !dialogShows(FsBundle.get("power.battery-reserves")));
+            capture("power-underpowered-empty-battery");
+        });
+        queue(() -> clickNamed("factoryscope-power-back"));
+        queue(this::closeAnyDialog);
+
         scenario("the Area Power view keeps multiple engine grids separate");
         int x1 = rx(), y1 = ry(), x2 = rx() + 40, y2 = ry() + 12;
         Building[] gridProducers = new Building[2];
@@ -989,7 +1095,10 @@ public class AcceptanceHarness extends Mod{
             check("the area Power view opened", Core.scene.find("factoryscope-power-dialog") != null);
             check("two disconnected engine PowerGraphs remain two reports",
                 report != null && report.grids.size() == 2,
-                report == null ? "no report" : "grids " + report.grids.size());
+                report == null ? "no report" : "grids " + report.grids.stream()
+                    .map(grid -> grid.snapshot.members.stream().map(member -> member.ref.toString())
+                        .collect(java.util.stream.Collectors.joining(", ")))
+                    .collect(java.util.stream.Collectors.joining(" | ")));
             check("the battery remains distinct from generator membership",
                 report != null && report.grids.stream().flatMap(grid -> grid.snapshot.batteries.stream())
                     .anyMatch(member -> member.ref.blockId.equals(Blocks.battery.name))
