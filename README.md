@@ -23,6 +23,9 @@ never modifies the state it inspects.
   reachable producers and see their existing diagnostic state. The player selects the area to analyze;
   traces distinguish known dead ends, area boundaries, storage endpoints, and transport the topology does
   not fully model.
+- **PowerScope (0.5 development).** Inspect the actual Mindustry `PowerGraph` for a building or selected
+  area. Reports show whole-grid generation, demand, delivered satisfaction, battery storage, and connected
+  generator diagnostics. A selected area can intersect several independent grids.
 
 An area report is a snapshot of diagnostic observations; Network maps static item topology, and Supply
 Trace correlates that topology with the same diagnostic snapshots. Trace does not measure item movement
@@ -57,13 +60,18 @@ or prove that a reachable producer is supplying enough material; see
   production is the cause, and it does not pretend to. Supply Trace finds structurally reachable
   producers and reports their current diagnostics, but it does not establish that they are supplying a
   consumer or that their output is quantitatively sufficient.
+- **Per-wire power flow.** PowerScope reads Mindustry's pooled `PowerGraph`; ordinary electrical links
+  show established connectivity, not directional flow or a measured amount. Power Diodes remain explicit
+  cross-grid connectors without an attributed transfer quantity. PowerScope reports evidence, not a root
+  cause, battery-depletion estimate, or recommendation.
 - **Some transport families.** Armored conveyors and ducts, Plastanium Stack Conveyors, Duct Bridges,
   Mass Drivers, unloaders, and unknown modded transport are marked as incomplete topology rather than
   being approximated. Item bridges, ordinary conveyors, junctions, routers, sorters, gates, ducts, and
   duct routers are covered.
-- **Full production modelling outside `GenericCrafter`.** That covers the conventional crafting blocks on
-  both planets. Drills, pumps, generators, unit factories and the rest are inspected — inputs, power,
-  efficiency, verdict — but get no production rates, and the panel says so.
+- **Item/liquid production rates outside `GenericCrafter`.** That covers conventional crafting blocks on
+  both planets. Drills, pumps, generators, unit factories and the rest are inspected but get no modeled
+  item/liquid production rates. PowerScope separately reports current electrical generation exposed by
+  the engine.
 - **Current production estimates.** Every rate is derived from the current game state at the instant you
   look. It is not an observed average of item movement.
 - **History, alerts, or recommendations.**
@@ -144,6 +152,7 @@ gradlew acceptanceTest    # drives the inspector in a real Mindustry client, nee
 gradlew verifyArtifacts   # checks the built jars carry only production code
 gradlew areaBenchmark     # prints what an area analysis costs at 50 to 4000 buildings
 gradlew networkBenchmark  # prints static network construction cost at 50 to 4000 buildings
+gradlew powerBenchmark    # prints PowerGraph snapshot/model cost at 50 to 4000 buildings
 ```
 
 `scripts/smoke-test.ps1` builds, installs into a throwaway sandbox and confirms this version loads in the
@@ -163,10 +172,11 @@ relevant part of `last_log.txt` from your Mindustry data folder.
 - **0.2 complete:** area diagnostics, issue aggregation, and affected-building navigation.
 - **0.3 complete:** static, item-aware network topology inside a selected area.
 - **0.4 complete:** network-aware diagnostics and Supply Trace.
+- **0.5 development:** PowerScope reads Mindustry's engine-maintained power grids.
 
 Supply Trace correlates known topology with existing per-building diagnostics. It does not observe item
 movement or prove quantitative supply sufficiency. Future work has no promised date; possible areas
-include power analysis, liquid networks, and schematic analysis.
+include liquid networks and schematic analysis.
 
 Exact per-edge throughput is deferred. Mindustry 160.5 exposes no public transfer event that identifies
 the source building, destination building, and item for a successful transfer. Inventory changes and

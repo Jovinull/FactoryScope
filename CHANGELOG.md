@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0 - Unreleased
+
+### Added
+
+- PowerScope snapshots Mindustry's engine-maintained PowerGraph for individual buildings and selected
+  areas, preserving separate grids and clearly distinguishing whole-grid metrics from selected members.
+- Power summaries include generation, current demand, engine satisfaction, battery storage, recent engine
+  balance, connected generator diagnostics, established electrical connections, and conservative
+  cross-grid Power Diode relations.
+- Added real-engine PowerGraph and battery-support regression fixtures plus the `powerBenchmark` task.
+
+### Not in this release
+
+No per-wire power flow, transfer amount attribution, root-cause analysis, battery depletion prediction,
+or recommendations.
+
 ## 0.4.1 - 2026-10-02
 
 ### Fixed
