@@ -15,6 +15,7 @@ import mindustry.world.blocks.liquid.LiquidBridge;
 import mindustry.world.blocks.liquid.LiquidJunction;
 import mindustry.world.blocks.production.GenericCrafter;
 import mindustry.world.blocks.production.Pump;
+import mindustry.type.Liquid;
 import org.junit.jupiter.api.*;
 
 import java.util.*;
@@ -28,7 +29,10 @@ class MindustryLiquidProbeTest{
     private static final ResourceRef oil = new ResourceRef(ResourceKind.liquid, "oil", "Oil");
 
     @BeforeAll static void boot(){ HeadlessGame.start(); }
-    @BeforeEach void freshWorld(){ HeadlessGame.newWorld(36); }
+    @BeforeEach void freshWorld(){
+        ModdedBlocks.dynamicLiquidRequirements = new mindustry.type.LiquidStack[]{new mindustry.type.LiquidStack(Liquids.water, 0.1f)};
+        HeadlessGame.newWorld(36);
+    }
 
     @Test
     void conduitAcceptsBackAndSideInsertionButNeverItsOutputSide(){
@@ -71,10 +75,23 @@ class MindustryLiquidProbeTest{
             NetworkSide front = NetworkSide.rotation(rotation);
             for(NetworkSide side : NetworkSide.values()){
                 boolean input = side != front;
-                assertEquals(input, conduit.acceptLiquid(sources.get(rotation).get(side), Liquids.water),
+                Building source = sources.get(rotation).get(side);
+                assertEquals(input, conduit.acceptLiquid(source, Liquids.water),
                     "engine acceptance for rotation " + rotation + " side " + side);
                 assertEquals(input, graph.graph.isReachable(input(ref, side), output(ref, front), water),
                     "structural direction for rotation " + rotation + " side " + side);
+                assertEquals(input, graph.graph.ports.contains(input(ref, side)),
+                    "only the three engine-accepted sides become Conduit input ports");
+                if(input){
+                    assertFalse(graph.graph.isReachable(output(ref, front), input(ref, side), water),
+                        "a Conduit does not structurally reverse its forward transport direction");
+                }
+
+                source.liquids.add(Liquids.water, 1f);
+                source.dumpLiquid(Liquids.water);
+                assertEquals(input, conduit.liquids.get(Liquids.water) > 0f,
+                    "real engine dump transfer for rotation " + rotation + " side " + side);
+                conduit.liquids.clear();
             }
         }
     }
@@ -98,13 +115,25 @@ class MindustryLiquidProbeTest{
         Building consumer = place(ModdedBlocks.liquidConsumer, 11, 10, 0);
         AreaSelection selection = AreaSelection.of(8, 8, 13, 12);
         LiquidNetwork empty = MindustryLiquidProbe.scan(selection, Team.sharded, Map.of());
+        List<String> expectedEdges = empty.graph.edges.stream().map(Object::toString).toList();
+        for(Liquid liquid : List.of(Liquids.water, Liquids.oil)){
+            for(float amount : new float[]{1f, conduit.block.liquidCapacity}){
+                conduit.liquids.clear();
+                conduit.liquids.add(liquid, amount);
+                LiquidNetwork occupied = MindustryLiquidProbe.scan(selection, Team.sharded, Map.of());
+                assertEquals(expectedEdges, occupied.graph.edges.stream().map(Object::toString).toList(),
+                    "contents and fullness do not change static routes: " + liquid.name + " " + amount);
+                assertTrue(occupied.graph.isReachable(output(AreaProbe.refOf(producer), NetworkSide.east),
+                    input(AreaProbe.refOf(consumer), NetworkSide.west), water));
+                assertFalse(occupied.graph.ports.contains(input(AreaProbe.refOf(conduit), NetworkSide.east)),
+                    "the current Water buffer cannot create a front/input port");
+                assertFalse(occupied.graph.isReachable(input(AreaProbe.refOf(conduit), NetworkSide.east),
+                    output(AreaProbe.refOf(conduit), NetworkSide.west), water),
+                    "the current Water buffer cannot create reverse/front input topology");
+            }
+        }
+        conduit.liquids.clear();
         conduit.liquids.add(Liquids.oil, 4f);
-        LiquidNetwork occupied = MindustryLiquidProbe.scan(selection, Team.sharded, Map.of());
-
-        assertEquals(empty.graph.edges.size(), occupied.graph.edges.size());
-        assertEquals(empty.graph.edges.stream().map(Object::toString).toList(), occupied.graph.edges.stream().map(Object::toString).toList());
-        assertTrue(occupied.graph.isReachable(output(AreaProbe.refOf(producer), NetworkSide.east),
-            input(AreaProbe.refOf(consumer), NetworkSide.west), water));
         assertEquals(List.of(oil), MindustryFactoryProbe.probe(conduit).storedLiquids.stream().map(state -> state.liquid).toList());
     }
 
@@ -150,6 +179,10 @@ class MindustryLiquidProbeTest{
         junction.enabled = true;
         assertSame(east, ((LiquidJunction.LiquidJunctionBuild)junction).getLiquidDestination(west, Liquids.water));
         assertNotSame(northSink, ((LiquidJunction.LiquidJunctionBuild)junction).getLiquidDestination(west, Liquids.water));
+        junction.liquids.add(Liquids.water, 5f);
+        junction.moveLiquid(((LiquidJunction.LiquidJunctionBuild)junction).getLiquidDestination(west, Liquids.water), Liquids.water);
+        assertTrue(east.liquids.get(Liquids.water) > 0f, "engine movement continues west-to-east");
+        assertEquals(0f, northSink.liquids.get(Liquids.water), "the crossing channel receives no Water");
     }
 
     @Test
@@ -175,12 +208,16 @@ class MindustryLiquidProbeTest{
         Building router = place(Blocks.liquidRouter, 10, 10, 0);
         Building east = place(ModdedBlocks.liquidConsumer, 11, 10, 0);
         Building north = place(ModdedBlocks.liquidConsumer, 10, 11, 0);
+        Building west = place(ModdedBlocks.liquidConsumer, 9, 10, 0);
+        Building south = place(ModdedBlocks.liquidConsumer, 10, 9, 0);
         router.liquids.add(Liquids.water, 10f);
 
         ((mindustry.world.blocks.liquid.LiquidRouter.LiquidRouterBuild)router).updateTile();
 
         assertTrue(east.liquids.get(Liquids.water) > 0f, "engine dump reaches the east branch");
         assertTrue(north.liquids.get(Liquids.water) > 0f, "engine dump reaches the north branch");
+        assertTrue(west.liquids.get(Liquids.water) > 0f, "engine dump reaches the west branch");
+        assertTrue(south.liquids.get(Liquids.water) > 0f, "engine dump reaches the south branch");
     }
 
     @Test
@@ -200,26 +237,89 @@ class MindustryLiquidProbeTest{
 
     @Test
     void crafterProductsRemainLiquidSpecificAndRespectRotatedOutputDirections(){
-        Building source = place(ModdedBlocks.dualLiquidSource, 10, 10, 1);
-        Building northWater = place(ModdedBlocks.liquidConsumer, 10, 11, 0);
-        Building westOil = place(ModdedBlocks.oilConsumer, 9, 10, 0);
+        for(int rotation = 0; rotation < 4; rotation++){
+            int x = 6 + rotation * 7, y = 10;
+            Building source = place(ModdedBlocks.dualLiquidSource, x, y, rotation);
+            NetworkSide waterSide = NetworkSide.rotation(rotation);
+            NetworkSide oilSide = NetworkSide.rotation(rotation + 1);
+            Building waterSink = place(ModdedBlocks.anyLiquidConsumer, x + waterSide.dx, y + waterSide.dy, 0);
+            Building oilSink = place(ModdedBlocks.anyLiquidConsumer, x + oilSide.dx, y + oilSide.dy, 0);
+            LiquidNetwork graph = scan(AreaSelection.of(4, 7, 32, 13));
+            BuildingRef sourceRef = AreaProbe.refOf(source);
+
+            assertTrue(graph.graph.isReachable(output(sourceRef, waterSide),
+                input(AreaProbe.refOf(waterSink), waterSide.opposite()), water), "Water output rotation " + rotation);
+            assertFalse(graph.graph.isReachable(output(sourceRef, waterSide),
+                input(AreaProbe.refOf(waterSink), waterSide.opposite()), oil),
+                "the Water side cannot carry the sibling Oil product into a multi-liquid tank");
+            assertFalse(graph.graph.isReachable(output(sourceRef, oilSide),
+                input(AreaProbe.refOf(oilSink), oilSide.opposite()), water),
+                "the Oil side cannot carry the sibling Water product into a multi-liquid tank");
+            assertTrue(graph.graph.isReachable(output(sourceRef, oilSide),
+                input(AreaProbe.refOf(oilSink), oilSide.opposite()), oil), "Oil output rotation " + rotation);
+
+            source.liquids.add(Liquids.water, 1f);
+            source.liquids.add(Liquids.oil, 1f);
+            ((GenericCrafter.GenericCrafterBuild)source).dumpOutputs();
+            assertTrue(waterSink.liquids.get(Liquids.water) > 0f, "engine dumps Water on its rotated side");
+            assertTrue(oilSink.liquids.get(Liquids.oil) > 0f, "engine dumps Oil on its rotated side");
+            assertEquals(0f, waterSink.liquids.get(Liquids.oil), "Water cannot borrow the Oil direction");
+            assertEquals(0f, oilSink.liquids.get(Liquids.water), "Oil cannot borrow the Water direction");
+        }
+    }
+
+    @Test
+    void unrestrictedLiquidProductDoesNotMakeItsDirectedSiblingUnrestricted(){
+        Building source = place(ModdedBlocks.mixedDirectionLiquidSource, 10, 10, 0);
+        Building northTank = place(ModdedBlocks.anyLiquidConsumer, 10, 11, 0);
+        Building eastOil = place(ModdedBlocks.oilConsumer, 11, 10, 0);
         LiquidNetwork graph = scan(AreaSelection.of(8, 8, 13, 13));
         BuildingRef sourceRef = AreaProbe.refOf(source);
-        NetworkPort north = output(sourceRef, NetworkSide.north), west = output(sourceRef, NetworkSide.west);
 
-        assertTrue(graph.graph.isReachable(north, input(AreaProbe.refOf(northWater), NetworkSide.south), water),
-            () -> graph.graph.edges.toString());
-        assertFalse(graph.graph.isReachable(north, input(AreaProbe.refOf(northWater), NetworkSide.south), oil));
-        assertFalse(graph.graph.isReachable(west, input(AreaProbe.refOf(westOil), NetworkSide.east), water));
-        assertTrue(graph.graph.isReachable(west, input(AreaProbe.refOf(westOil), NetworkSide.east), oil));
+        assertTrue(graph.graph.isReachable(output(sourceRef, NetworkSide.north),
+            input(AreaProbe.refOf(northTank), NetworkSide.south), water));
+        assertFalse(graph.graph.isReachable(output(sourceRef, NetworkSide.north),
+            input(AreaProbe.refOf(northTank), NetworkSide.south), oil),
+            "Oil's east-only declaration is not widened by Water's unrestricted output");
+        assertTrue(graph.graph.isReachable(output(sourceRef, NetworkSide.east),
+            input(AreaProbe.refOf(eastOil), NetworkSide.west), oil));
+    }
 
-        source.liquids.add(Liquids.water, 1f);
-        source.liquids.add(Liquids.oil, 1f);
-        ((GenericCrafter.GenericCrafterBuild)source).dumpOutputs();
-        assertTrue(northWater.liquids.get(Liquids.water) > 0f, "the engine dumps Water to its rotated declared side");
-        assertTrue(westOil.liquids.get(Liquids.oil) > 0f, "the engine dumps Oil to its own rotated declared side");
-        assertEquals(0f, northWater.liquids.get(Liquids.oil), "one output cannot borrow the other liquid's direction");
-        assertEquals(0f, westOil.liquids.get(Liquids.water));
+    @Test
+    void dynamicLiquidConsumerRequirementsAreReevaluatedOnRefresh(){
+        Building consumer = place(ModdedBlocks.dynamicLiquidConsumer, 10, 10, 0);
+        AreaSelection selection = AreaSelection.of(8, 8, 12, 12);
+
+        AreaDiagnosticResult waterReport = AreaProbe.scan(selection, Team.sharded);
+        LiquidTrace waterTrace = LiquidTraceAnalyzer.input(waterReport, AreaProbe.refOf(consumer), water);
+        assertTrue(waterTrace.targetUsesLiquid);
+
+        ModdedBlocks.dynamicLiquidRequirements = new mindustry.type.LiquidStack[]{
+            new mindustry.type.LiquidStack(Liquids.oil, 0.1f)
+        };
+        AreaDiagnosticResult oilReport = AreaProbe.scan(selection, Team.sharded);
+        LiquidTrace staleWater = LiquidTraceAnalyzer.input(oilReport, AreaProbe.refOf(consumer), water);
+        LiquidTrace refreshedOil = LiquidTraceAnalyzer.input(oilReport, AreaProbe.refOf(consumer), oil);
+        assertFalse(staleWater.targetUsesLiquid, "Refresh must remove the prior dynamic Water requirement");
+        assertTrue(refreshedOil.targetUsesLiquid, "Refresh must expose the newly configured Oil requirement");
+
+        ModdedBlocks.dynamicLiquidRequirements = null;
+        AreaDiagnosticResult malformed = AreaProbe.scan(selection, Team.sharded);
+        LiquidTrace incomplete = LiquidTraceAnalyzer.input(malformed, AreaProbe.refOf(consumer), water);
+        assertFalse(malformed.entries.stream().filter(entry -> entry.ref.equals(AreaProbe.refOf(consumer)))
+            .findFirst().orElseThrow().snapshot.liquidInputsComplete);
+        assertTrue(incomplete.requirementsIncomplete, "a null dynamic result is incomplete, not an empty requirement set");
+        assertFalse(incomplete.noRouteProven);
+
+        for(mindustry.type.LiquidStack malformedStack : new mindustry.type.LiquidStack[]{null,
+            new mindustry.type.LiquidStack(null, 0.1f)}){
+            ModdedBlocks.dynamicLiquidRequirements = new mindustry.type.LiquidStack[]{malformedStack};
+            AreaDiagnosticResult malformedEntry = AreaProbe.scan(selection, Team.sharded);
+            FactorySnapshot malformedSnapshot = malformedEntry.entries.stream()
+                .filter(entry -> entry.ref.equals(AreaProbe.refOf(consumer))).findFirst().orElseThrow().snapshot;
+            assertFalse(malformedSnapshot.liquidInputsComplete,
+                "null dynamic stacks/liquid identities remain explicit uncertainty");
+        }
     }
 
     @Test
@@ -235,6 +335,31 @@ class MindustryLiquidProbeTest{
         assertTrue(trace.incompleteConnections.stream().anyMatch(value -> value.building.equals(AreaProbe.refOf(source))));
         assertFalse(area.liquids.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
             input(AreaProbe.refOf(consumer), NetworkSide.west), water));
+
+        Building positiveInvalid = place(ModdedBlocks.invalidPositiveDirectionLiquidSource, 10, 20, 0);
+        Building secondConsumer = place(ModdedBlocks.liquidConsumer, 11, 20, 0);
+        AreaDiagnosticResult positiveArea = AreaProbe.scan(AreaSelection.of(8, 18, 13, 22), Team.sharded);
+        LiquidTrace positiveTrace = LiquidTraceAnalyzer.input(positiveArea, AreaProbe.refOf(secondConsumer), water);
+        assertFalse(positiveTrace.complete, "direction 4 is not normalized to a supported side");
+        assertFalse(positiveTrace.noRouteProven);
+        assertTrue(positiveTrace.incompleteConnections.stream()
+            .anyMatch(value -> value.building.equals(AreaProbe.refOf(positiveInvalid))));
+    }
+
+    @Test
+    void declaredCrafterLiquidProductRemainsStructuralAtZeroTimeScale(){
+        Building source = place(ModdedBlocks.liquidSource, 10, 10, 0);
+        Building consumer = place(ModdedBlocks.liquidConsumer, 11, 10, 0);
+        source.applySlowdown(0f, 60f);
+        assertEquals(0f, source.timeScale(), "fixture has zero current production speed");
+
+        AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 8, 13, 12), Team.sharded);
+        LiquidTrace trace = LiquidTraceAnalyzer.input(area, AreaProbe.refOf(consumer), water);
+
+        assertTrue(area.entries.stream().filter(entry -> entry.ref.equals(AreaProbe.refOf(source)))
+            .findFirst().orElseThrow().snapshot.producedLiquids.contains(water),
+            "declared output identity is structural and independent of current rate");
+        assertEquals(List.of(AreaProbe.refOf(source)), trace.producers().stream().map(endpoint -> endpoint.building).toList());
     }
 
     @Test
@@ -246,6 +371,27 @@ class MindustryLiquidProbeTest{
         assertTrue(requirement.acceptedResources.contains(liquid(Liquids.water)));
         assertTrue(requirement.acceptedResources.contains(liquid(Liquids.cryofluid)));
         assertFalse(requirement.accepts(liquid(Liquids.oil)));
+    }
+
+    @Test
+    void filterEnumerationFailureDiscardsPartialSetAndMarksRequirementsIncomplete(){
+        Building consumer = place(ModdedBlocks.throwingFilterLiquidConsumer, 10, 10, 0);
+
+        ModdedBlocks.filterSawWater = false;
+        ModdedBlocks.failFilterEnumeration = true;
+        FactorySnapshot snapshot;
+        try{
+            snapshot = MindustryFactoryProbe.probe(consumer);
+        }finally{
+            ModdedBlocks.failFilterEnumeration = false;
+        }
+
+        assertTrue(ModdedBlocks.filterSawWater, "the filter fixture fails after a partial accepted set exists");
+        assertFalse(snapshot.liquidInputsComplete,
+            "one filter predicate failure cannot turn a partially enumerated set into a complete set");
+        assertTrue(snapshot.inputs.stream().noneMatch(input -> input.kind == ResourceKind.liquid
+                && input.acceptedResources.contains(water)),
+            "the partially accumulated Water identity is not exposed as the whole accepted set");
     }
 
     @Test
@@ -336,7 +482,10 @@ class MindustryLiquidProbeTest{
         BuildingRef sourceRef = AreaProbe.refOf(source), destinationRef = AreaProbe.refOf(destination);
         LiquidNetwork linked = scan(AreaSelection.of(6, 8, 20, 12));
         NetworkPort remoteOut = output(sourceRef, NetworkSide.east), remoteIn = input(destinationRef, NetworkSide.west);
-        assertTrue(linked.graph.isReachable(remoteOut, remoteIn, water));
+        assertTrue(linked.unsupportedTransport.contains(sourceRef));
+        assertTrue(linked.unsupportedTransport.contains(destinationRef));
+        assertFalse(linked.graph.isReachable(remoteOut, remoteIn, water),
+            "configured remote transfer is real, but its local/remote port rules are intentionally partial");
 
         source.liquids.add(Liquids.water, 5f);
         ((LiquidBridge.LiquidBridgeBuild)source).warmup = 1f;
@@ -350,6 +499,39 @@ class MindustryLiquidProbeTest{
         assertFalse(unlinked.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(AreaProbe.refOf(near))
             && edge.to.building.equals(AreaProbe.refOf(nearTarget))),
             "proximity alone never creates a remote bridge edge");
+    }
+
+    @Test
+    void linkedLiquidBridgeDoesNotStructurallyDumpToItsLocalNeighbors(){
+        Building producer = place(ModdedBlocks.liquidSource, 9, 10, 0);
+        Building bridge = place(Blocks.bridgeConduit, 10, 10, 0);
+        Building remote = place(Blocks.bridgeConduit, 14, 10, 0);
+        Building localConsumer = place(ModdedBlocks.liquidConsumer, 10, 11, 0);
+        bridge.configure(remote.tile.pos());
+
+        // The engine accepts a local input away from the configured link direction, then the
+        // linked bridge update sends it remotely. A valid-link LiquidBridge does not run doDump().
+        producer.liquids.add(Liquids.water, 5f);
+        producer.dumpLiquid(Liquids.water);
+        assertTrue(bridge.liquids.get(Liquids.water) > 0f, "the local input reaches the bridge module");
+        LiquidBridge.LiquidBridgeBuild bridgeBuild = (LiquidBridge.LiquidBridgeBuild)bridge;
+        bridgeBuild.warmup = 1f;
+        bridgeBuild.updateTile();
+        assertTrue(remote.liquids.get(Liquids.water) > 0f, "the configured remote link receives the liquid");
+        assertEquals(0f, localConsumer.liquids.get(Liquids.water),
+            "with a valid remote link, the bridge does not locally dump to this neighbor");
+
+        LiquidNetwork graph = scan(AreaSelection.of(7, 8, 17, 13));
+        assertFalse(graph.graph.isReachable(output(AreaProbe.refOf(producer), NetworkSide.east),
+            input(AreaProbe.refOf(localConsumer), NetworkSide.south), water),
+            "a static route must not use LiquidBridge as an all-side local router while its configured link is valid");
+
+        AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(7, 8, 17, 13), Team.sharded);
+        LiquidTrace trace = LiquidTraceAnalyzer.input(area, AreaProbe.refOf(localConsumer), water);
+        assertFalse(trace.complete);
+        assertFalse(trace.noRouteProven, "the partial bridge prevents a complete no-route conclusion");
+        assertTrue(trace.unsupportedInterruptions.stream().anyMatch(value -> value.transport.equals(AreaProbe.refOf(bridge))),
+            "the relevant bridge is surfaced as an interruption, not silently omitted");
     }
 
     @Test

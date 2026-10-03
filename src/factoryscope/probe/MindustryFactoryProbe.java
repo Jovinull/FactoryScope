@@ -393,6 +393,9 @@ public final class MindustryFactoryProbe{
                     ProductionRates.perTickToPerSecond(stack.amount, timeScale),
                     stack.amount * liquidProgressNow,
                     stored, crafter.liquidCapacity, full));
+                // A declared positive product remains a structural output when a temporary
+                // slowdown makes its current/theoretical rate zero.
+                if(stack.amount > 0f) snapshot.producedLiquid(liquidRef(stack.liquid));
             }
             //dumpExtraLiquid lets a crafter keep going while only some outputs are full
             if(!crafter.ignoreLiquidFullness) blocked |= crafter.dumpExtraLiquid ? allFull : anyFull;

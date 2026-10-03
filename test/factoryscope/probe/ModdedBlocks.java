@@ -32,10 +32,18 @@ final class ModdedBlocks{
     static GenericCrafter liquidSource;
     static GenericCrafter directedLiquidSource;
     static GenericCrafter dualLiquidSource;
+    static GenericCrafter mixedDirectionLiquidSource;
     static GenericCrafter invalidDirectionLiquidSource;
+    static GenericCrafter invalidPositiveDirectionLiquidSource;
     static GenericCrafter liquidConsumer;
     static GenericCrafter oilConsumer;
     static GenericCrafter filteredLiquidConsumer;
+    static GenericCrafter anyLiquidConsumer;
+    static GenericCrafter throwingFilterLiquidConsumer;
+    static boolean failFilterEnumeration;
+    static boolean filterSawWater;
+    static GenericCrafter dynamicLiquidConsumer;
+    static LiquidStack[] dynamicLiquidRequirements;
     static GenericCrafter hydrogenConsumer;
     static SolidPump solidLiquidPump;
     static Block unknownLiquidConsumer;
@@ -124,11 +132,23 @@ final class ModdedBlocks{
             outputLiquids = new LiquidStack[]{new LiquidStack(Liquids.water, 1f), new LiquidStack(Liquids.oil, 1f)};
             liquidOutputDirections = new int[]{0, 1};
         }};
+        mixedDirectionLiquidSource = new GenericCrafter("fs-test-mixed-direction-liquid-source"){{
+            craftTime = 60f;
+            liquidCapacity = 20f;
+            outputLiquids = new LiquidStack[]{new LiquidStack(Liquids.water, 1f), new LiquidStack(Liquids.oil, 1f)};
+            liquidOutputDirections = new int[]{-1, 0};
+        }};
         invalidDirectionLiquidSource = new GenericCrafter("fs-test-invalid-liquid-direction-source"){{
             hasLiquids = true;
             liquidCapacity = 20f;
             outputLiquids = new LiquidStack[]{new LiquidStack(Liquids.water, 1f)};
             liquidOutputDirections = new int[]{-2};
+        }};
+        invalidPositiveDirectionLiquidSource = new GenericCrafter("fs-test-invalid-positive-liquid-direction-source"){{
+            hasLiquids = true;
+            liquidCapacity = 20f;
+            outputLiquids = new LiquidStack[]{new LiquidStack(Liquids.water, 1f)};
+            liquidOutputDirections = new int[]{4};
         }};
         liquidConsumer = new GenericCrafter("fs-test-liquid-consumer"){{
             consumeLiquid(Liquids.water, 0.1f);
@@ -138,6 +158,20 @@ final class ModdedBlocks{
         }};
         filteredLiquidConsumer = new GenericCrafter("fs-test-filter-liquid-consumer"){{
             consume(new ConsumeLiquidFilter(liquid -> liquid == Liquids.water || liquid == Liquids.cryofluid, 0.1f));
+        }};
+        anyLiquidConsumer = new GenericCrafter("fs-test-any-liquid-consumer"){{
+            consume(new ConsumeLiquidFilter(liquid -> true, 0.1f));
+        }};
+        throwingFilterLiquidConsumer = new GenericCrafter("fs-test-throwing-filter-liquid-consumer"){{
+            consume(new ConsumeLiquidFilter(liquid -> {
+                if(failFilterEnumeration && liquid == Liquids.water) filterSawWater = true;
+                if(failFilterEnumeration && liquid == Liquids.cryofluid) throw new IllegalStateException("fixture filter failure");
+                return liquid == Liquids.water;
+            }, 0.1f));
+        }};
+        dynamicLiquidRequirements = new LiquidStack[]{new LiquidStack(Liquids.water, 0.1f)};
+        dynamicLiquidConsumer = new GenericCrafter("fs-test-dynamic-liquid-consumer"){{
+            consume(new ConsumeLiquidsDynamic(build -> dynamicLiquidRequirements));
         }};
         hydrogenConsumer = new GenericCrafter("fs-test-hydrogen-consumer"){{
             consumeLiquid(Liquids.hydrogen, 0.1f);
