@@ -2,11 +2,11 @@
 
 A factory diagnostics utility for Mindustry v8.
 
-FactoryScope answers one question: **why is this factory not running at full capacity?**
+FactoryScope helps answer: **what is this factory doing, and what is it waiting for?**
 
 Select a production block and it tells you what the building is doing, what it is waiting for, and which
-input or output is responsible. It adds no blocks, no items, no units and no balance changes, and it
-never modifies the state it inspects.
+input or output is currently limiting it. It adds no blocks, no items, no units, and no balance changes;
+it never modifies the state it inspects.
 
 ## What it does
 
@@ -26,11 +26,15 @@ never modifies the state it inspects.
 - **PowerScope.** Inspect the actual Mindustry `PowerGraph` for a building or selected
   area. Reports show whole-grid generation, demand, delivered satisfaction, battery storage, and connected
   generator diagnostics. A selected area can intersect several independent grids.
+- **LiquidScope.** Inspect structural liquid and gas routes, reachable producers and consumers,
+  storage, area boundaries, and explicitly partial transport. Current buffer contents are shown
+  separately from topology; routes do not represent measured transfer or supply sufficiency.
 
-An area report is a snapshot of diagnostic observations; Network maps static item topology, and Supply
-Trace correlates that topology with the same diagnostic snapshots. Trace does not measure item movement
-or prove that a reachable producer is supplying enough material; see
-[what it does not support](#what-it-does-not-support).
+FactoryScope is read-only: it observes the factory and never moves materials, changes configuration, or
+alters power. Area, Network, PowerScope and LiquidScope reports are snapshots rebuilt by Refresh. Supply
+Trace and LiquidScope correlate structural topology with building diagnostics; neither measures material
+movement nor proves that a reachable producer supplies enough material. See
+[what it does not support](#what-it-does-not-support) and the [support matrix](docs/support-matrix.md).
 
 ## Single-building diagnostics
 
@@ -65,10 +69,9 @@ or prove that a reachable producer is supplying enough material; see
   cross-grid connectors without an attributed transfer quantity. PowerScope reports evidence, not a root
   cause, battery-depletion estimate, or recommendation. Remote multiplayer grid synchronization has not
   been independently validated.
-- **Some transport families.** Armored conveyors and ducts, Plastanium Stack Conveyors, Duct Bridges,
-  Mass Drivers, unloaders, and unknown modded transport are marked as incomplete topology rather than
-  being approximated. Item bridges, ordinary conveyors, junctions, routers, sorters, gates, ducts, and
-  duct routers are covered.
+- **Some transport families.** Armored conveyors and ducts, Stack Conveyors, Duct Bridges, unloaders,
+  Mass Drivers, Armored Conduits, Liquid Bridges, Direction Liquid Bridges, and unknown modded transport
+  are marked as incomplete rather than approximated. See the [v160.5 support matrix](docs/support-matrix.md).
 - **Item/liquid production rates outside `GenericCrafter`.** That covers conventional crafting blocks on
   both planets. Drills, pumps, generators, unit factories and the rest are inspected but get no modeled
   item/liquid production rates. PowerScope separately reports current electrical generation exposed by
@@ -80,9 +83,9 @@ or prove that a reachable producer is supplying enough material; see
 Fog of war is respected, and an area selection queries only your own team's index, so it can never
 report a building you could not already see.
 
-**Platforms.** Desktop is validated end to end. The release jar carries the dexed classes Android needs
-and loads, but nothing has yet run it on a device — touch behaviour in particular is unverified. Reports
-from Android players are welcome on the issue tracker.
+**Platforms.** Desktop is validated end to end. CI builds and structurally verifies the release DEX,
+but FactoryScope has not yet been run inside Android Mindustry; Android runtime and touch behavior remain
+unverified. Reports from Android players are welcome on the issue tracker.
 
 ## Requirements
 
@@ -110,7 +113,7 @@ Restart Mindustry afterwards.
 ## Using the inspector
 
 1. Enter any game.
-2. Press the FactoryScope button in the bottom-left corner of the HUD.
+2. Press the FactoryScope button directly below the HUD's wave/editor layout area.
 3. Then either:
    - **click or tap a building** to diagnose that one, or
    - **drag a rectangle** to diagnose everything of yours inside it.
@@ -121,9 +124,9 @@ Restart Mindustry afterwards.
 A press that never travels far, or never leaves its starting tile, is a click — a shaky hand will not
 turn a click into an area, and the threshold grows with your UI scale. To cancel without selecting
 anything: press the FactoryScope button again, tap empty ground, or right-click. Escape and the Android
-back key cancel too, though they open the pause menu as they do everywhere else in the game. Everything
-works with a mouse and with touch, and nothing of FactoryScope stays in the input path once the overlay
-is gone.
+back key cancel too, though they open the pause menu as they do everywhere else in the game. The input
+path handles pointer and touch-style events; Android runtime and touch behavior have not yet been
+independently validated. Nothing of FactoryScope stays in the input path once the overlay is gone.
 
 ## Building from source
 
@@ -148,13 +151,28 @@ jar is for quick local testing and is not a substitute for a release.
 ### Tests
 
 ```
-gradlew test              # unit + headless-Mindustry integration tests, needs only a JDK
-gradlew acceptanceTest    # drives the inspector in a real Mindustry client, needs a local install
-gradlew verifyArtifacts   # checks the built jars carry only production code
-gradlew areaBenchmark     # prints what an area analysis costs at 50 to 4000 buildings
-gradlew networkBenchmark  # prints static network construction cost at 50 to 4000 buildings
-gradlew powerBenchmark    # prints PowerGraph snapshot/model cost at 50 to 4000 buildings
+gradlew test                    # unit + headless-Mindustry integration tests
+gradlew acceptanceTest          # isolated production-UI run in a real Mindustry client
+gradlew acceptanceLauncherTest  # portable path/sandbox tests; no game window required
+gradlew verifyArtifacts         # checks the built jars carry only production code
+gradlew areaBenchmark           # area analysis costs at 50 to 4000 buildings
+gradlew networkBenchmark        # item network construction costs
+gradlew traceBenchmark          # Supply Trace costs
+gradlew powerBenchmark          # PowerGraph snapshot/model costs
+gradlew liquidBenchmark         # LiquidScope snapshot/graph/trace costs
 ```
+
+The acceptance launcher supports automatic discovery or an explicit client/artifact. For example:
+
+```
+./gradlew acceptanceTest -PmindustryJar="/games/Mindustry.jar" -PmodJar="build/libs/FactoryScope.jar" -Plocale=pt-BR
+./gradlew acceptanceTest -PmindustryPath="/games/Mindustry" -Pcapture=true -PkeepSandbox=true
+```
+
+Available properties are `mindustryJar`, `mindustryPath`, `modJar`, `harnessJar`, `locale`, `capture`,
+`keepSandbox`, and `timeoutSeconds`. `harnessJar` is an optional prebuilt acceptance-harness override.
+The launcher copies only FactoryScope and its acceptance harness into an isolated temporary Mindustry
+data directory; it does not use player saves, installed mods, or Workshop content.
 
 `scripts/smoke-test.ps1` builds, installs into a throwaway sandbox and confirms this version loads in the
 real client without errors. Your saves, settings and installed mods are never touched.

@@ -3,7 +3,7 @@ displayName: "FactoryScope"
 author: "Jovinull"
 description: "Diagnose factory efficiency, inputs, outputs and production problems directly in Mindustry."
 subtitle: "Why is this factory not running at full capacity?"
-version: "0.6.0"
+version: "0.7.0"
 main: "factoryscope.FactoryScope"
 minGameVersion: 160
 java: true

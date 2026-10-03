@@ -74,8 +74,23 @@ and every liquid-specific locale key. Real UI acceptance is run in both English 
 gradlew acceptanceTest
 ```
 
-Needs **a Mindustry v8 client** and, for now, **Windows**. Pass `-MindustryPath` for an installed
-client or `-MindustryJar` for an official desktop release jar.
+Needs a Mindustry v8 Build 160.5 desktop client. `acceptanceTest` is a Java launcher and runs on Windows,
+Linux, and macOS; automatic Steam discovery is best-effort, while an explicit jar works without Steam.
+Use Gradle properties (`-PmindustryPath`, `-PmindustryJar`, `-PmodJar`) rather than platform-specific
+shell scripts:
+
+```
+./gradlew acceptanceTest -PmindustryJar="/games/Mindustry.jar" -PmodJar="build/libs/FactoryScope.jar" -Plocale=pt-BR
+./gradlew acceptanceTest -PmindustryPath="/games/Mindustry" -Pcapture=true -PkeepSandbox=true
+```
+
+`mindustryJar` and `mindustryPath` are mutually exclusive. `modJar` may point at a desktop jar, a
+universal CI artifact, or a downloaded release asset; when supplied, the launcher does not build or
+substitute the production mod jar. `harnessJar` optionally selects a prebuilt acceptance harness. Other
+properties are `locale`, `capture`, `keepSandbox`, and `timeoutSeconds`. The launcher requires a desktop
+jar containing Mindustry's desktop entry point, or a Windows install with its bundled client. For headless
+Linux environments, use a working X server such as Xvfb; GUI client availability is separate from launcher
+portability.
 
 This is the layer that catches what the other two cannot. `acceptance/` builds a second Mindustry mod,
 `FactoryScopeAcceptance.jar`, which loads next to FactoryScope in a throwaway sandbox and drives the
@@ -94,6 +109,10 @@ It covers:
 - A target destroyed while its panel is open.
 - Repeated activate → select → close cycles, asserting scene element counts return to baseline.
 - A world change while the panel is open.
+- The HUD toggle's position follows Mindustry's named `waves/editor` layout slot instead of a fixed
+  bottom-screen padding; the suite checks alignment with the real chat fragment shown and hidden, after a
+  world-load event, and at desktop and portrait scene sizes and multiple UI scales. The saving indicator
+  is conditional on an asynchronous save and is not reliably reproducible in this harness.
 - Panel layout at several scene sizes and UI scales.
 - Every user-facing string resolving in the active locale, including the formatted ones, whose missing
   keys render as `???key???` rather than as an error.
@@ -132,19 +151,22 @@ scrollable at 1280x720 with 2x UI scale and that endpoint rows use the available
 Captures include the normal trace and the same trace at high UI scale. A separate complete Mindustry
 headless integration fixture independently checks the same structural path.
 
-Results are written to the game log as `[HARNESS]` lines; `scripts/acceptance-test.ps1` reads them and
-turns them into an exit code. Your saves, settings and installed mods are never touched.
+Results are written to the game log as `[HARNESS]` lines; the Java launcher validates the result, requires
+the no-external-mods harness check, and turns failures, client crashes and timeouts into a nonzero exit
+code. It redirects each platform's Mindustry data directory into a unique temporary sandbox, copies only
+FactoryScope and its harness there, overrides the Steam version marker to avoid Workshop loading, and
+deletes a successful sandbox unless capture/keep was requested. Player saves, settings and installed mods
+are never touched.
 
-Run the script directly if you want the options:
+The launcher can also be tested without opening a game window:
 
 ```
-powershell -ExecutionPolicy Bypass -File scripts\acceptance-test.ps1 -KeepSandbox
-powershell -ExecutionPolicy Bypass -File scripts\acceptance-test.ps1 -MindustryJar C:\Games\Mindustry.jar -ModJar build\libs\FactoryScope.jar
+./gradlew acceptanceLauncherTest
 ```
 
-On a non-Windows machine `gradlew acceptanceTest` fails with a clear message rather than silently
-passing. Porting the launcher is a small, welcome contribution: the Mindustry discovery logic lives in
-`scripts/mindustry.ps1` and the harness itself is plain Java.
+The small `scripts/acceptance-test.ps1` remains only as a Windows compatibility wrapper around the same
+Gradle task. The launcher/path test runs in Windows, Linux, and macOS CI; the real graphical client has
+been exercised end to end on Windows, not claimed for platforms where it has not been run.
 
 ## 3. Load smoke test
 
