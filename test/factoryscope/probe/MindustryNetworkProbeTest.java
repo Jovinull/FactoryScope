@@ -40,6 +40,8 @@ class MindustryNetworkProbeTest{
 
             assertTrue(network.graph.isReachable(input(ref, forward.opposite()), output(ref, forward), copper));
             assertFalse(network.graph.isReachable(input(ref, forward), output(ref, forward.opposite()), copper));
+            assertFalse(network.graph.isReachable(input(ref, forward), output(ref, forward), copper),
+                "the engine rejects structural input from the conveyor's output side");
             conveyor.tile.remove();
         }
     }
