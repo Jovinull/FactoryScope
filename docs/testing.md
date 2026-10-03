@@ -51,6 +51,19 @@ single-building inspector and Area Diagnostics, checks separate grids and batter
 exercises a real BeamNode connection and a directional Power Diode between separate grids, then uses
 Refresh and the electrical-connection overlay.
 
+LiquidScope has pure tests in `liquid/LiquidTraceAnalyzerTest` and real v160.5 transport fixtures in
+`probe/MindustryLiquidProbeTest`. They cover Conduit side acceptance/output direction, content-independent
+topology, Liquid Junction channel isolation (including the engine destination oracle), router branches,
+configured Liquid Bridge links, directed multi-liquid crafter outputs, filter accepted sets, placed pump
+products, SolidPump products before first update, multi-liquid module snapshots, gas resource identity, and an
+unsupported transport adjacent to a consumer. Production topology is separately audited to ensure it never
+calls runtime `acceptLiquid()` to decide structural reachability.
+
+The LiquidScope acceptance path enters from a missing liquid in the single-building panel, selects an explicit
+area, follows Water to a real pump through a conduit, opens pump diagnostics, returns, refreshes, and uses the
+Area Diagnostics Liquids filter/Trace controls. It also checks the structural-only wording, high-scale layout,
+and every liquid-specific locale key. Real UI acceptance is run in both English and Brazilian Portuguese.
+
 ## 2. Acceptance suite
 
 ```
@@ -147,6 +160,7 @@ gradlew areaBenchmark
 gradlew networkBenchmark
 gradlew traceBenchmark
 gradlew powerBenchmark
+gradlew liquidBenchmark
 ```
 
 Prints what one area analysis costs at 50, 250, 1000 and 4000 buildings, split into spatial collection,
@@ -159,7 +173,9 @@ It is excluded from `gradlew test` by a JUnit tag, so an ordinary test run is no
 
 `powerBenchmark` measures engine-graph grouping, immutable snapshot/connection capture, and a lightweight
 PowerScope presentation model for connected 50/250/1000/4000-node PowerNode grids. Timing is reported,
-not gated.
+not gated. `liquidBenchmark` separately reports area collection, liquid snapshot probing, structural graph
+construction, and resource-specific trace costs at the same building counts; it has no wall-clock pass/fail
+threshold.
 
 ## Artifact checks
 

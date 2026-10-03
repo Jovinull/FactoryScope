@@ -17,6 +17,7 @@ import factoryscope.area.*;
 import factoryscope.model.*;
 import factoryscope.probe.*;
 import factoryscope.power.*;
+import factoryscope.liquid.*;
 import factoryscope.trace.*;
 import factoryscope.ui.*;
 import mindustry.content.*;
@@ -29,6 +30,7 @@ import mindustry.mod.*;
 import mindustry.type.*;
 import mindustry.world.*;
 import mindustry.world.blocks.environment.Floor;
+import mindustry.world.consumers.ConsumeCoolant;
 
 import static mindustry.Vars.*;
 
@@ -65,6 +67,8 @@ public class AcceptanceHarness extends Mod{
     final Seq<Building> patch = new Seq<>();
     final Seq<AreaSelection> bounds = new Seq<>();
     final Seq<String> members = new Seq<>();
+    ConsumeCoolant acceptanceCoolant;
+    boolean acceptanceCoolantWasOptional;
 
     public AcceptanceHarness(){
         Events.on(ClientLoadEvent.class, event -> Time.runTask(120f, this::start));
@@ -333,6 +337,7 @@ public class AcceptanceHarness extends Mod{
         mixedProblems();
         itemNetworkView();
         powerScopeScenarios();
+        liquidScopeScenarios();
         healthyArea();
         emptyArea();
         configurableBlocks();
@@ -1306,6 +1311,171 @@ public class AcceptanceHarness extends Mod{
                 && Core.scene.find("factoryscope-power-viewing") == null));
     }
 
+    void liquidScopeScenarios(){
+        scenario("a missing Water input traces through the production UI to a real pump");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            int x = rx(), y = ry();
+            for(int dx = 2; dx <= 3; dx++) for(int dy = 2; dy <= 3; dy++){
+                Tile floor = world.tile(x + dx, y + dy);
+                floor.setFloor((Floor)Blocks.water);
+                floor.clearOverlay();
+            }
+            producer = placeAt(Blocks.mechanicalPump, x + 3, y + 3);
+            placeAt(Blocks.conduit, x + 4, y + 3, 0);
+            placeAt(Blocks.conduit, x + 5, y + 3, 0);
+            //Cryofluid Mixer is 2x2; its west footprint starts at x+6, beside the second conduit.
+            target = placeAt(Blocks.cryofluidMixer, x + 6, y + 3);
+        });
+        queue(() -> {
+            //Let the pump resolve its placement-specific liquidDrop, then preserve a real shortage.
+            //Drain both line buffers too: stored contents never define static topology, but the
+            //single-building button intentionally appears only while the diagnostic input is empty.
+            producer.enabled = false;
+            if(producer.liquids != null) producer.liquids.clear();
+            for(int dx = 4; dx <= 5; dx++){
+                Building conduit = world.tile(rx() + dx, ry() + 3).build;
+                if(conduit != null && conduit.liquids != null) conduit.liquids.clear();
+            }
+            target.liquids.clear();
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> check("the missing Water input offers a direct Liquid Trace action",
+            Core.scene.find("factoryscope-trace-liquid-water") != null));
+        queue(() -> clickNamed("factoryscope-trace-liquid-water"));
+        queue(() -> check("single-building Liquid Trace asks for an explicit area",
+            FactoryScopeUI.picking() && FactoryScopeUI.inspected() == null));
+        queue(() -> dragTiles(rx() + 1, ry() + 1, rx() + 9, ry() + 8));
+        queue(() -> {
+            LiquidTrace trace = FactoryScopeUI.liquidTrace();
+            check("the production LiquidScope dialog opens from the single-building path",
+                Core.scene.find("factoryscope-liquid-dialog") != null && trace != null);
+            check("the structural Water trace reaches the placed mechanical pump",
+                trace != null && trace.producers().stream().anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer))),
+                trace == null ? "no trace" : "complete=" + trace.complete + ", endpoints=" + trace.endpoints);
+            check("the trace claims structure, not liquid flow",
+                dialogShows(FsBundle.get("liquid.trace-structural-input")));
+            capture("liquid-water-trace");
+        });
+        queue(() -> {
+            Scl.setProduct(2f);
+            Core.scene.resize(1280, 720);
+        });
+        queue(() -> checkFits("LiquidScope at 1280x720 @ 2x"));
+        queue(() -> capture("liquid-water-trace-high-ui-scale"));
+        queue(this::restoreLayout);
+        queue(() -> clickNamed("factoryscope-liquid-view-world"));
+        queue(() -> check("the liquid overlay identifies structural routes without flow claims",
+            Core.scene.find("factoryscope-liquid-viewing") != null));
+        queue(() -> clickNamed("factoryscope-liquid-return"));
+        queue(() -> check("Return restores the same Liquid Trace context",
+            Core.scene.find("factoryscope-liquid-dialog") != null && FactoryScopeUI.liquidTrace() != null
+                && FactoryScopeUI.liquidTrace().target.equals(AreaProbe.refOf(target))));
+        queue(() -> clickNamed("factoryscope-liquid-producer-inspect"));
+        queue(() -> check("Inspect opens the actual pump while retaining the trace dialog",
+            FactoryScopeUI.inspected() == producer,
+            "expected " + describe(producer) + ", inspected " + describe(FactoryScopeUI.inspected())
+                + ", trace dialog " + (Core.scene.find("factoryscope-liquid-dialog") != null)
+                + ", trace " + (FactoryScopeUI.liquidTrace() == null ? "null" : FactoryScopeUI.liquidTrace().target)));
+        queue(this::closeAnyDialog);
+        queue(() -> check("closing pump diagnostics returns to the same Liquid Trace",
+            Core.scene.find("factoryscope-liquid-dialog") != null && FactoryScopeUI.liquidTrace() != null));
+        queue(() -> clickNamed("factoryscope-liquid-refresh"));
+        queue(() -> check("Refresh rebuilds the liquid trace snapshot coherently",
+            FactoryScopeUI.liquidTrace() != null
+                && FactoryScopeUI.liquidTrace().producers().stream().anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer)))));
+        queue(() -> clickNamed("factoryscope-liquid-producer-inspect"));
+        queue(() -> check("the pump inspector is open before a world change", FactoryScopeUI.inspected() == producer));
+        queue(() -> Events.fire(new WorldLoadEvent()));
+        queue(() -> check("world change disposes an inspected Liquid Trace without reopening stale context",
+            FactoryScopeUI.inspected() == null && FactoryScopeUI.liquidTrace() == null
+                && Core.scene.find("factoryscope-liquid-dialog") == null));
+        queue(this::closeAnyDialog);
+
+        scenario("filter consumers let the player choose an accepted liquid before tracing");
+        queue(() -> {
+            clearRegion();
+            acceptanceCoolant = Blocks.foreshadow.findConsumer(consume -> consume instanceof ConsumeCoolant);
+            check("vanilla Foreshadow exposes its coolant filter", acceptanceCoolant != null);
+            if(acceptanceCoolant != null){
+                acceptanceCoolantWasOptional = acceptanceCoolant.optional;
+                // The acceptance-only condition makes the vanilla filter a required diagnostic input.
+                // This changes only the probe-facing field for the test; it does not update the engine's
+                // precomputed optional-consumer arrays or alter simulation behavior.
+                acceptanceCoolant.optional = false;
+            }
+            target = placeAt(Blocks.foreshadow, rx() + 4, ry() + 4);
+            FactorySnapshot snapshot = MindustryFactoryProbe.probe(target);
+            boolean filterInput = snapshot.inputs.stream().anyMatch(input -> input.kind == ResourceKind.liquid
+                && input.contentId == null && !input.optional
+                && input.acceptedResources.stream().anyMatch(resource -> resource.id.equals(Liquids.cryofluid.name)));
+            check("the vanilla filter snapshot exposes Cryofluid as a required accepted alternative", filterInput,
+                "optional=" + (acceptanceCoolant == null ? "missing" : acceptanceCoolant.optional)
+                    + ", inputs=" + snapshot.inputs);
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> check("the filter target opens in the real inspector", FactoryScopeUI.inspected() == target,
+            "target=" + MindustryFactoryProbe.describe(target) + ", inspected="
+                + (FactoryScopeUI.inspected() == null ? "null" : MindustryFactoryProbe.describe(FactoryScopeUI.inspected()))));
+        queue(() -> check("an empty filter consumer offers a liquid-choice action",
+            Core.scene.find("factoryscope-trace-liquid-choice") != null));
+        queue(() -> clickNamed("factoryscope-trace-liquid-choice"));
+        queue(() -> check("the choice dialog lists the filter's accepted resources",
+            Core.scene.find("factoryscope-liquid-filter-option-water") != null
+                && Core.scene.find("factoryscope-liquid-filter-option-cryofluid") != null
+                && Core.scene.find("factoryscope-liquid-filter-option-oil") == null));
+        queue(() -> clickNamed("factoryscope-liquid-filter-option-cryofluid"));
+        queue(() -> check("choosing Cryofluid requests an explicit area for that exact resource",
+            FactoryScopeUI.picking() && Core.scene.find("factoryscope-liquid-dialog") == null));
+        queue(() -> dragTiles(rx() + 2, ry() + 2, rx() + 6, ry() + 6));
+        queue(() -> {
+            LiquidTrace trace = FactoryScopeUI.liquidTrace();
+            check("filter selection opens a Cryofluid trace without inventing a single filter product",
+                trace != null && trace.liquid.equals(new ResourceRef(ResourceKind.liquid,
+                    Liquids.cryofluid.name, Liquids.cryofluid.localizedName)) && trace.targetUsesLiquid
+                    && trace.target.equals(AreaProbe.refOf(target)));
+            if(acceptanceCoolant != null){
+                acceptanceCoolant.optional = acceptanceCoolantWasOptional;
+            }
+        });
+        queue(this::closeAnyDialog);
+
+        scenario("the Area Liquids view filters Water and traces its consumer through production UI");
+        queue(() -> {
+            clearRegion();
+            int x = rx(), y = ry();
+            for(int dx = 2; dx <= 3; dx++) for(int dy = 2; dy <= 3; dy++)
+                world.tile(x + dx, y + dy).setFloor((Floor)Blocks.water);
+            producer = placeAt(Blocks.mechanicalPump, x + 3, y + 3);
+            placeAt(Blocks.conduit, x + 4, y + 3, 0);
+            placeAt(Blocks.conduit, x + 5, y + 3, 0);
+            target = placeAt(Blocks.cryofluidMixer, x + 6, y + 3);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(rx() + 1, ry() + 1, rx() + 9, ry() + 8));
+        queue(() -> clickNamed("factoryscope-area-liquids"));
+        queue(() -> check("Area Diagnostics opens the LiquidScope resource view",
+            Core.scene.find("factoryscope-liquid-dialog") != null
+                && Core.scene.find("factoryscope-liquid-select-water") != null));
+        queue(() -> clickNamed("factoryscope-liquid-select-water"));
+        queue(() -> clickNamed("factoryscope-liquid-trace-input"));
+        queue(() -> {
+            LiquidTrace trace = FactoryScopeUI.liquidTrace();
+            check("Area Liquids traces from the actual selected consumer row",
+                trace != null && trace.target.equals(AreaProbe.refOf(target))
+                    && trace.producers().stream().anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer))));
+            check("the Area entry path does not bypass the player-facing Trace action",
+                Core.scene.find("factoryscope-liquid-dialog") != null
+                    && Core.scene.find("factoryscope-liquid-producer-inspect") != null);
+            capture("liquid-area-trace");
+        });
+        queue(this::closeAnyDialog);
+        queue(this::checkLiquidLocalization);
+    }
+
     void healthyArea(){
         int x1 = rx(), y1 = ry(), x2 = rx() + 14, y2 = ry() + 6;
 
@@ -1781,6 +1951,36 @@ public class AcceptanceHarness extends Mod{
         }else{
             check("single-member PowerScope counts avoid plural agreement errors",
                 oneMember.equals("1 / 1"), oneMember);
+        }
+    }
+
+    void checkLiquidLocalization(){
+        scenarioNow("every LiquidScope string resolves in the active locale");
+        Seq<String> keys = Seq.with("liquid.title", "liquid.open", "liquid.view-world", "liquid.viewing-structural",
+            "liquid.resource", "liquid.no-resources", "liquid.structural-network", "liquid.static-note", "liquid.partial",
+            "liquid.producers", "liquid.consumers", "liquid.storage", "liquid.boundaries", "liquid.unsupported",
+            "liquid.current-storage", "liquid.stored-more", "liquid.trace-title", "liquid.output-title",
+            "liquid.trace-target", "liquid.trace-structural-input", "liquid.trace-structural-output",
+            "liquid.trace-target-missing", "liquid.no-input-route", "liquid.no-output-route",
+            "liquid.no-in-area-producer", "liquid.no-in-area-consumer", "liquid.trace-incomplete",
+            "liquid.target-requirement-incomplete", "liquid.trace-incomplete-connections",
+            "liquid.target-outside-snapshot",
+            "liquid.trace-boundary", "liquid.boundary-at", "liquid.trace-unsupported", "liquid.unsupported-at",
+            "liquid.dead-end", "liquid.reachable-sources", "liquid.reachable-destinations", "liquid.storage-endpoint",
+            "liquid.producer", "liquid.consumer", "liquid.trace-edges", "liquid.trace-input", "liquid.trace-output",
+            "liquid.choose-trace", "liquid.choose-title", "liquid.select-area", "liquid.unavailable");
+        for(String key : keys){
+            String text = FsBundle.get(key);
+            check("'" + key + "' resolves", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
+        }
+        for(String[] entry : new String[][]{
+            {"liquid.stored-more", "4"}, {"liquid.trace-target", "Cryofluid Mixer"}, {"liquid.trace-boundary", "2"},
+            {"liquid.boundary-at", "Conduit", "123", "61"}, {"liquid.unsupported-at", "Armored Conduit", "123", "61"},
+            {"liquid.dead-end", "Conduit", "123", "61"}, {"liquid.trace-edges", "5"}, {"value.of", "10", "40"}}){
+            Object[] args = new Object[entry.length - 1];
+            System.arraycopy(entry, 1, args, 0, args.length);
+            String text = FsBundle.format(entry[0], args);
+            check("'" + entry[0] + "' formats", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
         }
     }
 

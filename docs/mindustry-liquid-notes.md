@@ -1,0 +1,84 @@
+# Mindustry v160.5 liquid topology notes
+
+LiquidScope describes structural possibilities. It does not sample or predict liquid transfer. There is
+no engine-maintained liquid graph comparable to `PowerGraph`; buildings call liquid transfer methods
+with live buffer, capacity, team, pressure, and receiver-state checks. Those methods are useful as an
+engine oracle in tests, but their current result is not a static topology query.
+
+## Verified behavior and initial support matrix
+
+| Family | Structural model | 0.6 status | Why |
+| --- | --- | --- | --- |
+| Conduit | Any of the three non-front sides may enter; output is front-only | Supported | `acceptLiquid` also checks the current buffer, so only its directional side rule is used for topology |
+| Liquid Junction | Independent straight-through N–S and E–W channels | Supported | `getLiquidDestination` preserves the incoming direction; disabled runtime state is not structural topology |
+| Liquid Router, Liquid Container, Liquid Tank | All-side storage/router; structurally connect each distinct input/output side | Supported | Current contents affect acceptance and dumping, not the persistent set of possible routes |
+| Liquid Bridge | Remote route only for the engine-validated configured link; local router behavior retained | Supported with engine link validation | It inherits ItemBridge link validation and calls `moveLiquid` on the linked building; no proximity-derived remote edge |
+| GenericCrafter liquid output | One resource-specific output route for each declared `LiquidStack`, using that stack's `liquidOutputDirections` after rotation; `-1` means unrestricted dump sides | Supported | `dumpOutputs` passes each product's own direction to `dumpLiquid` |
+| Pump | Product from the live placement's `liquidDrop`; external output may dump on neighboring sides | Supported | Floor/footprint state is placement-specific and is read at Refresh |
+| SolidPump / Fracker | Product from configured `result`; inherits Pump's liquid routing | Supported | `SolidPumpBuild.updateTile()` assigns `liquidDrop = result` and uses Pump's dump behavior; the product is available structurally before its first update |
+| SolidPump / Fracker | Product from live `result`; resource identity is not inferred from block name | Supported | Fracker adds item consumption but remains a SolidPump output family |
+| Exact `ConsumeLiquid` / `ConsumeLiquids` | Declared resource identities, one requirement per declared liquid | Supported | Consumer stacks are static block metadata |
+| `ConsumeLiquidFilter` / coolant filter | Enumerate the filter's accepted content set, preserving each `Liquid` identity | Supported when enumerable | Current `getConsumed` is only a buffer choice and cannot define all structural choices; conventional consumers without liquid-output behavior are terminal input endpoints |
+| `ConsumeLiquidsDynamic` | Evaluate the current building-specific `LiquidStack[]` on each Refresh | Supported when evaluation succeeds | Dynamic requirements are a snapshot fact, not a permanently cached block property |
+| ArmoredConduit | Not approximated as Conduit | Partial / interruption | Acceptance depends on source class/alignment and armored-blending rules |
+| DirectionLiquidBridge | Not approximated as LiquidBridge | Partial / interruption | It uses forward link search, per-direction occupancy, and a local forward fallback when unlinked |
+| Unknown/modded liquid transport | No guessed internal route | Partial / interruption | Liquid-output-capable blocks with unknown routing are not traversed; `hasLiquids` alone does not establish transport semantics |
+
+Liquids and gases both use Mindustry's `Liquid` content type. Resource identity is the content identity,
+never a localized name or the module's `current()` selection. Storage is independent of production: a
+router/tank may be both a transport participant and a storage endpoint, but its contents do not make it
+a producer.
+
+## Transfer methods are runtime operations
+
+`Building.acceptLiquid`, `moveLiquid`, `moveLiquidForward`, and `dumpLiquid` are not used by production
+topology construction. They apply transient checks such as current liquid compatibility, capacity,
+team, fullness, direction, bridge warmup, or pressure. A Conduit currently holding Oil must therefore
+retain the same structural Water edges it would have while empty; the displayed Oil amount is a separate
+snapshot fact.
+
+Conduit forwards only toward its rotation, while its side acceptance rejects the front/output side. Its
+front may also leak into a valid empty world tile when the block's `leaks` flag allows it, so a terminal
+port is described as a route termination, not automatically as a blockage. A Liquid Junction resolves
+the destination straight through from the source side; its two crossing channels must not be collapsed
+to one building node. A Liquid Router calls `dumpLiquid` and has no fixed directional choice or
+distribution guarantee.
+
+LiquidBridge's remote operation uses the configured ItemBridge link and its validity checks; its update
+also retains local `dumpLiquid` behavior. DirectionLiquidBridge is different: it searches forward for a
+matching directional bridge, records occupied entry directions, and falls back to front movement when
+there is no remote link. Until those rules are represented and tested as distinct states, it remains an
+explicit partial interruption.
+
+## Stored liquid and flow tracking
+
+`LiquidModule.current()` is documented by the engine as only valid for single-liquid modules. It is the
+last received/loaded selection, not a complete inventory listing. LiquidScope reads every positive
+content amount using `LiquidModule.each()` and stores only immutable resource references and amounts.
+
+The engine's optional `LiquidModule.updateFlow()` / `getFlowRate()` is module-level, aggregates positive
+module additions/handling over a window, and has no source, destination, or edge identity. It also
+allocates/shared-caches flow windows intended for the engine's own liquid display lifecycle. LiquidScope
+does not enable it and does not label it pipe throughput.
+
+## Scope and limitations
+
+Graphs are collected for the selected area only. A directly adjacent, resource-compatible supported route
+outside the area is reported as a boundary continuation; it is not recursively scanned. An unsupported
+transport immediately outside the area is an unsupported interruption, not a proven boundary route.
+Unreadable dynamic requirements/products remain resource-scoped incomplete continuations; they are not
+converted to dead ends. An unrelated unsupported branch for Oil does not poison a Water-only trace.
+Structural route does not mean current movement, quantitative sufficiency, blockage, or root cause.
+
+The behavior above was checked against the pinned Mindustry v8 Build 160.5 source. The engine implementation
+is available in the official [`Conduit`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/blocks/liquid/Conduit.java),
+[`LiquidJunction`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/blocks/liquid/LiquidJunction.java),
+[`LiquidRouter`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/blocks/liquid/LiquidRouter.java),
+[`LiquidBridge`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/blocks/liquid/LiquidBridge.java),
+[`DirectionLiquidBridge`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/blocks/distribution/DirectionLiquidBridge.java),
+[`LiquidModule`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/modules/LiquidModule.java),
+[`Pump`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/blocks/production/Pump.java),
+[`SolidPump`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/blocks/production/SolidPump.java),
+[`Fracker`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/blocks/production/Fracker.java),
+[`GenericCrafter`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/world/blocks/production/GenericCrafter.java),
+and the [`liquid consumer` implementations](https://github.com/Anuken/Mindustry/tree/v160.5/core/src/mindustry/world/consumers).

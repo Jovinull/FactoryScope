@@ -14,6 +14,8 @@ import mindustry.world.blocks.production.*;
 import mindustry.world.consumers.*;
 import mindustry.world.modules.*;
 
+import java.util.*;
+
 /**
  * Reads a live {@link Building} and produces a {@link FactorySnapshot}.
  *
@@ -86,8 +88,14 @@ public final class MindustryFactoryProbe{
             snapshot.power(readPower(build, block.consPower, visibleGraph));
         }
         if(crafter) addCrafterProduction(build, (GenericCrafter)block, snapshot, frameTicks, timeScale);
+        addConventionalLiquidProduction(build, snapshot);
         if(build instanceof Drill.DrillBuild drill && drill.dominantItem != null){
             snapshot.producedItem(new ResourceRef(ResourceKind.item, drill.dominantItem.name, drill.dominantItem.localizedName));
+        }
+        if(build.liquids != null){
+            build.liquids.each((liquid, amount) -> {
+                if(amount > 0f) snapshot.storedLiquid(new StoredLiquidState(liquidRef(liquid), amount, block.liquidCapacity));
+            });
         }
 
         return snapshot.build();
@@ -109,6 +117,7 @@ public final class MindustryFactoryProbe{
             try{
                 readConsumer(build, consume, optional, snapshot, frameTicks, timeScale);
             }catch(Exception e){
+                if(isLiquidConsumer(consume)) snapshot.liquidInputsComplete(false);
                 FsLog.warnOnce("consumer:" + consume.getClass().getName(),
                     "failed to read consumer " + consume.getClass().getSimpleName()
                         + " on " + describe(build), e);
@@ -134,22 +143,40 @@ public final class MindustryFactoryProbe{
         }else if(consume instanceof ConsumeItemFilter filter){
             snapshot.input(itemFilterInput(build, filter, optional));
         }else if(consume instanceof ConsumeLiquid liquid){
-            snapshot.input(liquidInput(build, liquid.liquid, liquid.amount * multiplier, optional, frameTicks, timeScale));
+            snapshot.input(liquidInput(build, liquid.liquid, liquid.amount * multiplier, optional, frameTicks, timeScale,
+                List.of(liquidRef(liquid.liquid))));
         }else if(consume instanceof ConsumeLiquids liquids){
             for(LiquidStack stack : liquids.liquids){
-                snapshot.input(liquidInput(build, stack.liquid, stack.amount * multiplier, optional, frameTicks, timeScale));
+                snapshot.input(liquidInput(build, stack.liquid, stack.amount * multiplier, optional, frameTicks, timeScale,
+                    List.of(liquidRef(stack.liquid))));
             }
         }else if(consume instanceof ConsumeLiquidFilter filter){
             //covers ConsumeCoolant and anything else that accepts a family of liquids
             Liquid current = filter.getConsumed(build);
+            List<ResourceRef> accepted = acceptedLiquids(filter);
             if(current != null){
-                snapshot.input(liquidInput(build, current, filter.amount * multiplier, optional, frameTicks, timeScale));
+                snapshot.input(liquidInput(build, current, filter.amount * multiplier, optional, frameTicks, timeScale, accepted));
             }else{
                 snapshot.input(ResourceState.of(ResourceKind.liquid, FsBundle.get("input.any-accepted-liquid"))
                     .optional(optional)
                     .satisfaction(0f)
+                    .accepts(accepted)
                     .amounts(0f, ProductionRates.perTickToPerSecond(filter.amount * multiplier, timeScale), RateUnit.perSecond)
                     .build());
+            }
+        }else if(consume instanceof ConsumeLiquidsDynamic dynamic){
+            LiquidStack[] stacks = dynamic.liquids.get(build);
+            if(stacks == null){
+                snapshot.liquidInputsComplete(false);
+            }else{
+                for(LiquidStack stack : stacks){
+                    if(stack == null || stack.liquid == null){
+                        snapshot.liquidInputsComplete(false);
+                        continue;
+                    }
+                    snapshot.input(liquidInput(build, stack.liquid, stack.amount * multiplier, optional, frameTicks,
+                        timeScale, List.of(liquidRef(stack.liquid))));
+                }
             }
         }else if(consume instanceof ConsumePower power){
             snapshot.input(powerInput(build, power, optional));
@@ -199,7 +226,8 @@ public final class MindustryFactoryProbe{
      * is zero: a heat-starved crafter is a block condition, not a liquid shortage, and is reported as such.
      */
     private static ResourceState liquidInput(Building build, Liquid liquid, float amountPerTick,
-                                             boolean optional, float frameTicks, float timeScale){
+                                             boolean optional, float frameTicks, float timeScale,
+                                             Collection<ResourceRef> accepted){
         LiquidModule module = build.liquids;
         float stored = module == null ? 0f : module.get(liquid);
 
@@ -212,9 +240,26 @@ public final class MindustryFactoryProbe{
         var builder = ResourceState.of(ResourceKind.liquid, liquid.localizedName)
             .contentId(liquid.name)
             .optional(optional)
+            .accepts(accepted)
             .satisfaction(satisfaction);
         return amounts(builder, stored,
             ProductionRates.perTickToPerSecond(amountPerTick, timeScale), RateUnit.perSecond).build();
+    }
+
+    private static List<ResourceRef> acceptedLiquids(ConsumeLiquidFilter filter){
+        List<ResourceRef> accepted = new ArrayList<>();
+        if(Vars.content == null || filter.filter == null) return accepted;
+        for(Liquid liquid : Vars.content.liquids()) if(filter.filter.get(liquid)) accepted.add(liquidRef(liquid));
+        return accepted;
+    }
+
+    private static boolean isLiquidConsumer(Consume consume){
+        return consume instanceof ConsumeLiquid || consume instanceof ConsumeLiquids
+            || consume instanceof ConsumeLiquidFilter || consume instanceof ConsumeLiquidsDynamic;
+    }
+
+    private static ResourceRef liquidRef(Liquid liquid){
+        return new ResourceRef(ResourceKind.liquid, liquid.name, liquid.localizedName);
     }
 
     /**
@@ -354,5 +399,22 @@ public final class MindustryFactoryProbe{
         }
 
         snapshot.outputBufferFull(blocked);
+    }
+
+    /** Captures conventional producers whose product is exposed directly by the engine block/build. */
+    private static void addConventionalLiquidProduction(Building build, FactorySnapshot.Builder snapshot){
+        // SolidPumpBuild assigns liquidDrop from result during updateTile(). Its configured product is
+        // already known before the first simulation update, so use the block declaration directly.
+        if(build.block instanceof SolidPump pump && pump.result != null && pump.pumpAmount > 0f){
+            snapshot.producedLiquid(liquidRef(pump.result));
+        }else if(build instanceof Pump.PumpBuild pump && pump.liquidDrop != null && pump.block instanceof Pump block && block.pumpAmount > 0f){
+            snapshot.producedLiquid(liquidRef(pump.liquidDrop));
+        }
+        if(build.block instanceof ConsumeGenerator generator && generator.outputLiquid != null && generator.outputLiquid.amount > 0f){
+            snapshot.producedLiquid(liquidRef(generator.outputLiquid.liquid));
+        }
+        if(build.block instanceof ThermalGenerator generator && generator.outputLiquid != null && generator.outputLiquid.amount > 0f){
+            snapshot.producedLiquid(liquidRef(generator.outputLiquid.liquid));
+        }
     }
 }

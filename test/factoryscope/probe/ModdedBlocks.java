@@ -29,6 +29,17 @@ final class ModdedBlocks{
     static ItemBridge sameTypeBridge;
     static PowerGenerator moddedGenerator;
     static Block moddedPowerConsumer;
+    static GenericCrafter liquidSource;
+    static GenericCrafter directedLiquidSource;
+    static GenericCrafter dualLiquidSource;
+    static GenericCrafter invalidDirectionLiquidSource;
+    static GenericCrafter liquidConsumer;
+    static GenericCrafter oilConsumer;
+    static GenericCrafter filteredLiquidConsumer;
+    static GenericCrafter hydrogenConsumer;
+    static SolidPump solidLiquidPump;
+    static Block unknownLiquidConsumer;
+    static Block unknownLiquidTransport;
 
     private ModdedBlocks(){
     }
@@ -95,6 +106,59 @@ final class ModdedBlocks{
         }};
 
         moddedPowerConsumer = new PowerConsumerBlock("fs-test-power-consumer");
+
+        liquidSource = new GenericCrafter("fs-test-liquid-source"){{
+            craftTime = 60f;
+            liquidCapacity = 20f;
+            outputLiquids = new LiquidStack[]{new LiquidStack(Liquids.water, 1f)};
+        }};
+        directedLiquidSource = new GenericCrafter("fs-test-directed-liquid-source"){{
+            craftTime = 60f;
+            liquidCapacity = 20f;
+            outputLiquids = new LiquidStack[]{new LiquidStack(Liquids.water, 1f)};
+            liquidOutputDirections = new int[]{0};
+        }};
+        dualLiquidSource = new GenericCrafter("fs-test-dual-liquid-source"){{
+            craftTime = 60f;
+            liquidCapacity = 20f;
+            outputLiquids = new LiquidStack[]{new LiquidStack(Liquids.water, 1f), new LiquidStack(Liquids.oil, 1f)};
+            liquidOutputDirections = new int[]{0, 1};
+        }};
+        invalidDirectionLiquidSource = new GenericCrafter("fs-test-invalid-liquid-direction-source"){{
+            hasLiquids = true;
+            liquidCapacity = 20f;
+            outputLiquids = new LiquidStack[]{new LiquidStack(Liquids.water, 1f)};
+            liquidOutputDirections = new int[]{-2};
+        }};
+        liquidConsumer = new GenericCrafter("fs-test-liquid-consumer"){{
+            consumeLiquid(Liquids.water, 0.1f);
+        }};
+        oilConsumer = new GenericCrafter("fs-test-oil-consumer"){{
+            consumeLiquid(Liquids.oil, 0.1f);
+        }};
+        filteredLiquidConsumer = new GenericCrafter("fs-test-filter-liquid-consumer"){{
+            consume(new ConsumeLiquidFilter(liquid -> liquid == Liquids.water || liquid == Liquids.cryofluid, 0.1f));
+        }};
+        hydrogenConsumer = new GenericCrafter("fs-test-hydrogen-consumer"){{
+            consumeLiquid(Liquids.hydrogen, 0.1f);
+        }};
+        solidLiquidPump = new SolidPump("fs-test-solid-liquid-pump"){{
+            result = Liquids.oil;
+            pumpAmount = 0.1f;
+        }};
+        unknownLiquidConsumer = new Block("fs-test-unknown-liquid-consumer"){{
+            update = true;
+            solid = true;
+            hasLiquids = true;
+            consumeLiquid(Liquids.water, 0.1f);
+        }};
+        unknownLiquidTransport = new Block("fs-test-unknown-liquid-transport"){{
+            update = true;
+            solid = true;
+            hasLiquids = true;
+            outputsLiquid = true;
+            consumeLiquid(Liquids.water, 0.1f);
+        }};
     }
 
     /** A consumer type FactoryScope has never heard of, with a satisfaction the test can steer. */

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 - Unreleased
+
+### Added
+
+- LiquidScope models supported liquid and gas routes inside a selected area, with resource-aware input/output
+  traces, reachable producers/consumers, storage endpoints, boundaries, and explicit partial transport.
+- Current positive liquid-buffer contents are captured as immutable state; they do not change structural routes.
+- Added v160.5 engine-backed Conduit, Liquid Junction, Liquid Router, configured Liquid Bridge, pump, and directed
+  crafter-output fixtures, plus `liquidBenchmark`.
+
+### Not in this release
+
+No liquid-flow or per-pipe throughput measurement, pressure simulation, quantitative supply sufficiency,
+root-cause analysis, or recommendations. Armored Conduits, Direction Liquid Bridges, and unknown modded liquid
+transport remain partial rather than guessed.
+
 ## 0.5.0 - 2026-10-02
 
 ### Added

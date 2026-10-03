@@ -32,7 +32,9 @@ public final class FactoryScopePanel extends BaseDialog{
     private Table body;
     private Building target;
     private BiConsumer<Building, ResourceRef> onTrace;
+    private BiConsumer<Building, ResourceRef> onTraceLiquid;
     private Cons<Building> onInspectPower;
+    private Runnable onDismiss;
 
     public FactoryScopePanel(){
         super("");
@@ -50,11 +52,20 @@ public final class FactoryScopePanel extends BaseDialog{
             }
             if(timer.get(REFRESH_TICKS)) rebuild();
         });
-        hidden(() -> target = null);
+        hidden(() -> {
+            target = null;
+            Runnable dismiss = onDismiss;
+            onDismiss = null;
+            if(dismiss != null) dismiss.run();
+        });
     }
 
     void setOnTrace(BiConsumer<Building, ResourceRef> onTrace){
         this.onTrace = onTrace;
+    }
+
+    void setOnTraceLiquid(BiConsumer<Building, ResourceRef> onTraceLiquid){
+        this.onTraceLiquid = onTraceLiquid;
     }
 
     void setOnInspectPower(Cons<Building> onInspectPower){
@@ -62,7 +73,16 @@ public final class FactoryScopePanel extends BaseDialog{
     }
 
     public void inspect(Building build){
+        inspect(build, null);
+    }
+
+    void cancelOnDismiss(){
+        onDismiss = null;
+    }
+
+    void inspect(Building build, Runnable onDismiss){
         target = build;
+        this.onDismiss = onDismiss;
         title.setText(build.block.localizedName);
         timer.reset(0, 0f);
         rebuild();
@@ -218,11 +238,41 @@ public final class FactoryScopePanel extends BaseDialog{
                     () -> onTrace.accept(target, input.ref()))
                     .height(34f).padLeft(6f).name("factoryscope-trace-input-" + input.contentId);
             }
+            if(target != null && onTraceLiquid != null && !input.optional && input.kind == ResourceKind.liquid && input.missing()){
+                if(input.contentId != null){
+                    row.button(FsBundle.ref("trace.open"), Icon.list, Styles.flatt,
+                        () -> onTraceLiquid.accept(target, input.ref()))
+                        .height(34f).padLeft(6f).name("factoryscope-trace-liquid-" + input.contentId);
+                }else if(!input.acceptedResources.isEmpty()){
+                    row.button(FsBundle.ref("liquid.choose-trace"), Icon.list, Styles.flatt,
+                        () -> chooseLiquid(input))
+                        .height(34f).padLeft(6f).name("factoryscope-trace-liquid-choice");
+                }
+            }
         }).growX().padBottom(2f).row();
 
         if(!input.recognised){
             table.add(FsBundle.get("panel.unknown-consumer")).color(Pal.gray).padLeft(ICON_SIZE + 6f).left().row();
         }
+    }
+
+    private void chooseLiquid(ResourceState input){
+        if(target == null || input.acceptedResources.isEmpty()) return;
+        BaseDialog choices = new BaseDialog(FsBundle.get("liquid.choose-title"));
+        choices.cont.defaults().growX().left();
+        for(ResourceRef liquid : input.acceptedResources){
+            choices.cont.button(button -> {
+                button.left();
+                icon(button, ResourceKind.liquid, liquid.id);
+                button.add(liquid.name).growX().left().ellipsis(true).minWidth(0f);
+            }, Styles.flatt, () -> {
+                Building current = target;
+                choices.hide();
+                if(current != null && onTraceLiquid != null) onTraceLiquid.accept(current, liquid);
+            }).height(42f).name("factoryscope-liquid-filter-option-" + liquid.id).row();
+        }
+        choices.addCloseButton();
+        choices.show();
     }
 
     private void buildBuffers(FactorySnapshot snapshot){

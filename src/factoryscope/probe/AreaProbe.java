@@ -87,6 +87,7 @@ public final class AreaProbe{
 
         return AreaAnalyzer.analyze(selection, buildings.size, entries)
             .withNetwork(MindustryNetworkProbe.scan(selection, viewer, snapshots))
+            .withLiquids(MindustryLiquidProbe.scan(selection, viewer, snapshots))
             .withPower(MindustryPowerProbe.scan(buildings, viewer, snapshots))
             .withSkippedBuildings(skipped);
     }
