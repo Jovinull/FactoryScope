@@ -109,6 +109,7 @@ public class AcceptanceHarness extends Mod{
         areaOriginX = tileX() + 5;
         areaOriginY = tileY() - 7;
         areaOriginCaptured = true;
+        chatVisibilityScenarios();
         scenario("the HUD toggle activates the picker");
         queue(this::closeAnyDialog);
         queue(this::ensurePickerOff);
@@ -117,6 +118,7 @@ public class AcceptanceHarness extends Mod{
             check("picker is active after clicking the HUD button", FactoryScopeUI.picking());
             check("exactly one HUD toggle exists", countNamed("factoryscope-toggle") == 1);
             check("exactly one picker overlay exists", countNamed("factoryscope-picker") == 1);
+            checkToggleFollowsHudLayout("default window");
         });
         queue(this::clickToggleButton);
         queue(() -> check("picker is inactive after clicking again", !FactoryScopeUI.picking()));
@@ -160,8 +162,14 @@ public class AcceptanceHarness extends Mod{
         layout(1280, 720, 1f);
         layout(1920, 1080, 1f);
         layout(2560, 1440, 1f);
+        layout(1280, 720, 2f);
         layout(1280, 720, 1.5f);
+        layout(1920, 1080, 1.5f);
+        layout(1920, 1080, 2f);
+        layout(2560, 1440, 1.5f);
         layout(2560, 1440, 2f);
+        layout(720, 1280, 1.5f);
+        layout(720, 1280, 2f);
         queue(this::restoreLayout);
         queue(this::checkLocalization);
 
@@ -175,6 +183,7 @@ public class AcceptanceHarness extends Mod{
         queue(() -> {
             check("panel cleared on world load", FactoryScopeUI.inspected() == null);
             check("picker cleared on world load", !FactoryScopeUI.picking());
+            checkToggleFollowsHudLayout("after world load");
         });
 
         areaScenarios();
@@ -182,6 +191,21 @@ public class AcceptanceHarness extends Mod{
 
         actions.add(this::finish);
         pump();
+    }
+
+    void chatVisibilityScenarios(){
+        scenario("the HUD toggle stays aligned when chat is shown or hidden");
+        queue(() -> {
+            ui.chatfrag.hide();
+            ui.chatfrag.toggle();
+            check("the real chat fragment is shown", ui.chatfrag.shown());
+            checkToggleFollowsHudLayout("chat visible");
+        });
+        queue(() -> {
+            ui.chatfrag.hide();
+            check("the real chat fragment is hidden", !ui.chatfrag.shown());
+            checkToggleFollowsHudLayout("chat hidden");
+        });
     }
 
     /**
@@ -251,6 +275,7 @@ public class AcceptanceHarness extends Mod{
             Scl.setProduct(scale);
             Core.scene.resize(width, height);
         });
+        queue(() -> checkToggleFollowsHudLayout(width + "x" + height + " @ " + scale + "x"));
         //opened directly: the click path is covered above, and a synthetic click would otherwise mix
         //real window coordinates with a resized scene viewport
         queue(() -> target = place(Blocks.surgeSmelter, tileX() + 14, tileY() + 6));
@@ -310,6 +335,24 @@ public class AcceptanceHarness extends Mod{
      */
     int rx(){
         return areaOriginCaptured ? areaOriginX : tileX() + 5;
+    }
+
+    void checkToggleFollowsHudLayout(String label){
+        Element button = Core.scene.find("factoryscope-toggle");
+        Element anchor = ui.hudGroup.find("waves/editor");
+        if(button == null || anchor == null){
+            check("HUD toggle and vanilla layout anchor exist at " + label, false,
+                "toggle=" + button + " anchor=" + anchor);
+            return;
+        }
+        Vec2 buttonBottomLeft = button.localToStageCoordinates(new Vec2(0f, 0f));
+        Vec2 anchorBottomLeft = anchor.localToStageCoordinates(new Vec2(0f, 0f));
+        float xError = Math.abs(buttonBottomLeft.x - anchorBottomLeft.x);
+        float yError = Math.abs(buttonBottomLeft.y + button.getHeight() - anchorBottomLeft.y);
+        check("HUD toggle remains visible and aligned below the layout anchor at " + label,
+            button.visible && xError < 1f && yError < 1f,
+            "toggle=" + buttonBottomLeft + " size=" + button.getWidth() + "x" + button.getHeight()
+                + " anchor=" + anchorBottomLeft + " size=" + anchor.getWidth() + "x" + anchor.getHeight());
     }
 
     int ry(){
