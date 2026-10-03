@@ -290,8 +290,12 @@ final class LiquidDialog extends BaseDialog{
             .color(Pal.lightOrange).wrap().padTop(6f).row();
         if(!trace.complete) body.add(FsBundle.get("liquid.trace-incomplete"))
             .color(Pal.lightOrange).wrap().padTop(6f).row();
-        if(!trace.boundaryContinuations.isEmpty()) body.add(FsBundle.format("liquid.trace-boundary", trace.boundaryContinuations.size()))
-            .color(Pal.accent).wrap().padTop(6f).row();
+        if(!trace.boundaryContinuations.isEmpty()){
+            int count = trace.boundaryContinuations.size();
+            body.add(count == 1 ? FsBundle.get("liquid.trace-boundary-one")
+                : FsBundle.format("liquid.trace-boundary-many", count))
+                .color(Pal.accent).wrap().padTop(6f).row();
+        }
         for(NetworkPort port : trace.boundaryContinuations) endpointRow(port.building, "boundary");
         if(!trace.unsupportedTransports.isEmpty()){
             body.add(FsBundle.get("liquid.trace-unsupported")).color(Pal.lightOrange).wrap().padTop(6f).row();

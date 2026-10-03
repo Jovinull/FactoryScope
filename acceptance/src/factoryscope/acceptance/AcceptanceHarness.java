@@ -1471,6 +1471,7 @@ public class AcceptanceHarness extends Mod{
             Core.scene.find("factoryscope-liquid-filter-option-water") != null
                 && Core.scene.find("factoryscope-liquid-filter-option-cryofluid") != null
                 && Core.scene.find("factoryscope-liquid-filter-option-oil") == null));
+        queue(() -> capture("liquid-filter-choice"));
         queue(() -> clickNamed("factoryscope-liquid-filter-option-cryofluid"));
         queue(() -> check("choosing Cryofluid requests an explicit area for that exact resource",
             FactoryScopeUI.picking() && Core.scene.find("factoryscope-liquid-dialog") == null));
@@ -1503,6 +1504,7 @@ public class AcceptanceHarness extends Mod{
                 && !FactoryScopeUI.liquidTrace().noRouteProven
                 && !FactoryScopeUI.liquidTrace().unsupportedInterruptions.isEmpty()
                 && Core.scene.find("factoryscope-liquid-unsupported-locate") != null));
+        queue(() -> capture("liquid-unsupported"));
         queue(() -> clickNamed("factoryscope-liquid-unsupported-locate"));
         queue(() -> check("Locate opens for the actual unsupported liquid transport", FactoryScopeUI.locating()));
         queue(() -> clickNamed("factoryscope-locate-return"));
@@ -1510,6 +1512,40 @@ public class AcceptanceHarness extends Mod{
             Core.scene.find("factoryscope-liquid-dialog") != null && FactoryScopeUI.liquidTrace() != null
                 && FactoryScopeUI.liquidTrace().target.equals(AreaProbe.refOf(target))
                 && !FactoryScopeUI.liquidTrace().unsupportedInterruptions.isEmpty()));
+        queue(this::closeAnyDialog);
+
+        scenario("a liquid trace marks a route that continues beyond the selected area");
+        queue(() -> {
+            clearRegion();
+            int x = rx(), y = ry();
+            // The west conduit is deliberately outside the selected area; the east conduit
+            // and consumer remain inside it. No producer is needed to prove continuation.
+            placeAt(Blocks.conduit, x + 4, y + 3, 0);
+            placeAt(Blocks.conduit, x + 5, y + 3, 0);
+            target = placeAt(Blocks.cryofluidMixer, x + 6, y + 3);
+            world.tile(x + 4, y + 3).build.liquids.clear();
+            world.tile(x + 5, y + 3).build.liquids.clear();
+            target.liquids.clear();
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(rx() + 5, ry() + 1, rx() + 9, ry() + 8));
+        queue(() -> clickNamed("factoryscope-area-liquids"));
+        queue(() -> clickNamed("factoryscope-liquid-select-water"));
+        queue(() -> clickNamed("factoryscope-liquid-trace-input"));
+        queue(() -> {
+            LiquidTrace trace = FactoryScopeUI.liquidTrace();
+            check("the trace preserves an external continuation without claiming an in-area producer",
+                trace != null && !trace.boundaryContinuations.isEmpty() && trace.producers().isEmpty()
+                    && !trace.noRouteProven,
+                trace == null ? "trace unavailable" : "boundaries=" + trace.boundaryContinuations.size()
+                    + ", producers=" + trace.producers().size() + ", dead ends=" + trace.structuralDeadEnds.size()
+                    + ", noRoute=" + trace.noRouteProven);
+            check("the liquid dialog uses selected-area boundary wording",
+                trace != null && dialogShows(trace.boundaryContinuations.size() == 1
+                    ? FsBundle.get("liquid.trace-boundary-one")
+                    : FsBundle.format("liquid.trace-boundary-many", trace.boundaryContinuations.size())));
+            capture("liquid-boundary");
+        });
         queue(this::closeAnyDialog);
 
         scenario("the Area Liquids view filters Water and traces its consumer through production UI");
@@ -1558,6 +1594,41 @@ public class AcceptanceHarness extends Mod{
                 dialogShows(FsBundle.get("liquid.trace-structural-output")));
             capture("liquid-output-trace");
         });
+        queue(this::closeAnyDialog);
+
+        scenario("an Erekir gas can be traced through a Liquid Junction without flow claims");
+        queue(() -> {
+            clearRegion();
+            int x = rx(), y = ry();
+            producer = placeAt(Blocks.electrolyzer, x + 3, y + 4);
+            // Mindustry v160.5's Electrolyzer gas outputs are directed south.
+            placeAt(Blocks.conduit, x + 3, y + 2, 3);
+            placeAt(Blocks.liquidJunction, x + 3, y + 1);
+            placeAt(Blocks.conduit, x + 3, y, 3);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(rx() + 1, ry() + 1, rx() + 10, ry() + 8));
+        queue(() -> clickNamed("factoryscope-area-liquids"));
+        queue(() -> check("the Erekir Electrolyzer exposes Hydrogen in the liquid/gas filter",
+            Core.scene.find("factoryscope-liquid-select-hydrogen") != null));
+        queue(() -> clickNamed("factoryscope-liquid-select-hydrogen"));
+        queue(() -> clickNamed("factoryscope-liquid-trace-output"));
+        queue(() -> {
+            LiquidTrace trace = FactoryScopeUI.liquidTrace();
+            check("the gas output trace preserves Hydrogen identity and structural direction",
+                trace != null && trace.direction == TraceDirection.output
+                    && trace.liquid.equals(new ResourceRef(ResourceKind.liquid,
+                        Liquids.hydrogen.name, Liquids.hydrogen.localizedName))
+                    && trace.target.equals(AreaProbe.refOf(producer))
+                    && !trace.traversedEdges.isEmpty(),
+                trace == null ? "trace unavailable" : "direction=" + trace.direction + ", liquid=" + trace.liquid
+                    + ", target=" + trace.target + ", expected=" + AreaProbe.refOf(producer)
+                    + ", traversed=" + trace.traversedEdges.size() + ", endpoints=" + trace.endpoints.size());
+        });
+        queue(() -> clickNamed("factoryscope-liquid-view-world"));
+        queue(() -> check("the gas trace can display its static route overlay",
+            Core.scene.find("factoryscope-liquid-viewing") != null));
+        queue(() -> capture("liquid-gas-junction-world"));
         queue(this::closeAnyDialog);
         queue(this::checkLiquidLocalization);
     }
@@ -2051,7 +2122,8 @@ public class AcceptanceHarness extends Mod{
             "liquid.no-in-area-producer", "liquid.no-in-area-consumer", "liquid.trace-incomplete",
             "liquid.target-requirement-incomplete", "liquid.trace-incomplete-connections",
             "liquid.target-outside-snapshot",
-            "liquid.trace-boundary", "liquid.boundary-at", "liquid.trace-unsupported", "liquid.unsupported-at",
+            "liquid.trace-boundary-one", "liquid.trace-boundary-many", "liquid.boundary-at",
+            "liquid.trace-unsupported", "liquid.unsupported-at",
             "liquid.dead-end", "liquid.reachable-sources", "liquid.reachable-destinations", "liquid.storage-endpoint",
             "liquid.producer", "liquid.consumer", "liquid.trace-edges", "liquid.trace-input", "liquid.trace-output",
             "liquid.trace-input-short", "liquid.trace-output-short",
@@ -2061,7 +2133,8 @@ public class AcceptanceHarness extends Mod{
             check("'" + key + "' resolves", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
         }
         for(String[] entry : new String[][]{
-            {"liquid.stored-more", "4"}, {"liquid.trace-target", "Cryofluid Mixer"}, {"liquid.trace-boundary", "2"},
+            {"liquid.stored-more", "4"}, {"liquid.trace-target", "Cryofluid Mixer"},
+            {"liquid.trace-boundary-many", "2"},
             {"liquid.boundary-at", "Conduit", "123", "61"}, {"liquid.unsupported-at", "Armored Conduit", "123", "61"},
             {"liquid.dead-end", "Conduit", "123", "61"}, {"liquid.trace-edges", "5"}, {"value.of", "10", "40"}}){
             Object[] args = new Object[entry.length - 1];
