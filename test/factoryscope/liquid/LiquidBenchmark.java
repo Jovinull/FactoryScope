@@ -29,9 +29,9 @@ class LiquidBenchmark{
     @Test
     void measureLiquidScopeStages(){
         System.out.printf("%n%-10s %10s %10s %10s %10s %10s%n", "buildings", "collect", "probe+buffer", "graph", "trace", "ui-model");
-        for(int count : new int[]{50, 250, 1000, 4000}) measure(count);
-        System.out.printf("milliseconds, median of %d runs after %d warm-up runs; trace fixture is an independent %d-node chain%n",
-            RUNS, WARMUP, 4000);
+        for(int count : new int[]{50, 250, 1000, 2000, 4000}) measure(count);
+        System.out.printf("milliseconds, median of %d runs after %d warm-up runs; each trace uses an independent chain matching its row size%n",
+            RUNS, WARMUP);
     }
 
     private void measure(int count){
@@ -45,7 +45,7 @@ class LiquidBenchmark{
         }
         assertEquals(count, placed);
         AreaSelection selection = AreaSelection.of(0, 0, WORLD - 1, WORLD - 1);
-        Fixture traceFixture = traceFixture(4000);
+        Fixture traceFixture = traceFixture(count);
 
         double[] collect = new double[RUNS], probe = new double[RUNS], graph = new double[RUNS];
         double[] trace = new double[RUNS], ui = new double[RUNS];
