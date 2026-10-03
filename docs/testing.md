@@ -53,11 +53,15 @@ Refresh and the electrical-connection overlay.
 
 LiquidScope has pure tests in `liquid/LiquidTraceAnalyzerTest` and real v160.5 transport fixtures in
 `probe/MindustryLiquidProbeTest`. They cover Conduit side acceptance/output direction, content-independent
-topology, Liquid Junction channel isolation (including the engine destination oracle), router branches,
-configured Liquid Bridge links, directed multi-liquid crafter outputs, filter accepted sets, placed pump
-products, SolidPump products before first update, multi-liquid module snapshots, gas resource identity, and an
-unsupported transport adjacent to a consumer. Production topology is separately audited to ensure it never
-calls runtime `acceptLiquid()` to decide structural reachability.
+topology, Liquid Junction channel isolation (including real straight-through movement), router branches,
+Liquid Bridge interruption behavior and a real remote-transfer/local-routing differential, directed
+multi-liquid crafter outputs, filter accepted sets, dynamic requirement refresh, placed pump products,
+SolidPump products before first update, multi-liquid module snapshots, gas resource identity, and unsupported
+transport adjacent to a consumer. Production topology is separately audited to ensure it never calls runtime
+`acceptLiquid()` to decide structural reachability.
+
+Remote multiplayer replication of liquid buffers, bridge configuration, and dynamic requirements has not been
+validated. LiquidScope reports the local client snapshot and applies the normal team/fog visibility checks.
 
 The LiquidScope acceptance path enters from a missing liquid in the single-building panel, selects an explicit
 area, follows Water to a real pump through a conduit, opens pump diagnostics, returns, refreshes, and uses the

@@ -204,18 +204,21 @@ into a separate pure `LiquidNetworkGraph` with resource constraints and side-lev
 probe's team/visibility boundary and the existing `FactorySnapshot` input, output, and diagnostic evidence.
 
 The first supported families are ordinary Conduits, straight-through Liquid Junction channels, liquid routers
-and tanks, configured/engine-valid Liquid Bridges, conventional pumps/generators, and `GenericCrafter` liquid
+and tanks, conventional pumps/generators, and `GenericCrafter` liquid
 outputs including their rotated `liquidOutputDirections`. Filter and dynamic consumers preserve their accepted
 resource sets where those sets can be enumerated. Current positive liquid-module entries are captured separately
 as immutable `StoredLiquidState` values; `LiquidModule.current()` is not treated as a full inventory. Gases are
 Mindustry `Liquid` content and use the same identity and route model.
 
-Armored Conduits, Direction Liquid Bridges, unknown modded liquid transports, and unreadable dynamic requirements
-remain partial evidence. An unsupported neighbor or area boundary is not turned into a dead end or a no-route
+Armored Conduits, Liquid Bridges, Direction Liquid Bridges, unknown modded liquid transports, and unreadable
+dynamic requirements remain partial evidence. An unsupported neighbor or area boundary is not turned into a dead end or a no-route
 conclusion. Liquid Trace uses iterative, resource-aware port traversal and one deterministic representative
 path per endpoint. Like item Supply Trace, it says only that a route is structurally possible; it does not
 observe liquid movement, pressure, per-pipe throughput, quantitative sufficiency, or cause. The engine's
 `LiquidModule` flow average has no edge/source attribution and is deliberately not enabled by LiquidScope.
+
+Remote multiplayer replication of liquid buffers, bridge configuration, and dynamic requirements is not
+validated; reports reflect the local client snapshot.
 
 Refresh reconstructs factory snapshots, liquid topology, current buffers, and trace evidence as one area report.
 World changes discard the report and overlay. See [the v160.5 liquid behavior notes](mindustry-liquid-notes.md)

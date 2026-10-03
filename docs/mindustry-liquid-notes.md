@@ -12,11 +12,10 @@ engine oracle in tests, but their current result is not a static topology query.
 | Conduit | Any of the three non-front sides may enter; output is front-only | Supported | `acceptLiquid` also checks the current buffer, so only its directional side rule is used for topology |
 | Liquid Junction | Independent straight-through N–S and E–W channels | Supported | `getLiquidDestination` preserves the incoming direction; disabled runtime state is not structural topology |
 | Liquid Router, Liquid Container, Liquid Tank | All-side storage/router; structurally connect each distinct input/output side | Supported | Current contents affect acceptance and dumping, not the persistent set of possible routes |
-| Liquid Bridge | Remote route only for the engine-validated configured link; local router behavior retained | Supported with engine link validation | It inherits ItemBridge link validation and calls `moveLiquid` on the linked building; no proximity-derived remote edge |
+| Liquid Bridge | Not approximated as a router or simple remote edge | Partial / interruption | `ItemBridgeBuild.updateTile()` chooses remote `updateTransport()` for a valid configured link and local `doDump()` only when the link is invalid; input/output sides also depend on that link and registered incoming bridges |
 | GenericCrafter liquid output | One resource-specific output route for each declared `LiquidStack`, using that stack's `liquidOutputDirections` after rotation; `-1` means unrestricted dump sides | Supported | `dumpOutputs` passes each product's own direction to `dumpLiquid` |
 | Pump | Product from the live placement's `liquidDrop`; external output may dump on neighboring sides | Supported | Floor/footprint state is placement-specific and is read at Refresh |
-| SolidPump / Fracker | Product from configured `result`; inherits Pump's liquid routing | Supported | `SolidPumpBuild.updateTile()` assigns `liquidDrop = result` and uses Pump's dump behavior; the product is available structurally before its first update |
-| SolidPump / Fracker | Product from live `result`; resource identity is not inferred from block name | Supported | Fracker adds item consumption but remains a SolidPump output family |
+| SolidPump / Fracker | Product from configured `result`; inherits Pump's liquid routing | Supported | `SolidPumpBuild.updateTile()` assigns `liquidDrop = result` and uses Pump's dump behavior; the configured product is available before its first update, and Fracker remains a SolidPump output family |
 | Exact `ConsumeLiquid` / `ConsumeLiquids` | Declared resource identities, one requirement per declared liquid | Supported | Consumer stacks are static block metadata |
 | `ConsumeLiquidFilter` / coolant filter | Enumerate the filter's accepted content set, preserving each `Liquid` identity | Supported when enumerable | Current `getConsumed` is only a buffer choice and cannot define all structural choices; conventional consumers without liquid-output behavior are terminal input endpoints |
 | `ConsumeLiquidsDynamic` | Evaluate the current building-specific `LiquidStack[]` on each Refresh | Supported when evaluation succeeds | Dynamic requirements are a snapshot fact, not a permanently cached block property |
@@ -44,8 +43,11 @@ the destination straight through from the source side; its two crossing channels
 to one building node. A Liquid Router calls `dumpLiquid` and has no fixed directional choice or
 distribution guarantee.
 
-LiquidBridge's remote operation uses the configured ItemBridge link and its validity checks; its update
-also retains local `dumpLiquid` behavior. DirectionLiquidBridge is different: it searches forward for a
+LiquidBridge is ItemBridge-backed and does not have stable all-side router semantics. With a valid link,
+`updateTile()` uses the remote transport path; when that link is invalid, it uses local dumping instead.
+Its local input and output eligibility also depend on the configured direction and `incoming` links.
+LiquidScope therefore marks the family partial and emits a navigable interruption instead of inventing
+local router branches or treating a remote link as a complete port model. DirectionLiquidBridge is different: it searches forward for a
 matching directional bridge, records occupied entry directions, and falls back to front movement when
 there is no remote link. Until those rules are represented and tested as distinct states, it remains an
 explicit partial interruption.

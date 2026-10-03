@@ -174,13 +174,14 @@ relevant part of `last_log.txt` from your Mindustry data folder.
 - **0.3 complete:** static, item-aware network topology inside a selected area.
 - **0.4 complete:** network-aware diagnostics and Supply Trace.
 - **0.5 complete:** PowerScope reads Mindustry's engine-maintained power grids.
-- **0.6 in development:** LiquidScope models structural liquid/gas routes, producer and consumer roles, and current buffer contents.
+- **0.6 complete:** LiquidScope models structural liquid/gas routes, producer and consumer roles, current buffer contents, area boundaries, and partial transport. It does not measure pipe flow or establish supply sufficiency.
 
 Supply Trace and LiquidScope correlate known topology with existing per-building diagnostics. They report
 structural possibilities, not current material flow, quantitative supply sufficiency, or root cause. LiquidScope
 shows current liquid-buffer contents separately; a buffer's contents do not change the structural route.
-Armored Conduits, Direction Liquid Bridges, and unknown modded liquid transport remain explicitly incomplete
-where their routing is not modeled.
+Armored Conduits, Liquid Bridges, Direction Liquid Bridges, and unknown modded liquid transport remain
+explicitly incomplete where their routing is not modeled. Remote multiplayer replication of liquid state
+and bridge configuration has not been validated.
 
 Exact per-edge throughput is deferred. Mindustry 160.5 exposes no public transfer event that identifies
 the source building, destination building, resource, and amount for a successful transfer. Inventory changes
