@@ -218,18 +218,22 @@ final class LiquidDialog extends BaseDialog{
             boolean produces = entry.snapshot.producedLiquids.contains(selected);
             body.table(row -> {
                 row.add(entry.ref.blockName).color(Pal.lightishGray).growX().left().ellipsis(true).minWidth(0f);
-                if(consumes && onTraceInput != null) row.button(FsBundle.ref("liquid.trace-input"), Icon.list, Styles.flatt,
-                    () -> onTraceInput.accept(entry.ref, selected)).height(34f).name("factoryscope-liquid-trace-input");
-                if(produces && onTraceOutput != null) row.button(FsBundle.ref("liquid.trace-output"), Icon.list, Styles.flatt,
-                    () -> onTraceOutput.accept(entry.ref, selected)).height(34f).name("factoryscope-liquid-trace-output");
+            }).growX().padTop(3f).row();
+            body.table(row -> {
+                if(consumes && onTraceInput != null) row.button(FsBundle.ref("liquid.trace-input-short"), Icon.list, Styles.flatt,
+                    () -> onTraceInput.accept(entry.ref, selected)).height(34f).tooltip(FsBundle.ref("liquid.trace-input"))
+                    .name("factoryscope-liquid-trace-input");
+                if(produces && onTraceOutput != null) row.button(FsBundle.ref("liquid.trace-output-short"), Icon.list, Styles.flatt,
+                    () -> onTraceOutput.accept(entry.ref, selected)).height(34f).tooltip(FsBundle.ref("liquid.trace-output"))
+                    .name("factoryscope-liquid-trace-output");
                 if(onLocate != null) row.button(Icon.zoomSmall, Styles.emptyi, () -> onLocate.accept(entry.ref))
                     .size(34f).tooltip(FsBundle.ref("area.locate")).name("factoryscope-liquid-locate");
                 if(onInspect != null){
                     Building build = AreaProbe.resolve(entry.ref);
-                    if(build != null) row.button(FsBundle.ref("trace.inspect"), Icon.eye, Styles.flatt,
-                        () -> onInspect.get(build)).height(34f).name("factoryscope-liquid-inspect");
+                    if(build != null) row.button(Icon.eye, Styles.emptyi, () -> onInspect.get(build))
+                        .size(34f).tooltip(FsBundle.ref("trace.inspect")).name("factoryscope-liquid-inspect");
                 }
-            }).growX().padTop(3f).row();
+            }).growX().padTop(1f).row();
         }
         if(limit < relevant.size()) body.button(FsBundle.get("area.show-more"), Styles.flatt,
             () -> { shownDetails += PAGE; rebuild(); }).name("factoryscope-liquid-details-more").row();
@@ -314,16 +318,19 @@ final class LiquidDialog extends BaseDialog{
                     row.add(endpoint.building.blockName).growX().left().ellipsis(true).minWidth(0f);
                     row.add(FsBundle.get(endpoint.kind == TraceEndpointKind.storage ? "liquid.storage-endpoint" :
                         endpoint.kind == TraceEndpointKind.producer ? "liquid.producer" : "liquid.consumer"))
-                        .color(Pal.lightishGray).right().padRight(4f);
-                    if(endpoint.diagnostic != null) row.add(Diagnostics.status(endpoint.diagnostic.reason()))
-                        .color(Diagnostics.color(endpoint.diagnostic.reason())).right();
+                        .color(Pal.lightishGray).right();
+                }).growX().padTop(3f).row();
+                if(endpoint.diagnostic != null) body.add(Diagnostics.status(endpoint.diagnostic.reason()))
+                    .color(Diagnostics.color(endpoint.diagnostic.reason())).wrap().growX().left().padTop(1f).row();
+                body.table(row -> {
                     String role = endpoint.kind == TraceEndpointKind.storage ? "storage" :
                         endpoint.kind == TraceEndpointKind.producer ? "producer" : "consumer";
                     actionButtons(row, endpoint.building, role);
-                }).growX().padTop(3f).row();
+                }).growX().padTop(1f).row();
             }
         }
-        body.add(FsBundle.format("liquid.trace-edges", trace.traversedEdges.size())).color(Pal.gray).padTop(8f).row();
+        body.add(FsBundle.format("liquid.trace-edges", trace.traversedEdges.size()))
+            .color(Pal.gray).wrap().growX().left().padTop(8f).row();
     }
 
     private void endpointRow(BuildingRef ref, String role){
@@ -331,8 +338,10 @@ final class LiquidDialog extends BaseDialog{
             row.add(ref.blockName).color(Pal.lightOrange)
                 .growX().left().ellipsis(true).minWidth(0f);
             row.add("(" + ref.tileX + ", " + ref.tileY + ")").color(Pal.lightishGray).right().padRight(5f);
-            actionButtons(row, ref, role);
         }).growX().padTop(3f).row();
+        body.table(row -> {
+            actionButtons(row, ref, role);
+        }).growX().padTop(1f).row();
     }
 
     private void actionButtons(Table row, BuildingRef ref, String role){
@@ -340,8 +349,8 @@ final class LiquidDialog extends BaseDialog{
             .tooltip(FsBundle.ref("area.locate")).name("factoryscope-liquid-" + role + "-locate");
         if(onInspect != null){
             Building build = AreaProbe.resolve(ref);
-            if(build != null) row.button(FsBundle.ref("trace.inspect"), Icon.eye, Styles.flatt,
-                () -> onInspect.get(build)).height(34f).name("factoryscope-liquid-" + role + "-inspect");
+            if(build != null) row.button(Icon.eye, Styles.emptyi, () -> onInspect.get(build))
+                .size(34f).tooltip(FsBundle.ref("trace.inspect")).name("factoryscope-liquid-" + role + "-inspect");
         }
     }
 

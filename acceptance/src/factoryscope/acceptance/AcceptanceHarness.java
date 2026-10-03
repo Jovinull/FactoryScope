@@ -1365,6 +1365,16 @@ public class AcceptanceHarness extends Mod{
         });
         queue(() -> checkFits("LiquidScope at 1280x720 @ 2x"));
         queue(() -> capture("liquid-water-trace-high-ui-scale"));
+        queue(() -> {
+            Element inspect = Core.scene.find("factoryscope-liquid-producer-inspect");
+            boolean withinRow = inspect != null && inspect.parent != null
+                && inspect.x + inspect.getWidth() <= inspect.parent.getWidth() + 0.5f;
+            check("the liquid producer Inspect action stays compact at high UI scale",
+                inspect instanceof ImageButton && inspect.getWidth() <= 34.5f && withinRow,
+                inspect == null ? "missing action" : inspect.getClass().getSimpleName() + " x=" + inspect.x
+                    + ", width=" + inspect.getWidth() + ", parent width="
+                    + (inspect.parent == null ? "none" : inspect.parent.getWidth()));
+        });
         queue(this::restoreLayout);
         queue(() -> clickNamed("factoryscope-liquid-view-world"));
         queue(() -> check("the liquid overlay identifies structural routes without flow claims",
@@ -1461,6 +1471,7 @@ public class AcceptanceHarness extends Mod{
             Core.scene.find("factoryscope-liquid-dialog") != null
                 && Core.scene.find("factoryscope-liquid-select-water") != null));
         queue(() -> clickNamed("factoryscope-liquid-select-water"));
+        queue(() -> capture("liquid-area-network"));
         queue(() -> clickNamed("factoryscope-liquid-trace-input"));
         queue(() -> {
             LiquidTrace trace = FactoryScopeUI.liquidTrace();
@@ -1968,6 +1979,7 @@ public class AcceptanceHarness extends Mod{
             "liquid.trace-boundary", "liquid.boundary-at", "liquid.trace-unsupported", "liquid.unsupported-at",
             "liquid.dead-end", "liquid.reachable-sources", "liquid.reachable-destinations", "liquid.storage-endpoint",
             "liquid.producer", "liquid.consumer", "liquid.trace-edges", "liquid.trace-input", "liquid.trace-output",
+            "liquid.trace-input-short", "liquid.trace-output-short",
             "liquid.choose-trace", "liquid.choose-title", "liquid.select-area", "liquid.unavailable");
         for(String key : keys){
             String text = FsBundle.get(key);
