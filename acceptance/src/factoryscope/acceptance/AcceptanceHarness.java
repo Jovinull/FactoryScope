@@ -59,6 +59,8 @@ public class AcceptanceHarness extends Mod{
     final Seq<String> failures = new Seq<>();
     final Seq<Runnable> actions = new Seq<>();
     int checks;
+    int areaOriginX, areaOriginY;
+    boolean areaOriginCaptured;
 
     Building upper, lower, target, producer, disabledProducer, disabledRouteBreak;
     AreaDiagnosticResult traceSnapshotBeforeRefresh;
@@ -100,6 +102,13 @@ public class AcceptanceHarness extends Mod{
     }
 
     void plan(){
+        //Area fixtures and their queued drag coordinates must share one origin. Some production
+        //scenarios intentionally pan the camera (Locate and off-world selection); following the
+        //camera in rx()/ry() after those actions made later fixtures get built at a new location
+        //while their already-queued screen gestures still pointed at the old one.
+        areaOriginX = tileX() + 5;
+        areaOriginY = tileY() - 7;
+        areaOriginCaptured = true;
         scenario("the HUD toggle activates the picker");
         queue(this::closeAnyDialog);
         queue(this::ensurePickerOff);
@@ -300,11 +309,11 @@ public class AcceptanceHarness extends Mod{
      * the camera that both corners of any drag are on screen at the zoom the scenarios set.
      */
     int rx(){
-        return tileX() + 5;
+        return areaOriginCaptured ? areaOriginX : tileX() + 5;
     }
 
     int ry(){
-        return tileY() - 7;
+        return areaOriginCaptured ? areaOriginY : tileY() - 7;
     }
 
     static final int REGION_WIDTH = 16;
@@ -1382,7 +1391,12 @@ public class AcceptanceHarness extends Mod{
         queue(() -> clickNamed("factoryscope-liquid-return"));
         queue(() -> check("Return restores the same Liquid Trace context",
             Core.scene.find("factoryscope-liquid-dialog") != null && FactoryScopeUI.liquidTrace() != null
-                && FactoryScopeUI.liquidTrace().target.equals(AreaProbe.refOf(target))));
+                && FactoryScopeUI.liquidTrace().target.equals(AreaProbe.refOf(target))
+                && FactoryScopeUI.liquidTrace().liquid.equals(new ResourceRef(ResourceKind.liquid,
+                    Liquids.water.name, Liquids.water.localizedName))
+                && FactoryScopeUI.liquidTrace().direction == TraceDirection.input
+                && FactoryScopeUI.liquidTrace().producers().stream()
+                    .anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer)))));
         queue(() -> clickNamed("factoryscope-liquid-producer-inspect"));
         queue(() -> check("Inspect opens the actual pump while retaining the trace dialog",
             FactoryScopeUI.inspected() == producer,
@@ -1392,16 +1406,36 @@ public class AcceptanceHarness extends Mod{
         queue(this::closeAnyDialog);
         queue(() -> check("closing pump diagnostics returns to the same Liquid Trace",
             Core.scene.find("factoryscope-liquid-dialog") != null && FactoryScopeUI.liquidTrace() != null));
+        queue(() -> producer.enabled = true);
         queue(() -> clickNamed("factoryscope-liquid-refresh"));
         queue(() -> check("Refresh rebuilds the liquid trace snapshot coherently",
             FactoryScopeUI.liquidTrace() != null
                 && FactoryScopeUI.liquidTrace().producers().stream().anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer)))));
+        queue(() -> check("Refresh also rebuilds the producer diagnostic annotation",
+            FactoryScopeUI.liquidTrace() != null && FactoryScopeUI.liquidTrace().producers().stream()
+                .anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer))
+                    && endpoint.diagnostic != null && endpoint.diagnostic.reason() != DiagnosticReason.disabled)));
         queue(() -> clickNamed("factoryscope-liquid-producer-inspect"));
         queue(() -> check("the pump inspector is open before a world change", FactoryScopeUI.inspected() == producer));
+        queue(this::closeAnyDialog);
+        queue(() -> check("Return restores Liquid Trace before a topology change",
+            Core.scene.find("factoryscope-liquid-dialog") != null && FactoryScopeUI.liquidTrace() != null));
+        queue(() -> {
+            Building firstConduit = world.tile(rx() + 4, ry() + 3).build;
+            if(firstConduit != null) firstConduit.rotation = 1;
+        });
+        queue(() -> clickNamed("factoryscope-liquid-refresh"));
+        queue(() -> check("Refresh removes a producer after its structural Conduit route is rotated away",
+            FactoryScopeUI.liquidTrace() != null && FactoryScopeUI.liquidTrace().producers().stream()
+                .noneMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer)))));
+        queue(() -> clickNamed("factoryscope-liquid-view-world"));
+        queue(() -> check("the liquid world overlay is active before a world change",
+            Core.scene.find("factoryscope-liquid-viewing") != null));
         queue(() -> Events.fire(new WorldLoadEvent()));
-        queue(() -> check("world change disposes an inspected Liquid Trace without reopening stale context",
+        queue(() -> check("world change clears the Liquid Trace snapshot and overlay",
             FactoryScopeUI.inspected() == null && FactoryScopeUI.liquidTrace() == null
-                && Core.scene.find("factoryscope-liquid-dialog") == null));
+                && Core.scene.find("factoryscope-liquid-dialog") == null
+                && Core.scene.find("factoryscope-liquid-viewing") == null));
         queue(this::closeAnyDialog);
 
         scenario("filter consumers let the player choose an accepted liquid before tracing");
@@ -1453,6 +1487,31 @@ public class AcceptanceHarness extends Mod{
         });
         queue(this::closeAnyDialog);
 
+        scenario("an unsupported liquid transport is an incomplete, locatable trace row");
+        queue(() -> {
+            clearRegion();
+            target = placeAt(Blocks.cryofluidMixer, rx() + 6, ry() + 4);
+            placeAt(Blocks.platedConduit, rx() + 5, ry() + 4);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(rx() + 2, ry() + 2, rx() + 9, ry() + 7));
+        queue(() -> clickNamed("factoryscope-area-liquids"));
+        queue(() -> clickNamed("factoryscope-liquid-select-water"));
+        queue(() -> clickNamed("factoryscope-liquid-trace-input"));
+        queue(() -> check("the unsupported transport is shown as incomplete rather than a dead end",
+            FactoryScopeUI.liquidTrace() != null && !FactoryScopeUI.liquidTrace().complete
+                && !FactoryScopeUI.liquidTrace().noRouteProven
+                && !FactoryScopeUI.liquidTrace().unsupportedInterruptions.isEmpty()
+                && Core.scene.find("factoryscope-liquid-unsupported-locate") != null));
+        queue(() -> clickNamed("factoryscope-liquid-unsupported-locate"));
+        queue(() -> check("Locate opens for the actual unsupported liquid transport", FactoryScopeUI.locating()));
+        queue(() -> clickNamed("factoryscope-locate-return"));
+        queue(() -> check("Return restores the same unsupported Liquid Trace",
+            Core.scene.find("factoryscope-liquid-dialog") != null && FactoryScopeUI.liquidTrace() != null
+                && FactoryScopeUI.liquidTrace().target.equals(AreaProbe.refOf(target))
+                && !FactoryScopeUI.liquidTrace().unsupportedInterruptions.isEmpty()));
+        queue(this::closeAnyDialog);
+
         scenario("the Area Liquids view filters Water and traces its consumer through production UI");
         queue(() -> {
             clearRegion();
@@ -1482,6 +1541,22 @@ public class AcceptanceHarness extends Mod{
                 Core.scene.find("factoryscope-liquid-dialog") != null
                     && Core.scene.find("factoryscope-liquid-producer-inspect") != null);
             capture("liquid-area-trace");
+        });
+        queue(this::closeAnyDialog);
+        queue(this::armPicker);
+        queue(() -> dragTiles(rx() + 1, ry() + 1, rx() + 9, ry() + 8));
+        queue(() -> clickNamed("factoryscope-area-liquids"));
+        queue(() -> clickNamed("factoryscope-liquid-select-water"));
+        queue(() -> clickNamed("factoryscope-liquid-trace-output"));
+        queue(() -> {
+            LiquidTrace trace = FactoryScopeUI.liquidTrace();
+            check("Area Liquids exposes a structural output trace from the pump",
+                trace != null && trace.direction == TraceDirection.output
+                    && trace.target.equals(AreaProbe.refOf(producer))
+                    && trace.endpoints.stream().anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(target))));
+            check("output wording remains distinct from upstream supply wording",
+                dialogShows(FsBundle.get("liquid.trace-structural-output")));
+            capture("liquid-output-trace");
         });
         queue(this::closeAnyDialog);
         queue(this::checkLiquidLocalization);
@@ -1970,7 +2045,7 @@ public class AcceptanceHarness extends Mod{
         Seq<String> keys = Seq.with("liquid.title", "liquid.open", "liquid.view-world", "liquid.viewing-structural",
             "liquid.resource", "liquid.no-resources", "liquid.structural-network", "liquid.static-note", "liquid.partial",
             "liquid.producers", "liquid.consumers", "liquid.storage", "liquid.boundaries", "liquid.unsupported",
-            "liquid.current-storage", "liquid.stored-more", "liquid.trace-title", "liquid.output-title",
+            "liquid.current-storage", "liquid.storage-capacity-note", "liquid.stored-more", "liquid.trace-title", "liquid.output-title",
             "liquid.trace-target", "liquid.trace-structural-input", "liquid.trace-structural-output",
             "liquid.trace-target-missing", "liquid.no-input-route", "liquid.no-output-route",
             "liquid.no-in-area-producer", "liquid.no-in-area-consumer", "liquid.trace-incomplete",
