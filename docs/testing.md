@@ -51,6 +51,23 @@ single-building inspector and Area Diagnostics, checks separate grids and batter
 exercises a real BeamNode connection and a directional Power Diode between separate grids, then uses
 Refresh and the electrical-connection overlay.
 
+LiquidScope has pure tests in `liquid/LiquidTraceAnalyzerTest` and real v160.5 transport fixtures in
+`probe/MindustryLiquidProbeTest`. They cover Conduit side acceptance/output direction, content-independent
+topology, Liquid Junction channel isolation (including real straight-through movement), router branches,
+Liquid Bridge interruption behavior and a real remote-transfer/local-routing differential, directed
+multi-liquid crafter outputs, filter accepted sets, dynamic requirement refresh, placed pump products,
+SolidPump products before first update, multi-liquid module snapshots, gas resource identity, and unsupported
+transport adjacent to a consumer. Production topology is separately audited to ensure it never calls runtime
+`acceptLiquid()` to decide structural reachability.
+
+Remote multiplayer replication of liquid buffers, bridge configuration, and dynamic requirements has not been
+validated. LiquidScope reports the local client snapshot and applies the normal team/fog visibility checks.
+
+The LiquidScope acceptance path enters from a missing liquid in the single-building panel, selects an explicit
+area, follows Water to a real pump through a conduit, opens pump diagnostics, returns, refreshes, and uses the
+Area Diagnostics Liquids filter/Trace controls. It also checks the structural-only wording, high-scale layout,
+and every liquid-specific locale key. Real UI acceptance is run in both English and Brazilian Portuguese.
+
 ## 2. Acceptance suite
 
 ```
@@ -147,6 +164,7 @@ gradlew areaBenchmark
 gradlew networkBenchmark
 gradlew traceBenchmark
 gradlew powerBenchmark
+gradlew liquidBenchmark
 ```
 
 Prints what one area analysis costs at 50, 250, 1000 and 4000 buildings, split into spatial collection,
@@ -159,7 +177,9 @@ It is excluded from `gradlew test` by a JUnit tag, so an ordinary test run is no
 
 `powerBenchmark` measures engine-graph grouping, immutable snapshot/connection capture, and a lightweight
 PowerScope presentation model for connected 50/250/1000/4000-node PowerNode grids. Timing is reported,
-not gated.
+not gated. `liquidBenchmark` separately reports area collection, liquid snapshot probing, structural graph
+construction, and resource-specific trace costs at the same building counts; it has no wall-clock pass/fail
+threshold.
 
 ## Artifact checks
 

@@ -7,6 +7,7 @@ import arc.scene.event.*;
 import arc.scene.ui.layout.*;
 import factoryscope.*;
 import factoryscope.area.*;
+import factoryscope.liquid.LiquidNetwork;
 import factoryscope.model.ResourceRef;
 import factoryscope.probe.*;
 import factoryscope.power.PowerGridReport;
@@ -48,8 +49,12 @@ public final class FactoryScopeUI{
     private static NetworkViewOverlay networkView;
     private static PowerOverlay powerOverlay;
     private static PowerViewOverlay powerView;
+    private static LiquidOverlay liquidOverlay;
+    private static LiquidViewOverlay liquidView;
+    private static ResourceRef liquidSelected;
     private static Table hint;
     private static TraceRequest pendingTrace;
+    private static LiquidTraceRequest pendingLiquidTrace;
     private static boolean initialized;
     private static boolean powerFromArea;
 
@@ -63,6 +68,7 @@ public final class FactoryScopeUI{
 
         panel = new FactoryScopePanel();
         panel.setOnTrace(FactoryScopeUI::traceInput);
+        panel.setOnTraceLiquid(FactoryScopeUI::traceLiquidInput);
         panel.setOnInspectPower(FactoryScopeUI::inspectPowerGrid);
         powerDialog = new PowerDialog();
         areaDialog = new AreaDiagnosticsDialog(
@@ -127,6 +133,7 @@ public final class FactoryScopeUI{
 
     private static void stopPicking(){
         pendingTrace = null;
+        pendingLiquidTrace = null;
         if(picker != null){
             picker.remove();
             picker = null;
@@ -157,6 +164,7 @@ public final class FactoryScopeUI{
         if(locate != null) locate.drawWorld();
         if(networkOverlay != null) networkOverlay.draw();
         if(powerOverlay != null) powerOverlay.draw();
+        if(liquidOverlay != null) liquidOverlay.draw();
     }
 
     // ------------------------------------------------------------------ selection
@@ -175,7 +183,9 @@ public final class FactoryScopeUI{
 
     private static void pickArea(AreaSelection selection){
         TraceRequest request = pendingTrace;
+        LiquidTraceRequest liquidRequest = pendingLiquidTrace;
         pendingTrace = null;
+        pendingLiquidTrace = null;
         stopPicking();
         stopLocating();
         if(areaDialog == null || !Vars.state.isGame()) return;
@@ -190,6 +200,9 @@ public final class FactoryScopeUI{
             if(request != null){
                 if(panel != null && panel.isShown()) panel.hide();
                 areaDialog.showTrace(request.target, request.item);
+            }else if(liquidRequest != null){
+                if(panel != null && panel.isShown()) panel.hide();
+                areaDialog.showLiquidTrace(liquidRequest.target, liquidRequest.liquid, TraceDirection.input);
             }
         }catch(Exception e){
             FsLog.warnOnce("area-scan", "could not analyse the selected area", e);
@@ -262,6 +275,16 @@ public final class FactoryScopeUI{
         networkOverlay = null;
     }
 
+    static void showLiquidOverlay(LiquidNetwork network, ResourceRef liquid, factoryscope.liquid.LiquidTrace trace){
+        liquidSelected = liquid;
+        liquidOverlay = network == null ? null : new LiquidOverlay(network, liquid, trace);
+    }
+
+    static void stopLiquidOverlay(){
+        liquidOverlay = null;
+        liquidSelected = null;
+    }
+
     static void viewNetworkInWorld(factoryscope.network.ItemNetwork network, factoryscope.model.ResourceRef item,
                                    SupplyTrace trace,
                                    Runnable onReturn, Runnable onDismiss){
@@ -297,6 +320,14 @@ public final class FactoryScopeUI{
         if(!MindustryFactoryProbe.canInspect(build, viewerTeam())) return false;
 
         panel.inspect(build);
+        return true;
+    }
+
+    static boolean inspect(Building build, Runnable onDismiss){
+        if(panel == null || build == null) return false;
+        if(!MindustryFactoryProbe.canInspect(build, viewerTeam())) return false;
+
+        panel.inspect(build, onDismiss);
         return true;
     }
 
@@ -361,6 +392,26 @@ public final class FactoryScopeUI{
         }
     }
 
+    static void viewLiquidInWorld(LiquidNetwork network, Runnable onReturn, Runnable onDismiss){
+        stopLiquidView();
+        showLiquidOverlay(network, liquidSelected, null);
+        liquidView = new LiquidViewOverlay(liquidSelected, () -> {
+            stopLiquidView();
+            onReturn.run();
+        }, () -> {
+            stopLiquidView();
+            stopLiquidOverlay();
+            onDismiss.run();
+        });
+    }
+
+    private static void stopLiquidView(){
+        if(liquidView != null){
+            liquidView.remove();
+            liquidView = null;
+        }
+    }
+
     /** The building the diagnostic panel is currently showing, or null. */
     public static Building inspected(){
         return panel == null ? null : panel.inspected();
@@ -374,6 +425,11 @@ public final class FactoryScopeUI{
     /** Immutable power-grid snapshot currently held by PowerScope, or null when no report is open. */
     public static PowerGridReport powerReport(){
         return powerDialog == null ? null : powerDialog.report();
+    }
+
+    /** Immutable liquid-trace snapshot currently held by LiquidScope, or null outside a trace. */
+    public static factoryscope.liquid.LiquidTrace liquidTrace(){
+        return areaDialog == null ? null : areaDialog.liquidTrace();
     }
 
     /** True when a report is being held for the player to come back to, whether on screen or not. */
@@ -396,25 +452,56 @@ public final class FactoryScopeUI{
         BuildingRef ref = AreaProbe.refOf(build);
         AreaDiagnosticResult held = areaDialog.showing() ? areaDialog.heldResult() : null;
         if(held != null && held.entries.stream().anyMatch(entry -> entry.ref.equals(ref))){
-            if(panel != null && panel.isShown()) panel.hide();
+            if(panel != null && panel.isShown()){
+                panel.cancelOnDismiss();
+                panel.hide();
+            }
             areaDialog.showTrace(ref, item);
             return;
         }
 
         pendingTrace = new TraceRequest(ref, item);
-        if(panel != null && panel.isShown()) panel.hide();
+        if(panel != null && panel.isShown()){
+            panel.cancelOnDismiss();
+            panel.hide();
+        }
         startPicking();
         Vars.ui.showInfoToast(FsBundle.get("trace.select-area"), 4f);
+    }
+
+    private static void traceLiquidInput(Building build, ResourceRef liquid){
+        if(build == null || liquid == null || areaDialog == null) return;
+        BuildingRef ref = AreaProbe.refOf(build);
+        AreaDiagnosticResult held = areaDialog.showing() ? areaDialog.heldResult() : null;
+        if(held != null && held.entries.stream().anyMatch(entry -> entry.ref.equals(ref))){
+            if(panel != null && panel.isShown()){
+                panel.cancelOnDismiss();
+                panel.hide();
+            }
+            areaDialog.showLiquidTrace(ref, liquid, TraceDirection.input);
+            return;
+        }
+        pendingLiquidTrace = new LiquidTraceRequest(ref, liquid);
+        if(panel != null && panel.isShown()){
+            panel.cancelOnDismiss();
+            panel.hide();
+        }
+        startPicking();
+        Vars.ui.showInfoToast(FsBundle.get("liquid.select-area"), 4f);
     }
 
     /** Drops every transient reference; safe to call at any time. */
     public static void reset(){
         pendingTrace = null;
+        pendingLiquidTrace = null;
         stopPicking();
         stopLocating();
         stopNetworkView();
         stopNetworkOverlay();
         stopPowerView();
+        stopLiquidView();
+        stopLiquidOverlay();
+        if(panel != null) panel.cancelOnDismiss();
         if(panel != null && panel.isShown()) panel.hide();
         if(areaDialog != null) areaDialog.clear();
         if(powerDialog != null) powerDialog.clearReport();
@@ -429,6 +516,15 @@ public final class FactoryScopeUI{
         TraceRequest(BuildingRef target, ResourceRef item){
             this.target = target;
             this.item = item;
+        }
+    }
+
+    private static final class LiquidTraceRequest{
+        final BuildingRef target;
+        final ResourceRef liquid;
+        LiquidTraceRequest(BuildingRef target, ResourceRef liquid){
+            this.target = target;
+            this.liquid = liquid;
         }
     }
 }

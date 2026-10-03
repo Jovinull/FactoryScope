@@ -1,5 +1,7 @@
 package factoryscope.model;
 
+import java.util.*;
+
 /**
  * State of a single consumer requirement at the moment of the snapshot.
  *
@@ -31,6 +33,8 @@ public final class ResourceState{
     /** Amount the consumer needs, in {@link #unit}, or -1 when not applicable. */
     public final float required;
     public final RateUnit unit;
+    /** Exact structural alternatives for filter consumers; empty for non-filter requirements. */
+    public final List<ResourceRef> acceptedResources;
 
     private ResourceState(Builder builder){
         this.kind = builder.kind;
@@ -43,11 +47,21 @@ public final class ResourceState{
         this.stored = builder.stored;
         this.required = builder.required;
         this.unit = builder.unit;
+        TreeMap<String, ResourceRef> accepted = new TreeMap<>();
+        for(ResourceRef resource : builder.acceptedResources){
+            if(resource != null && resource.kind == kind && resource.id != null) accepted.putIfAbsent(resource.key(), resource);
+        }
+        this.acceptedResources = List.copyOf(accepted.values());
     }
 
     /** Stable identity plus display name, for findings that need to name this input. */
     public ResourceRef ref(){
         return new ResourceRef(kind, contentId, name);
+    }
+
+    /** Whether this exact requirement accepts the selected resource. */
+    public boolean accepts(ResourceRef resource){
+        return ref().equals(resource) || acceptedResources.contains(resource);
     }
 
     public boolean satisfied(){
@@ -90,6 +104,7 @@ public final class ResourceState{
         private float stored = -1f;
         private float required = -1f;
         private RateUnit unit = RateUnit.none;
+        private final List<ResourceRef> acceptedResources = new ArrayList<>();
 
         private Builder(ResourceKind kind, String name){
             this.kind = kind;
@@ -125,6 +140,11 @@ public final class ResourceState{
             this.stored = stored;
             this.required = required;
             this.unit = unit;
+            return this;
+        }
+
+        public Builder accepts(Collection<ResourceRef> resources){
+            acceptedResources.addAll(resources);
             return this;
         }
 
