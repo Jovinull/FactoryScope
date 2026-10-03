@@ -87,8 +87,10 @@ shell scripts:
 `mindustryJar` and `mindustryPath` are mutually exclusive. `modJar` may point at a desktop jar, a
 universal CI artifact, or a downloaded release asset; when supplied, the launcher does not build or
 substitute the production mod jar. `harnessJar` optionally selects a prebuilt acceptance harness. Other
-properties are `locale`, `capture`, `keepSandbox`, and `timeoutSeconds`. The launcher requires a desktop
-jar containing Mindustry's desktop entry point, or a Windows install with its bundled client. For headless
+properties are `locale`, `capture`, `keepSandbox`, and `timeoutSeconds`. The launcher requires an official
+Mindustry v160.5 desktop jar containing both the desktop entry point and embedded version metadata. An
+install-directory path is accepted only when it contains such a jar; native executable-only installs are
+rejected because their client identity cannot be independently verified or reliably isolated. For headless
 Linux environments, use a working X server such as Xvfb; GUI client availability is separate from launcher
 portability.
 
@@ -153,10 +155,11 @@ headless integration fixture independently checks the same structural path.
 
 Results are written to the game log as `[HARNESS]` lines; the Java launcher validates the result, requires
 the no-external-mods harness check, and turns failures, client crashes and timeouts into a nonzero exit
-code. It redirects each platform's Mindustry data directory into a unique temporary sandbox, copies only
-FactoryScope and its harness there, overrides the Steam version marker to avoid Workshop loading, and
-deletes a successful sandbox unless capture/keep was requested. Player saves, settings and installed mods
-are never touched.
+code. Before launch it verifies the selected desktop JAR's embedded v160.5 metadata, then redirects each
+platform's Mindustry data directory into a unique temporary sandbox and copies only FactoryScope and its
+harness there. For a verified Steam JAR, the sandbox version marker suppresses Steam/Workshop behavior;
+it is not the client-version oracle. Successful sandboxes are deleted unless capture/keep was requested.
+Player saves, settings and installed mods are never touched.
 
 The launcher can also be tested without opening a game window:
 

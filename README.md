@@ -162,7 +162,8 @@ gradlew powerBenchmark          # PowerGraph snapshot/model costs
 gradlew liquidBenchmark         # LiquidScope snapshot/graph/trace costs
 ```
 
-The acceptance launcher supports automatic discovery or an explicit client/artifact. For example:
+The acceptance launcher verifies the official Mindustry v160.5 metadata embedded in the selected
+desktop JAR before launch. It supports automatic discovery or an explicit client/artifact. For example:
 
 ```
 ./gradlew acceptanceTest -PmindustryJar="/games/Mindustry.jar" -PmodJar="build/libs/FactoryScope.jar" -Plocale=pt-BR

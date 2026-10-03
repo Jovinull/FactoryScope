@@ -14,7 +14,9 @@ import java.util.stream.Stream;
 /** Portable real-client acceptance launcher. This source set is not part of the mod artifact. */
 public final class AcceptanceLauncher{
     private static final Pattern CHECKS = Pattern.compile("\\[HARNESS] ===== (\\d+) checks, (\\d+) failures =====");
+    private static final Pattern RESULT = Pattern.compile("(?m)^.*\\[HARNESS] RESULT (PASS|FAIL)\\s*$");
     private static final Pattern STEAM_LIBRARY = Pattern.compile("\\\"path\\\"\\s+\\\"([^\\\"]+)\\\"");
+    private static final Pattern MOD_VERSION = Pattern.compile("(?m)^\\s*version\\s*:\\s*\"([^\"]+)\"");
     private static final String GAME_VERSION = "160.5";
     private static final String MOD_NAME = "factory-scope";
     private static final String HARNESS_NAME = "factory-scope-acceptance";
@@ -83,27 +85,25 @@ public final class AcceptanceLauncher{
             System.err.println("No Mindustry log was produced. Process output: " + processLog);
             keep = true;
         }
-        if(!log.contains("[Mindustry] Version: " + GAME_VERSION)){
+        boolean reportedClientVersion = log.contains("[Mindustry] Version: " + GAME_VERSION);
+        if(!reportedClientVersion){
             System.err.println("Acceptance client did not identify itself as Mindustry " + GAME_VERSION + ".");
             keep = true;
         }
-        Matcher counts = CHECKS.matcher(log);
-        int checkCount = -1, failures = -1;
-        while(counts.find()){
-            checkCount = Integer.parseInt(counts.group(1));
-            failures = Integer.parseInt(counts.group(2));
-        }
         boolean noExternalMods = log.contains("[HARNESS]   PASS the sandbox loaded no external mods");
         boolean factoryScopeErrors = Pattern.compile("(?im)^\\[E].*\\[FactoryScope] ").matcher(log).find();
-        boolean passed = completed && log.contains("[HARNESS] RESULT PASS") && checkCount >= 0 && failures == 0
-            && noExternalMods && !factoryScopeErrors
-            && log.contains("Loading mod: " + MOD_NAME) && log.contains("Loading mod: " + HARNESS_NAME);
+        boolean inspectorReady = reportsInspectorReady(modJar, log);
+        boolean passed = acceptanceLogPassed(modJar, log, completed);
+        Matcher displayedCounts = CHECKS.matcher(log);
+        int checkCount = displayedCounts.find() ? Integer.parseInt(displayedCounts.group(1)) : -1;
 
         for(String line : log.split("\\R")) if(line.contains("[HARNESS]")) System.out.println(line);
         if(result.timedOut) System.err.println("Acceptance suite did not finish within " + options.timeoutSeconds + " seconds.");
         else if(!completed) System.err.println("Mindustry exited before the harness reported completion.");
         if(factoryScopeErrors) System.err.println("FactoryScope logged an error during acceptance.");
+        if(!inspectorReady) System.err.println("FactoryScope did not report its version-matched inspector-ready line.");
         if(!noExternalMods) System.err.println("The harness did not prove that no external mods were loaded.");
+        if(!reportedClientVersion) System.err.println("Acceptance client did not identify itself as Mindustry " + GAME_VERSION + ".");
         if(passed){
             System.out.println("ACCEPTANCE SUITE PASSED: " + checkCount + " checks.");
             Path savedLog = project.resolve("build/acceptance-test.log");
@@ -167,29 +167,92 @@ public final class AcceptanceLauncher{
         if(options.mindustryJar != null){
             Path jar = options.mindustryJar.toAbsolutePath().normalize();
             requireFile(jar, "Mindustry desktop jar");
-            try(JarFile file = new JarFile(jar.toFile())){
-                if(file.getEntry("mindustry/desktop/DesktopLauncher.class") == null){
-                    throw new IllegalArgumentException("Mindustry jar does not contain the desktop launcher: " + jar);
-                }
-            }
+            verifyClientJar(jar);
             return Client.jar(jar, os, javaExecutable(os), jar.toString());
         }
 
         List<Path> candidates = options.mindustryPath == null
             ? discoverInstallations(os, System.getenv()) : List.of(options.mindustryPath.toAbsolutePath().normalize());
+        String invalidClient = null;
         for(Path candidate : candidates){
             if(!Files.isDirectory(candidate)) continue;
             Path jar = findDesktopJar(candidate);
-            if(jar != null) return Client.jar(jar, os, javaExecutable(os), candidate.toString());
-            Path executable = candidate.resolve("Mindustry.exe");
-            if(os == OperatingSystem.windows && Files.isRegularFile(executable)){
-                if(isSteamPath(candidate)){
-                    throw new IllegalArgumentException("This Steam install has no bundled desktop jar; use -PmindustryJar with an official desktop jar to preserve Workshop isolation.");
+            if(jar != null){
+                try{
+                    verifyClientJar(jar);
+                    return Client.jar(jar, os, javaExecutable(os), candidate.toString());
+                }catch(IllegalArgumentException invalid){
+                    if(options.mindustryPath != null) throw invalid;
+                    invalidClient = invalid.getMessage();
                 }
-                return Client.nativeExe(executable, os, candidate.toString());
             }
         }
-        throw new IllegalArgumentException("Mindustry v160.5 was not found. Pass -PmindustryJar=<desktop jar> or -PmindustryPath=<install directory>.");
+        if(options.mindustryPath != null){
+            throw new IllegalArgumentException("No verifiable Mindustry v160.5 desktop jar was found in "
+                + options.mindustryPath.toAbsolutePath().normalize()
+                + ". Supply an official v160.5 desktop jar with -PmindustryJar or an install directory containing one.");
+        }
+        throw new IllegalArgumentException("Mindustry v160.5 was not found. Pass -PmindustryJar=<verified desktop jar> or -PmindustryPath=<install directory with desktop jar>."
+            + (invalidClient == null ? "" : " Last candidate rejected: " + invalidClient));
+    }
+
+    /** Verifies the selected binary itself before the sandbox's release marker can override Steam metadata. */
+    static void verifyClientJar(Path jar){
+        try(JarFile file = new JarFile(jar.toFile())){
+            if(file.getEntry("mindustry/desktop/DesktopLauncher.class") == null){
+                throw new IllegalArgumentException("Mindustry jar does not contain the desktop launcher: " + jar);
+            }
+            var metadata = file.getEntry("version.properties");
+            if(metadata == null){
+                throw new IllegalArgumentException("Mindustry jar has no embedded version.properties; cannot verify v"
+                    + GAME_VERSION + ": " + jar);
+            }
+            Properties properties = new Properties();
+            try(var input = file.getInputStream(metadata)){
+                properties.load(input);
+            }
+            String number = properties.getProperty("number", "").trim();
+            String build = properties.getProperty("build", "").trim();
+            String type = properties.getProperty("type", "").trim();
+            if(!"8".equals(number) || !GAME_VERSION.equals(build) || !"official".equalsIgnoreCase(type)){
+                throw new IllegalArgumentException("Mindustry desktop jar is not the official v" + GAME_VERSION
+                    + " client (embedded number=" + number + ", build=" + build + ", type=" + type + "): " + jar);
+            }
+        }catch(IOException e){
+            throw new IllegalArgumentException("Could not inspect Mindustry desktop jar version metadata: " + jar, e);
+        }
+    }
+
+    static boolean reportsInspectorReady(Path modJar, String log) throws IOException{
+        try(JarFile file = new JarFile(modJar.toFile())){
+            var metadata = file.getEntry("mod.hjson");
+            if(metadata == null) return false;
+            String mod;
+            try(var input = file.getInputStream(metadata)){
+                mod = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            Matcher version = MOD_VERSION.matcher(mod);
+            return version.find() && log.contains("[FactoryScope] " + version.group(1) + " inspector ready");
+        }
+    }
+
+    static boolean acceptanceLogPassed(Path modJar, String log, boolean completed) throws IOException{
+        if(!completed || !log.contains("[Mindustry] Version: " + GAME_VERSION)
+            || !reportsInspectorReady(modJar, log)
+            || !log.contains("[HARNESS]   PASS the sandbox loaded no external mods")
+            || Pattern.compile("(?im)^\\[E].*\\[FactoryScope] ").matcher(log).find()
+            || !log.contains("Loading mod: " + MOD_NAME)
+            || !log.contains("Loading mod: " + HARNESS_NAME)) return false;
+
+        Matcher counts = CHECKS.matcher(log);
+        if(!counts.find()) return false;
+        int checks = Integer.parseInt(counts.group(1));
+        int failures = Integer.parseInt(counts.group(2));
+        if(counts.find() || checks < 0 || failures != 0) return false;
+
+        Matcher results = RESULT.matcher(log);
+        if(!results.find() || !"PASS".equals(results.group(1))) return false;
+        return !results.find();
     }
 
     static Path findDesktopJar(Path install){
@@ -285,11 +348,6 @@ public final class AcceptanceLauncher{
         result.add(path.toAbsolutePath().normalize());
     }
 
-    private static boolean isSteamPath(Path path){
-        String normalized = path.toString().replace('\\', '/').toLowerCase(Locale.ROOT);
-        return normalized.contains("/steamapps/common/mindustry");
-    }
-
     private static Path javaExecutable(OperatingSystem os){
         Path bin = Paths.get(System.getProperty("java.home"), "bin");
         Path candidate = bin.resolve(os == OperatingSystem.windows ? "java.exe" : "java");
@@ -352,27 +410,17 @@ public final class AcceptanceLauncher{
         final Path path;
         final Path java;
         final OperatingSystem operatingSystem;
-        final boolean jar;
         final String display;
 
-        private Client(Path path, Path java, OperatingSystem os, boolean jar, String display){
+        private Client(Path path, Path java, OperatingSystem os, String display){
             this.path = path;
             this.java = java;
             this.operatingSystem = os;
-            this.jar = jar;
             this.display = display;
         }
 
-        static Client jar(Path path, OperatingSystem os, Path java, String display){ return new Client(path, java, os, true, display); }
-        static Client nativeExe(Path path, OperatingSystem os, String display){ return new Client(path, null, os, false, display); }
-
+        static Client jar(Path path, OperatingSystem os, Path java, String display){ return new Client(path, java, os, display); }
         List<String> command(Path sandbox, Path dataDirectory, Options options){
-            if(!jar){
-                if(options.capture || options.locale != null){
-                    throw new IllegalArgumentException("-Pcapture and -Plocale require a Mindustry desktop jar or an install with its bundled desktop jar.");
-                }
-                return List.of(path.toString());
-            }
             List<String> result = new ArrayList<>();
             result.add(java.toString());
             result.add("-Duser.home=" + sandbox);
@@ -415,7 +463,7 @@ public final class AcceptanceLauncher{
                     case "--mindustry-path": result.mindustryPath = blankPath(value); break;
                     case "--mod-jar": result.modJar = blankPath(value); break;
                     case "--harness-jar": result.harnessJar = blankPath(value); break;
-                    case "--locale": result.locale = blank(value); break;
+                    case "--locale": result.locale = locale(value); break;
                     case "--capture": result.capture = Boolean.parseBoolean(value); break;
                     case "--keep-sandbox": result.keepSandbox = Boolean.parseBoolean(value); break;
                     case "--timeout-seconds":
@@ -430,5 +478,13 @@ public final class AcceptanceLauncher{
 
         private static Path blankPath(String value){ String normalized = blank(value); return normalized == null ? null : Paths.get(normalized); }
         private static String blank(String value){ return value == null || value.isBlank() ? null : value; }
+
+        private static String locale(String value){
+            String normalized = blank(value);
+            if(normalized == null) return null;
+            if(normalized.replace('_', '-').equalsIgnoreCase("en-US")) return "en-US";
+            if(normalized.replace('_', '-').equalsIgnoreCase("pt-BR")) return "pt-BR";
+            throw new IllegalArgumentException("Unsupported acceptance locale '" + value + "'; use en-US or pt-BR.");
+        }
     }
 }

@@ -71,6 +71,69 @@ class AcceptanceLauncherTest{
         assertTrue(command.contains("-Dmindustry.data.dir=" + data));
     }
 
+    @Test void rejectsWrongClientBuildBeforeSandboxVersionOverride() throws Exception{
+        Path jar = temp.resolve("Mindustry 159.2.jar");
+        desktopJar(jar, "159.2", "release");
+
+        AcceptanceLauncher.Options options = new AcceptanceLauncher.Options();
+        options.mindustryJar = jar;
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+            () -> AcceptanceLauncher.resolveClient(options));
+        assertTrue(error.getMessage().contains("160.5"));
+        assertTrue(error.getMessage().contains("159.2"));
+    }
+
+    @Test void requiresAuthoritativeVersionMetadataAndAllowsSteam1605Jar() throws Exception{
+        Path missingMetadata = temp.resolve("missing-version.jar");
+        desktopJarWithoutVersion(missingMetadata);
+        AcceptanceLauncher.Options invalid = new AcceptanceLauncher.Options();
+        invalid.mindustryJar = missingMetadata;
+        assertThrows(IllegalArgumentException.class, () -> AcceptanceLauncher.resolveClient(invalid));
+
+        Path steamJar = temp.resolve("Steam 160.5.jar");
+        desktopJar(steamJar, "160.5", "steam");
+        AcceptanceLauncher.Options steam = new AcceptanceLauncher.Options();
+        steam.mindustryJar = steamJar;
+        assertEquals(steamJar.toAbsolutePath().normalize(), AcceptanceLauncher.resolveClient(steam).path);
+    }
+
+    @Test void inspectorReadyLineMustMatchTheSelectedModArtifactVersion() throws Exception{
+        Path mod = temp.resolve("FactoryScope.jar");
+        modArtifact(mod);
+        assertTrue(AcceptanceLauncher.reportsInspectorReady(mod,
+            "[FactoryScope] 0.7.0 inspector ready"));
+        assertFalse(AcceptanceLauncher.reportsInspectorReady(mod,
+            "[FactoryScope] 0.6.0 inspector ready"));
+    }
+
+    @Test void malformedHarnessLogsCannotPassAcceptance() throws Exception{
+        Path mod = temp.resolve("FactoryScope.jar");
+        modArtifact(mod);
+        String valid = "[I] [Mindustry] Version: 160.5\n"
+            + "[I] Loading mod: factory-scope\n[I] Loading mod: factory-scope-acceptance\n"
+            + "[I] [FactoryScope] 0.7.0 inspector ready\n"
+            + "[I] [HARNESS]   PASS the sandbox loaded no external mods\n"
+            + "[I] [HARNESS] ===== 1 checks, 0 failures =====\n[I] [HARNESS] RESULT PASS\n";
+        assertTrue(AcceptanceLauncher.acceptanceLogPassed(mod, valid, true));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod, valid, false));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
+            valid.replace("===== 1 checks, 0 failures =====\n", ""), true));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
+            valid.replace("===== 1 checks, 0 failures =====", "===== 1 checks, 1 failures ====="), true));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
+            valid.replace("RESULT PASS", "RESULT FAIL"), true));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
+            valid + "[I] [HARNESS] ===== 1 checks, 0 failures =====\n", true));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
+            valid + "[I] [HARNESS] RESULT FAIL\n", true));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
+            valid.replace("PASS the sandbox loaded no external mods", "loaded an external mod"), true));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
+            valid + "[E] [FactoryScope] test error\n", true));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
+            valid.replace("Version: 160.5", "Version: 159.2"), true));
+    }
+
     @Test void explicitInstallFindsBundledDesktopJarBeforeNativeExecutable() throws Exception{
         Path install = temp.resolve("Steam Library λ/Mindustry");
         Path jar = install.resolve("jre/desktop.jar");
@@ -81,7 +144,6 @@ class AcceptanceLauncherTest{
         AcceptanceLauncher.Options options = new AcceptanceLauncher.Options();
         options.mindustryPath = install;
         AcceptanceLauncher.Client client = AcceptanceLauncher.resolveClient(options);
-        assertTrue(client.jar);
         assertEquals(jar.toAbsolutePath().normalize(), client.path);
     }
 
@@ -125,17 +187,20 @@ class AcceptanceLauncherTest{
         assertTrue(options.capture);
         assertTrue(options.keepSandbox);
         assertEquals(77, options.timeoutSeconds);
+        assertEquals("pt-BR", AcceptanceLauncher.Options.parse(new String[]{"--locale", "pt_BR"}).locale);
+        assertThrows(IllegalArgumentException.class,
+            () -> AcceptanceLauncher.Options.parse(new String[]{"--locale", "portuguese"}));
     }
 
-    @Test void nativeWindowsFallbackRejectsOptionsItCannotApply(){
-        AcceptanceLauncher.Client client = AcceptanceLauncher.Client.nativeExe(temp.resolve("Mindustry.exe"),
-            AcceptanceLauncher.OperatingSystem.windows, "test");
-        AcceptanceLauncher.Options capture = new AcceptanceLauncher.Options();
-        capture.capture = true;
-        assertThrows(IllegalArgumentException.class, () -> client.command(temp, temp.resolve("data"), capture));
-        AcceptanceLauncher.Options locale = new AcceptanceLauncher.Options();
-        locale.locale = "pt-BR";
-        assertThrows(IllegalArgumentException.class, () -> client.command(temp, temp.resolve("data"), locale));
+    @Test void nativeOnlyInstallIsRejectedBecauseItsBinaryCannotBeVerified() throws Exception{
+        Path install = temp.resolve("native-only");
+        Files.createDirectories(install);
+        Files.writeString(install.resolve("Mindustry.exe"), "native client");
+        AcceptanceLauncher.Options options = new AcceptanceLauncher.Options();
+        options.mindustryPath = install;
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+            () -> AcceptanceLauncher.resolveClient(options));
+        assertTrue(error.getMessage().contains("official v160.5 desktop jar"));
     }
 
     @Test void completionAndClientCrashAreDistinguished(){
@@ -172,6 +237,32 @@ class AcceptanceLauncherTest{
     }
 
     private static void desktopJar(Path path) throws IOException{
+        desktopJar(path, "160.5", "release");
+    }
+
+    private static void modArtifact(Path path) throws IOException{
+        try(JarOutputStream output = new JarOutputStream(Files.newOutputStream(path))){
+            output.putNextEntry(new JarEntry("mod.hjson"));
+            output.write("name: \"factory-scope\"\nversion: \"0.7.0\"\n"
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            output.closeEntry();
+        }
+    }
+
+    private static void desktopJar(Path path, String build, String modifier) throws IOException{
+        Files.createDirectories(path.getParent());
+        try(JarOutputStream output = new JarOutputStream(Files.newOutputStream(path))){
+            output.putNextEntry(new JarEntry("mindustry/desktop/DesktopLauncher.class"));
+            output.write(new byte[]{0});
+            output.closeEntry();
+            output.putNextEntry(new JarEntry("version.properties"));
+            output.write(("number=8\nbuild=" + build + "\nmodifier=" + modifier + "\ntype=official\n")
+                .getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            output.closeEntry();
+        }
+    }
+
+    private static void desktopJarWithoutVersion(Path path) throws IOException{
         Files.createDirectories(path.getParent());
         try(JarOutputStream output = new JarOutputStream(Files.newOutputStream(path))){
             output.putNextEntry(new JarEntry("mindustry/desktop/DesktopLauncher.class"));
