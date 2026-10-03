@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 - Unreleased
+
+### Changed
+
+- Anchored the FactoryScope HUD toggle to Mindustry's live HUD layout instead of a fixed bottom offset.
+- Replaced the Windows-only acceptance orchestration with a portable Gradle/Java launcher and isolated sandbox.
+- Added a v160.5 support matrix for supported, partial, and deferred transport families.
+
+### Validation
+
+- Desktop acceptance is exercised against Mindustry 160.5. Android runtime and touch behavior remain unvalidated.
+
 ## 0.6.0 - 2026-10-03
 
 ### Added
