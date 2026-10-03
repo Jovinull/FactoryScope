@@ -248,7 +248,7 @@ public final class AcceptanceLauncher{
         if(!counts.find()) return false;
         int checks = Integer.parseInt(counts.group(1));
         int failures = Integer.parseInt(counts.group(2));
-        if(counts.find() || checks < 0 || failures != 0) return false;
+        if(counts.find() || checks <= 0 || failures != 0) return false;
 
         Matcher results = RESULT.matcher(log);
         if(!results.find() || !"PASS".equals(results.group(1))) return false;

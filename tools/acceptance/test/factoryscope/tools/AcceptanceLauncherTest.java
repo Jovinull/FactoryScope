@@ -119,6 +119,8 @@ class AcceptanceLauncherTest{
         assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
             valid.replace("===== 1 checks, 0 failures =====\n", ""), true));
         assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
+            valid.replace("1 checks, 0 failures", "0 checks, 0 failures"), true));
+        assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
             valid.replace("===== 1 checks, 0 failures =====", "===== 1 checks, 1 failures ====="), true));
         assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
             valid.replace("RESULT PASS", "RESULT FAIL"), true));
