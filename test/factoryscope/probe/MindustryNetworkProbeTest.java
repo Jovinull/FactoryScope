@@ -40,6 +40,8 @@ class MindustryNetworkProbeTest{
 
             assertTrue(network.graph.isReachable(input(ref, forward.opposite()), output(ref, forward), copper));
             assertFalse(network.graph.isReachable(input(ref, forward), output(ref, forward.opposite()), copper));
+            assertFalse(network.graph.isReachable(input(ref, forward), output(ref, forward), copper),
+                "the engine rejects structural input from the conveyor's output side");
             conveyor.tile.remove();
         }
     }
@@ -494,6 +496,29 @@ class MindustryNetworkProbeTest{
         assertFalse(network.graph.isReachable(input, output(ref, NetworkSide.north), copper));
         assertFalse(network.graph.isReachable(input, output(ref, NetworkSide.east), lead));
         assertTrue(network.graph.isReachable(input, output(ref, NetworkSide.north), lead));
+    }
+
+    @Test
+    void surgeRouterUsesTheSameConfiguredStructuralPortsAsDuctRouter(){
+        Building router = place(Blocks.surgeRouter, 10, 10, 0);
+        router.configure(Items.copper);
+        Building east = place(Blocks.router, 11, 10, 0);
+        place(Blocks.router, 10, 11, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+        BuildingRef ref = AreaProbe.refOf(router);
+        NetworkPort back = input(ref, NetworkSide.west);
+
+        assertTrue(network.graph.isReachable(back, output(ref, NetworkSide.east), copper));
+        assertFalse(network.graph.isReachable(back, output(ref, NetworkSide.north), copper));
+        assertFalse(network.graph.isReachable(back, output(ref, NetworkSide.east), lead));
+        assertTrue(network.graph.isReachable(back, output(ref, NetworkSide.north), lead));
+
+        mindustry.world.blocks.distribution.StackRouter.StackRouterBuild engineBuild =
+            (mindustry.world.blocks.distribution.StackRouter.StackRouterBuild)router;
+        engineBuild.handleItem(east, Items.copper);
+        engineBuild.unloading = true;
+        assertSame(east, engineBuild.target(), "the engine chooses the configured forward branch for Copper");
     }
 
     @Test

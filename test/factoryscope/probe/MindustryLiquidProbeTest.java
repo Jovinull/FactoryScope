@@ -13,6 +13,7 @@ import mindustry.world.blocks.environment.Floor;
 import mindustry.world.blocks.distribution.DirectionLiquidBridge;
 import mindustry.world.blocks.liquid.LiquidBridge;
 import mindustry.world.blocks.liquid.LiquidJunction;
+import mindustry.world.blocks.liquid.LiquidRouter;
 import mindustry.world.blocks.production.GenericCrafter;
 import mindustry.world.blocks.production.Pump;
 import mindustry.type.Liquid;
@@ -183,6 +184,51 @@ class MindustryLiquidProbeTest{
         junction.moveLiquid(((LiquidJunction.LiquidJunctionBuild)junction).getLiquidDestination(west, Liquids.water), Liquids.water);
         assertTrue(east.liquids.get(Liquids.water) > 0f, "engine movement continues west-to-east");
         assertEquals(0f, northSink.liquids.get(Liquids.water), "the crossing channel receives no Water");
+    }
+
+    @Test
+    void reinforcedLiquidVariantsKeepTheirEngineBaseRoutingAndStorageRoles(){
+        Building west = place(ModdedBlocks.liquidSource, 5, 10, 0);
+        Building junction = place(Blocks.reinforcedLiquidJunction, 6, 10, 0);
+        Building east = place(ModdedBlocks.liquidConsumer, 7, 10, 0);
+        Building northSink = place(ModdedBlocks.liquidConsumer, 6, 11, 0);
+
+        Building router = place(Blocks.reinforcedLiquidRouter, 12, 10, 0);
+        Building routerEast = place(ModdedBlocks.liquidConsumer, 13, 10, 0);
+        Building routerNorth = place(ModdedBlocks.liquidConsumer, 12, 11, 0);
+        Building container = place(Blocks.reinforcedLiquidContainer, 19, 10, 0);
+        Building tank = place(Blocks.reinforcedLiquidTank, 25, 10, 0);
+
+        AreaSelection selection = AreaSelection.of(3, 7, 31, 14);
+        LiquidNetwork graph = scan(selection);
+        BuildingRef junctionRef = AreaProbe.refOf(junction);
+        BuildingRef routerRef = AreaProbe.refOf(router);
+
+        assertTrue(graph.graph.isReachable(output(AreaProbe.refOf(west), NetworkSide.east),
+            input(AreaProbe.refOf(east), NetworkSide.west), water));
+        assertFalse(graph.graph.isReachable(input(junctionRef, NetworkSide.west),
+            output(junctionRef, NetworkSide.north), water));
+        assertSame(east, ((LiquidJunction.LiquidJunctionBuild)junction).getLiquidDestination(west, Liquids.water),
+            "the reinforced block is an engine LiquidJunction with straight-axis destinations");
+
+        assertTrue(graph.graph.isReachable(input(routerRef, NetworkSide.west),
+            output(routerRef, NetworkSide.east), water));
+        assertTrue(graph.graph.isReachable(input(routerRef, NetworkSide.west),
+            input(AreaProbe.refOf(routerNorth), NetworkSide.south), water));
+        router.liquids.add(Liquids.water, 10f);
+        ((LiquidRouter.LiquidRouterBuild)router).updateTile();
+        assertTrue(routerEast.liquids.get(Liquids.water) > 0f,
+            "reinforced router uses the engine LiquidRouter dump behavior");
+        assertTrue(routerNorth.liquids.get(Liquids.water) > 0f,
+            "reinforced router exposes another structurally possible side without claiming a split rate");
+
+        assertTrue(graph.storageEndpoints.contains(AreaProbe.refOf(router)));
+        assertTrue(graph.storageEndpoints.contains(AreaProbe.refOf(container)));
+        assertTrue(graph.storageEndpoints.contains(AreaProbe.refOf(tank)));
+        assertTrue(MindustryFactoryProbe.probe(router).producedLiquids.isEmpty());
+        assertTrue(MindustryFactoryProbe.probe(container).producedLiquids.isEmpty());
+        assertTrue(MindustryFactoryProbe.probe(tank).producedLiquids.isEmpty(),
+            "storage variants remain storage and never become producers");
     }
 
     @Test

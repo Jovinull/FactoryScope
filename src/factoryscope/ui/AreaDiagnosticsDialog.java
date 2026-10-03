@@ -48,6 +48,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
 
     public AreaDiagnosticsDialog(Runnable onSelectAnother, Cons<Building> onInspect, Cons<BuildingRef> onLocate){
         super("");
+        name = "factoryscope-area-dialog";
         this.onSelectAnother = onSelectAnother;
         this.onInspect = onInspect;
         this.onLocate = onLocate;

@@ -3,6 +3,7 @@ package factoryscope.ui;
 import arc.*;
 import arc.input.*;
 import arc.math.geom.*;
+import arc.scene.Element;
 import arc.scene.event.*;
 import arc.scene.ui.layout.*;
 import factoryscope.*;
@@ -37,8 +38,6 @@ import mindustry.ui.*;
  */
 public final class FactoryScopeUI{
     private static final float BUTTON_SIZE = 48f;
-    /** Clears the HUD's own bottom-left furniture (chat, saving indicator). */
-    private static final float BUTTON_BOTTOM_PAD = 70f;
 
     private static FactoryScopePanel panel;
     private static AreaDiagnosticsDialog areaDialog;
@@ -53,6 +52,8 @@ public final class FactoryScopeUI{
     private static LiquidViewOverlay liquidView;
     private static ResourceRef liquidSelected;
     private static Table hint;
+    private static Element toggleAnchor;
+    private static final Vec2 togglePosition = new Vec2();
     private static TraceRequest pendingTrace;
     private static LiquidTraceRequest pendingLiquidTrace;
     private static boolean initialized;
@@ -86,16 +87,38 @@ public final class FactoryScopeUI{
     }
 
     private static void buildToggle(){
-        Vars.ui.hudGroup.fill(table -> {
-            table.name = "factoryscope";
-            table.bottom().left();
-            table.button(Icon.production, Styles.clearTogglei, FactoryScopeUI::toggle)
-                .size(BUTTON_SIZE)
-                .checked(button -> picking())
-                .tooltip(FsBundle.ref("inspect.tooltip"))
-                .name("factoryscope-toggle")
-                .padLeft(6f).padBottom(BUTTON_BOTTOM_PAD);
+        Table table = new Table();
+        table.name = "factoryscope";
+        table.setSize(BUTTON_SIZE, BUTTON_SIZE);
+        table.color.a = 0f;
+        table.touchable = Touchable.disabled;
+        table.button(Icon.production, Styles.clearTogglei, FactoryScopeUI::toggle)
+            .size(BUTTON_SIZE)
+            .checked(button -> picking())
+            .tooltip(FsBundle.ref("inspect.tooltip"))
+            .name("factoryscope-toggle");
+        table.update(() -> {
+            // HudFragment reserves this named slot for its top-left wave/editor panel on every
+            // platform. Place the toggle directly below that live layout element, so resizing and
+            // UI scaling move it with the HUD rather than relying on an assumed bottom pixel pad.
+            // HudFragment may replace its child tables when HUD settings, scaling or the world
+            // layout changes. Re-resolve the stable name so we never keep a still-parented but
+            // obsolete element from the previous layout.
+            toggleAnchor = Vars.ui.hudGroup.find("waves/editor");
+            if(toggleAnchor == null || !Vars.ui.hudfrag.shown()){
+                //Keep this updater attached and acting so the toggle can recover when the HUD
+                //returns. Hiding the element itself would stop Arc from acting it on some parents.
+                table.color.a = 0f;
+                table.touchable = Touchable.disabled;
+                return;
+            }
+            table.color.a = 1f;
+            table.touchable = Touchable.enabled;
+            toggleAnchor.localToStageCoordinates(togglePosition.set(0f, 0f));
+            Vars.ui.hudGroup.stageToLocalCoordinates(togglePosition);
+            table.setPosition(togglePosition.x, togglePosition.y - table.getHeight());
         });
+        Vars.ui.hudGroup.addChild(table);
     }
 
     public static boolean picking(){

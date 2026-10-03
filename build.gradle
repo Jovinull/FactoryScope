@@ -11,6 +11,16 @@ sourceSets{
         java.srcDirs = ["acceptance/src"]
         compileClasspath += sourceSets.main.output
     }
+    // The real-client launcher is build tooling, not mod code; keeping it in a separate source set
+    // makes it impossible for launcher classes to enter either production artifact.
+    acceptanceLauncher{
+        java.srcDirs = ["tools/acceptance/src"]
+    }
+    launcherTest{
+        java.srcDirs = ["tools/acceptance/test"]
+        compileClasspath += sourceSets.acceptanceLauncher.output
+        runtimeClasspath += sourceSets.acceptanceLauncher.output
+    }
 }
 
 ext{
@@ -66,6 +76,8 @@ dependencies{
     mindustryAssets "Anuken:MindustryAssets:$mindustryVersion"
     testImplementation "org.junit.jupiter:junit-jupiter:$junitVersion"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+    launcherTestImplementation "org.junit.jupiter:junit-jupiter:$junitVersion"
+    launcherTestRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
 //Mindustry resolves its internal files from the classpath root, but the release archive nests them under
@@ -152,6 +164,14 @@ tasks.register("powerBenchmark", Test){
     outputs.upToDateWhen{ false }
 }
 
+tasks.register("acceptanceLauncherTest", Test){
+    group = "verification"
+    description = "Tests cross-platform acceptance launcher path and sandbox logic without starting Mindustry."
+    testClassesDirs = sourceSets.launcherTest.output.classesDirs
+    classpath = sourceSets.launcherTest.runtimeClasspath
+    useJUnitPlatform()
+}
+
 tasks.register("liquidBenchmark", Test){
     group = "verification"
     description = "Measures liquid buffer probing, structural topology and trace costs at 50, 250, 1000 and 4000 buildings."
@@ -188,7 +208,7 @@ tasks.register("verifyArtifacts"){
 
     doLast{
         def required = ["mod.hjson", "bundles/bundle.properties", "bundles/bundle_pt_BR.properties"]
-        def forbidden = ~/^(mindustry|arc|org|com|kotlin|javax)\/|acceptance|Test|fixture|harness|scratch/
+        def forbidden = ~/^(mindustry|arc|org|com|kotlin|javax)\/|acceptance|Test|fixture|harness|scratch|factoryscope\/tools\//
 
         ["${projectName}Desktop.jar", "${projectName}.jar"].each{ name ->
             def jar = libs.get().file(name).asFile
@@ -220,20 +240,26 @@ tasks.register("verifyArtifacts"){
     }
 }
 
-tasks.register("acceptanceTest", Exec){
+tasks.register("acceptanceTest", JavaExec){
     group = "verification"
-    description = "Runs the inspector acceptance suite in a real Mindustry client."
-    dependsOn "jar", "acceptanceJar"
+    description = "Runs the inspector acceptance suite in an isolated real Mindustry client."
+    dependsOn "acceptanceJar"
+    if(!project.hasProperty("modJar")) dependsOn "jar"
+    classpath = sourceSets.acceptanceLauncher.runtimeClasspath
+    mainClass = "factoryscope.tools.AcceptanceLauncher"
 
     doFirst{
-        if(!isWindows){
-            throw new GradleException("The acceptance suite launches a locally installed Mindustry and is "
-                + "currently scripted for Windows only. See docs/testing.md.")
-        }
+        def arguments = ["--project", projectDir.absolutePath]
+        if(project.hasProperty("mindustryPath")) arguments += ["--mindustry-path", project.property("mindustryPath").toString()]
+        if(project.hasProperty("mindustryJar")) arguments += ["--mindustry-jar", project.property("mindustryJar").toString()]
+        if(project.hasProperty("modJar")) arguments += ["--mod-jar", project.property("modJar").toString()]
+        if(project.hasProperty("harnessJar")) arguments += ["--harness-jar", project.property("harnessJar").toString()]
+        if(project.hasProperty("locale")) arguments += ["--locale", project.property("locale").toString()]
+        if(project.hasProperty("capture")) arguments += ["--capture", project.property("capture").toString()]
+        if(project.hasProperty("keepSandbox")) arguments += ["--keep-sandbox", project.property("keepSandbox").toString()]
+        if(project.hasProperty("timeoutSeconds")) arguments += ["--timeout-seconds", project.property("timeoutSeconds").toString()]
+        setArgs(arguments)
     }
-
-    commandLine "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-        "-File", file("scripts/acceptance-test.ps1").absolutePath, "-SkipBuild"
 }
 
 jar{

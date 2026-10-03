@@ -170,10 +170,13 @@ reason.
 `Vars.loadSettings()` calls `settings.setDataDirectory(Core.files.local("saves/"))` when
 `Version.isSteam`, so a Steam installation stores settings, mods and `last_log.txt` in a `saves` folder
 next to the executable rather than in `%APPDATA%\Mindustry`. Steam also loads subscribed Workshop mods,
-which would make a test depend on player state. The smoke and acceptance launchers override the Steam
-jar's `version.properties` in their temporary working directory to run it as a release client, and pass
-that temporary directory as `APPDATA`. The resulting `%APPDATA%\Mindustry` tree contains all test data
-and only the jars copied by the script.
+which would make a test depend on player state. The acceptance launcher overrides the Steam jar's
+`version.properties` in its temporary working directory to run it as a release client. The
+acceptance launcher first reads the selected desktop JAR's own embedded `version.properties` and
+requires the official v160.5 metadata (`number=8`, `build=160.5`, `type=official`); the sandbox marker
+is only a Steam/Workshop isolation override, not the version oracle. It then directs the process data
+directory and platform data environment into a fresh temporary sandbox, which contains only the jars
+copied for that run. The runtime version log is checked as a second consistency check.
 
 Non-Steam builds honour the `MINDUSTRY_DATA_DIR` environment variable and the `mindustry.data.dir`
 system property (`ClientLauncher.setup`).
