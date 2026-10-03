@@ -67,6 +67,14 @@ public final class FactorySnapshot{
     public final List<OutputState> outputs;
     /** Items this building can produce structurally, including conventional producers without a rate model. */
     public final List<ResourceRef> producedItems;
+    /** Liquids this building can produce structurally, including conventional producers without a rate model. */
+    public final List<ResourceRef> producedLiquids;
+    /** Every positive entry in the building's liquid module at snapshot time. */
+    public final List<StoredLiquidState> storedLiquids;
+    /** False when a declared liquid requirement could not be safely enumerated. */
+    public final boolean liquidInputsComplete;
+    /** False when a known liquid output declaration could not be safely enumerated. */
+    public final boolean liquidOutputsComplete;
     /** Null when the block does not consume power. */
     public final PowerState power;
 
@@ -91,6 +99,12 @@ public final class FactorySnapshot{
         List<ResourceRef> products = new ArrayList<>(b.producedItems);
         products.sort(Comparator.comparing(ResourceRef::key));
         this.producedItems = List.copyOf(new LinkedHashSet<>(products));
+        List<ResourceRef> liquidProducts = new ArrayList<>(b.producedLiquids);
+        liquidProducts.sort(Comparator.comparing(ResourceRef::key));
+        this.producedLiquids = List.copyOf(new LinkedHashSet<>(liquidProducts));
+        this.storedLiquids = List.copyOf(b.storedLiquids);
+        this.liquidInputsComplete = b.liquidInputsComplete;
+        this.liquidOutputsComplete = b.liquidOutputsComplete;
         this.power = b.power;
     }
 
@@ -138,6 +152,10 @@ public final class FactorySnapshot{
         private final List<ResourceState> inputs = new ArrayList<>();
         private final List<OutputState> outputs = new ArrayList<>();
         private final List<ResourceRef> producedItems = new ArrayList<>();
+        private final List<ResourceRef> producedLiquids = new ArrayList<>();
+        private final List<StoredLiquidState> storedLiquids = new ArrayList<>();
+        private boolean liquidInputsComplete = true;
+        private boolean liquidOutputsComplete = true;
         private PowerState power;
 
         private Builder(String blockName){
@@ -218,12 +236,37 @@ public final class FactorySnapshot{
         public Builder output(OutputState state){
             this.outputs.add(state);
             if(state.kind == ResourceKind.item) this.producedItems.add(state.ref());
+            if(state.kind == ResourceKind.liquid && state.contentId != null
+                && (state.theoreticalPerSecond > 0f || state.expectedPerSecond > 0f)) this.producedLiquids.add(state.ref());
             return this;
         }
 
         public Builder producedItem(ResourceRef item){
             if(item.kind != ResourceKind.item) throw new IllegalArgumentException("only items can be structural products");
             this.producedItems.add(item);
+            return this;
+        }
+
+        public Builder producedLiquid(ResourceRef liquid){
+            if(liquid.kind != ResourceKind.liquid || liquid.id == null){
+                throw new IllegalArgumentException("only identified liquids can be structural products");
+            }
+            this.producedLiquids.add(liquid);
+            return this;
+        }
+
+        public Builder storedLiquid(StoredLiquidState liquid){
+            this.storedLiquids.add(liquid);
+            return this;
+        }
+
+        public Builder liquidInputsComplete(boolean complete){
+            this.liquidInputsComplete = complete;
+            return this;
+        }
+
+        public Builder liquidOutputsComplete(boolean complete){
+            this.liquidOutputsComplete = complete;
             return this;
         }
 

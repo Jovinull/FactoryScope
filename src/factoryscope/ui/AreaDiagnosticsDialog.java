@@ -8,6 +8,7 @@ import factoryscope.*;
 import factoryscope.area.*;
 import factoryscope.model.*;
 import factoryscope.probe.*;
+import factoryscope.trace.TraceDirection;
 import mindustry.*;
 import mindustry.game.*;
 import mindustry.gen.*;
@@ -43,6 +44,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     private AreaSelection selection;
     private AreaDiagnosticResult result;
     private final NetworkDialog networkDialog = new NetworkDialog();
+    private final LiquidDialog liquidDialog = new LiquidDialog();
 
     public AreaDiagnosticsDialog(Runnable onSelectAnother, Cons<Building> onInspect, Cons<BuildingRef> onLocate){
         super("");
@@ -57,6 +59,12 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
             hide();
             FactoryScopeUI.locateFromNetwork(ref, networkDialog::reopen);
         });
+        liquidDialog.setActions(this::viewLiquidInWorld, this::refresh, this::inspectFromLiquids, ref -> {
+            hide();
+            liquidDialog.hide();
+            FactoryScopeUI.locateFromNetwork(ref, liquidDialog::reopen);
+        }, (ref, liquid) -> showLiquidTrace(ref, liquid, TraceDirection.input),
+            (ref, liquid) -> showLiquidTrace(ref, liquid, TraceDirection.output));
         //a column rather than the full width of the window: a count pinned to the far edge of a 4K
         //display is a long way from the label it belongs to
         cont.pane(outer -> {
@@ -72,6 +80,8 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
             .size(180f, 64f).name("factoryscope-area-network");
         buttons.button(FsBundle.ref("power.open"), Icon.power, this::openPower)
             .size(170f, 64f).name("factoryscope-area-power");
+        buttons.button(FsBundle.ref("liquid.open"), Icon.liquid, this::openLiquids)
+            .size(185f, 64f).name("factoryscope-area-liquids");
         addCloseButton();
     }
 
@@ -112,8 +122,18 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         return result;
     }
 
+    factoryscope.liquid.LiquidTrace liquidTrace(){
+        return liquidDialog.trace();
+    }
+
     void showTrace(BuildingRef target, ResourceRef item){
         if(result != null && result.network != null) networkDialog.showTrace(result, target, item);
+    }
+
+    void showLiquidTrace(BuildingRef target, ResourceRef liquid, TraceDirection direction){
+        if(result == null || result.liquids == null) return;
+        hide();
+        liquidDialog.showTrace(result, target, liquid, direction);
     }
 
     public AreaSelection selection(){
@@ -137,6 +157,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         }
         result = AreaProbe.scan(selection, viewerTeam());
         networkDialog.refresh(result);
+        liquidDialog.refresh(result);
         rebuild();
     }
 
@@ -145,6 +166,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         selection = null;
         result = null;
         networkDialog.clearReport();
+        liquidDialog.clearReport();
         if(body != null) body.clear();
         if(isShown()) hide();
     }
@@ -158,6 +180,13 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         if(result != null && result.network != null) networkDialog.show(result);
     }
 
+    private void openLiquids(){
+        if(result != null && result.liquids != null){
+            hide();
+            liquidDialog.show(result);
+        }
+    }
+
     private void openPower(){
         if(result != null) FactoryScopeUI.showAreaPower(result.power, this::refresh);
     }
@@ -168,6 +197,14 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         FactoryScopeUI.viewNetworkInWorld(result.network, networkDialog.selected(), networkDialog.trace(), () -> {
             show();
             networkDialog.reopen();
+        }, this::clear);
+    }
+
+    private void viewLiquidInWorld(){
+        if(result == null || result.liquids == null) return;
+        FactoryScopeUI.viewLiquidInWorld(result.liquids, () -> {
+            show();
+            liquidDialog.reopen();
         }, this::clear);
     }
 
@@ -329,6 +366,16 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         }
         //the report stays open underneath, so closing the building panel comes straight back to it
         onInspect.get(build);
+    }
+
+    private void inspectFromLiquids(Building build){
+        if(build == null || !MindustryFactoryProbe.canInspect(build, Vars.player == null ? null : Vars.player.team())){
+            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+            liquidDialog.reopen();
+            return;
+        }
+        liquidDialog.hide();
+        if(!FactoryScopeUI.inspect(build, liquidDialog::reopen)) liquidDialog.reopen();
     }
 
     /**
