@@ -145,6 +145,59 @@ class LiquidTraceAnalyzerTest{
     }
 
     @Test
+    void producerDeadEndBoundaryAndUnsupportedBranchRemainDistinctEvidence(){
+        BuildingRef target = ref("consumer", 1), producer = ref("pump", 2), dead = ref("conduit-dead", 3);
+        BuildingRef unsupported = ref("armored-conduit", 4);
+        NetworkPort producerOut = port(producer, NetworkSide.east, "out");
+        NetworkPort deadOut = port(dead, NetworkSide.east, "out");
+        NetworkPort targetA = port(target, NetworkSide.west, "in");
+        NetworkPort targetB = port(target, NetworkSide.east, "in");
+        NetworkPort targetC = port(target, NetworkSide.north, "in");
+        NetworkPort targetD = port(target, NetworkSide.south, "in");
+        LiquidInterruption interruption = new LiquidInterruption(targetD, unsupported,
+            LiquidInterruption.Direction.incoming, LiquidConstraint.only(water));
+        LiquidNetwork topology = new LiquidNetwork(graph(List.of(producerOut, deadOut, targetA, targetB, targetC, targetD),
+            List.of(edge(producerOut, targetA, LiquidConstraint.only(water)),
+                edge(deadOut, targetB, LiquidConstraint.only(water)))), List.of(), List.of(targetC),
+            Map.of(), Map.of(targetC, LiquidConstraint.only(water)), List.of(unsupported), List.of(interruption),
+            List.of(), List.of(), List.of(), List.of(water));
+
+        LiquidTrace trace = LiquidTraceAnalyzer.input(area(topology, entry(producer, producer(water)),
+            entry(target, consumer(water))), target, water);
+
+        assertEquals(List.of(producer), trace.producers().stream().map(endpoint -> endpoint.building).toList());
+        assertEquals(List.of(dead), trace.structuralDeadEnds);
+        assertEquals(List.of(targetC), trace.boundaryContinuations);
+        assertEquals(List.of(interruption), trace.unsupportedInterruptions);
+        assertFalse(trace.complete);
+        assertFalse(trace.noRouteProven);
+    }
+
+    @Test
+    void boundaryAndUnsupportedTerminationsAreNotDuplicatedAsDeadEnds(){
+        BuildingRef target = ref("consumer", 1), pipe = ref("conduit", 2), unknown = ref("armored-conduit", 3);
+        NetworkPort targetIn = port(target, NetworkSide.west, "in");
+        NetworkPort targetOtherIn = port(target, NetworkSide.north, "in");
+        NetworkPort pipeOut = port(pipe, NetworkSide.east, "out");
+        NetworkPort pipeIn = port(pipe, NetworkSide.west, "in");
+        NetworkPort interruptedPipeOut = port(ref("conduit-interrupted", 4), NetworkSide.east, "out");
+        LiquidInterruption interruption = new LiquidInterruption(interruptedPipeOut, unknown,
+            LiquidInterruption.Direction.incoming, LiquidConstraint.only(water));
+        LiquidNetwork topology = new LiquidNetwork(graph(List.of(targetIn, targetOtherIn, pipeOut, pipeIn, interruptedPipeOut),
+            List.of(edge(pipeOut, targetIn, LiquidConstraint.only(water)),
+                edge(pipeIn, pipeOut, LiquidConstraint.any()),
+                edge(interruptedPipeOut, targetOtherIn, LiquidConstraint.only(water)))), List.of(), List.of(pipeIn),
+            Map.of(), Map.of(pipeIn, LiquidConstraint.only(water)), List.of(unknown), List.of(interruption),
+            List.of(), List.of(), List.of(), List.of(water));
+
+        LiquidTrace trace = LiquidTraceAnalyzer.input(area(topology, entry(target, consumer(water))), target, water);
+
+        assertEquals(List.of(pipeIn), trace.boundaryContinuations);
+        assertEquals(List.of(interruption), trace.unsupportedInterruptions);
+        assertTrue(trace.structuralDeadEnds.isEmpty());
+    }
+
+    @Test
     void outputBoundaryIsAnOutsideContinuationNotAnOutputFailure(){
         BuildingRef target = ref("pump", 1);
         NetworkPort source = port(target, NetworkSide.east, "out");
@@ -229,6 +282,42 @@ class LiquidTraceAnalyzerTest{
 
         assertEquals(200, trace.producers().size());
         assertTrue(trace.producers().stream().allMatch(endpoint -> endpoint.path.edges().size() == 3));
+    }
+
+    @Test
+    void multipleRoutesToOneProducerYieldOneStableRepresentativePath(){
+        BuildingRef producer = ref("pump", 1), target = ref("consumer", 2);
+        NetworkPort sourceWest = port(producer, NetworkSide.west, "out");
+        NetworkPort sourceNorth = port(producer, NetworkSide.north, "out");
+        NetworkPort routeAWest = port(ref("conduit-a", 3), NetworkSide.west, "in");
+        NetworkPort routeAEast = port(routeAWest.building, NetworkSide.east, "out");
+        NetworkPort routeBWest = port(ref("conduit-b", 4), NetworkSide.west, "in");
+        NetworkPort routeBEast = port(routeBWest.building, NetworkSide.east, "out");
+        NetworkPort targetWest = port(target, NetworkSide.west, "in");
+        List<NetworkPort> ports = List.of(sourceWest, sourceNorth, routeAWest, routeAEast,
+            routeBWest, routeBEast, targetWest);
+        List<LiquidNetworkEdge> routeA = List.of(
+            edge(sourceWest, routeAWest, LiquidConstraint.only(water)),
+            edge(routeAWest, routeAEast, LiquidConstraint.any()),
+            edge(routeAEast, targetWest, LiquidConstraint.only(water)));
+        List<LiquidNetworkEdge> routeB = List.of(
+            edge(sourceNorth, routeBWest, LiquidConstraint.only(water)),
+            edge(routeBWest, routeBEast, LiquidConstraint.any()),
+            edge(routeBEast, targetWest, LiquidConstraint.only(water)));
+
+        List<LiquidNetworkEdge> forwardInsertion = new ArrayList<>(routeA);
+        forwardInsertion.addAll(routeB);
+        LiquidTrace first = LiquidTraceAnalyzer.input(area(network(ports, forwardInsertion),
+            entry(producer, producer(water)), entry(target, consumer(water))), target, water);
+        List<LiquidNetworkEdge> reversedInsertion = new ArrayList<>(routeB);
+        reversedInsertion.addAll(routeA);
+        LiquidTrace second = LiquidTraceAnalyzer.input(area(network(ports, reversedInsertion),
+            entry(producer, producer(water)), entry(target, consumer(water))), target, water);
+
+        assertEquals(1, first.producers().size(), "the same producer is one endpoint despite multiple routes");
+        assertEquals(first.producers().get(0).path.edges(), second.producers().get(0).path.edges(),
+            "the representative path is deterministic and independent of insertion order");
+        assertEquals(3, first.producers().get(0).path.edges().size());
     }
 
     @Test
@@ -376,6 +465,26 @@ class LiquidTraceAnalyzerTest{
         assertTrue(oilTrace.topologyIncomplete);
         assertEquals(List.of(oilInterruption), oilTrace.unsupportedInterruptions);
         assertFalse(oilTrace.noRouteProven);
+    }
+
+    @Test
+    void disconnectedUnsupportedTransportForSameLiquidDoesNotPoisonThisTrace(){
+        BuildingRef pump = ref("pump", 1), target = ref("crafter", 2), unknown = ref("armored-conduit", 20);
+        NetworkPort source = port(pump, NetworkSide.east, "out");
+        NetworkPort sink = port(target, NetworkSide.west, "in");
+        NetworkPort unrelated = port(unknown, NetworkSide.west, "in");
+        LiquidInterruption interruption = new LiquidInterruption(unrelated, unknown,
+            LiquidInterruption.Direction.incoming, LiquidConstraint.only(water));
+        LiquidNetwork graph = new LiquidNetwork(graph(List.of(source, sink, unrelated),
+            List.of(edge(source, sink, LiquidConstraint.only(water)))), List.of(), List.of(), Map.of(), Map.of(),
+            List.of(unknown), List.of(interruption), List.of(), List.of(), List.of(), List.of(water));
+
+        LiquidTrace trace = LiquidTraceAnalyzer.input(area(graph, entry(pump, producer(water)),
+            entry(target, consumer(water))), target, water);
+
+        assertTrue(trace.complete, "an unsupported branch that is disconnected from the traced subgraph is irrelevant");
+        assertTrue(trace.unsupportedInterruptions.isEmpty());
+        assertEquals(List.of(pump), trace.producers().stream().map(endpoint -> endpoint.building).toList());
     }
 
     private static AreaDiagnosticResult area(LiquidNetwork network, AreaEntry... entries){
