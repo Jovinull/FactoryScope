@@ -38,6 +38,8 @@ they mark the area topology partial rather than adding an approximation.
 
 `DuctRouterBuild` accepts from its rear, sends its configured item forward, and sends other items to a
 side exit. Those side exits are structurally possible alternatives, not a claim about the current choice.
+The v160.5 Surge Router extends this block family and uses the same configured ports; its transient
+loading/unloading state is intentionally not presented as a live route or rate.
 
 Overflow gates keep their direct route preferred and their side routes conditional; underflow gates invert
 that relationship. Overflow ducts use the same preferred-versus-fallback distinction.

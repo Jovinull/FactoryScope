@@ -46,9 +46,9 @@ import static mindustry.Vars.*;
  * scene next lays out, and a dialog told to hide is still on screen until its fade finishes, so
  * back-to-back actions would only ever test the harness.
  *
- * <p>Results are written to the game log as {@code [HARNESS]} lines and the process exits when the
- * suite finishes; {@code scripts/acceptance-test.ps1} reads those lines and turns them into an exit
- * code. This is a separate mod: it is never part of the FactoryScope artifact.
+ * <p>Results are written to the game log as {@code [HARNESS]} lines and the portable Java acceptance
+ * launcher reads those lines and turns them into an exit code. This is a separate mod: it is never
+ * part of the FactoryScope artifact.
  */
 public class AcceptanceHarness extends Mod{
     static final float TICKS_BETWEEN_ACTIONS = 12f;
@@ -65,7 +65,8 @@ public class AcceptanceHarness extends Mod{
     Building upper, lower, target, producer, disabledProducer, disabledRouteBreak;
     AreaDiagnosticResult traceSnapshotBeforeRefresh;
     PowerGridReport refreshedPowerSnapshot;
-    int baselineElements;
+    int baselineFactoryScopeElements;
+    float nextActionDelay = TICKS_BETWEEN_ACTIONS;
     final Seq<Building> patch = new Seq<>();
     final Seq<AreaSelection> bounds = new Seq<>();
     final Seq<String> members = new Seq<>();
@@ -109,6 +110,9 @@ public class AcceptanceHarness extends Mod{
         areaOriginX = tileX() + 5;
         areaOriginY = tileY() - 7;
         areaOriginCaptured = true;
+        chatVisibilityScenarios();
+        hudVisibilityScenarios();
+        hudAnchorRebuildScenario();
         scenario("the HUD toggle activates the picker");
         queue(this::closeAnyDialog);
         queue(this::ensurePickerOff);
@@ -117,6 +121,7 @@ public class AcceptanceHarness extends Mod{
             check("picker is active after clicking the HUD button", FactoryScopeUI.picking());
             check("exactly one HUD toggle exists", countNamed("factoryscope-toggle") == 1);
             check("exactly one picker overlay exists", countNamed("factoryscope-picker") == 1);
+            checkToggleFollowsHudLayout("default window");
         });
         queue(this::clickToggleButton);
         queue(() -> check("picker is inactive after clicking again", !FactoryScopeUI.picking()));
@@ -160,8 +165,14 @@ public class AcceptanceHarness extends Mod{
         layout(1280, 720, 1f);
         layout(1920, 1080, 1f);
         layout(2560, 1440, 1f);
+        layout(1280, 720, 2f);
         layout(1280, 720, 1.5f);
+        layout(1920, 1080, 1.5f);
+        layout(1920, 1080, 2f);
+        layout(2560, 1440, 1.5f);
         layout(2560, 1440, 2f);
+        layout(720, 1280, 1.5f);
+        layout(720, 1280, 2f);
         queue(this::restoreLayout);
         queue(this::checkLocalization);
 
@@ -175,6 +186,7 @@ public class AcceptanceHarness extends Mod{
         queue(() -> {
             check("panel cleared on world load", FactoryScopeUI.inspected() == null);
             check("picker cleared on world load", !FactoryScopeUI.picking());
+            checkToggleFollowsHudLayout("after world load");
         });
 
         areaScenarios();
@@ -182,6 +194,73 @@ public class AcceptanceHarness extends Mod{
 
         actions.add(this::finish);
         pump();
+    }
+
+    void chatVisibilityScenarios(){
+        scenario("the HUD toggle stays aligned when chat is shown or hidden");
+        queue(() -> {
+            ui.chatfrag.hide();
+            ui.chatfrag.toggle();
+            check("the real chat fragment is shown", ui.chatfrag.shown());
+            checkToggleFollowsHudLayout("chat visible");
+        });
+        queue(() -> {
+            ui.chatfrag.hide();
+            check("the real chat fragment is hidden", !ui.chatfrag.shown());
+            checkToggleFollowsHudLayout("chat hidden");
+        });
+    }
+
+    void hudVisibilityScenarios(){
+        scenario("the FactoryScope toggle follows the vanilla HUD visibility");
+        queue(() -> ui.hudfrag.shown = false);
+        queue(() -> {
+            Element slot = Core.scene.find("factoryscope");
+            check("the toggle is hidden and non-interactive with the vanilla HUD",
+                slot != null && slot.color.a == 0f && slot.touchable == arc.scene.event.Touchable.disabled);
+        });
+        queue(() -> ui.hudfrag.shown = true);
+        queue(() -> {
+            Element slot = Core.scene.find("factoryscope");
+            check("the toggle returns when the vanilla HUD is shown",
+                slot != null && slot.color.a == 1f && slot.touchable == arc.scene.event.Touchable.enabled);
+            checkToggleFollowsHudLayout("HUD restored");
+        });
+    }
+
+    void hudAnchorRebuildScenario(){
+        Element anchor = ui.hudGroup.find("waves/editor");
+        Element replacement = new Element();
+        replacement.name = "waves/editor";
+        replacement.setSize(120f, 60f);
+        replacement.setPosition(25f, 620f);
+        replacement.touchable = arc.scene.event.Touchable.disabled;
+        scenario("the FactoryScope toggle recovers when the HUD layout anchor is rebuilt");
+        queue(() -> {
+            check("the expected vanilla layout anchor exists before rebuild", anchor != null);
+            if(anchor != null) anchor.name = "factoryscope-test-stale-anchor";
+        });
+        queue(() -> {
+            Element slot = Core.scene.find("factoryscope");
+            check("the toggle is hidden while the HUD layout anchor is absent",
+                slot != null && slot.color.a == 0f && slot.touchable == arc.scene.event.Touchable.disabled);
+        });
+        queue(() -> {
+            ui.hudGroup.addChild(replacement);
+        });
+        queue(() -> {
+            Element slot = Core.scene.find("factoryscope");
+            check("the toggle follows a replacement instead of its still-parented stale anchor",
+                slot != null && slot.color.a == 1f && slot.touchable == arc.scene.event.Touchable.enabled);
+            checkToggleFollowsHudLayout("replacement HUD anchor");
+        });
+        queue(() -> {
+            replacement.remove();
+            if(anchor != null) anchor.name = "waves/editor";
+        });
+        queue(() -> {
+            checkToggleFollowsHudLayout("original HUD anchor restored");
+        });
     }
 
     /**
@@ -219,7 +298,7 @@ public class AcceptanceHarness extends Mod{
         queue(this::ensurePickerOff);
         queue(() -> {
             target = place(Blocks.siliconSmelter, tileX() + 12, tileY() - 4);
-            baselineElements = countElements();
+            baselineFactoryScopeElements = countFactoryScopeElements();
         });
 
         for(int i = 0; i < cycles; i++){
@@ -233,9 +312,9 @@ public class AcceptanceHarness extends Mod{
             check("still exactly one HUD toggle", countNamed("factoryscope-toggle") == 1);
             check("no leftover picker overlay", countNamed("factoryscope-picker") == 0);
             check("no leftover hint", countNamed("factoryscope-hint") == 0);
-            int now = countElements();
-            check("scene element count returned to baseline", now <= baselineElements,
-                "baseline " + baselineElements + " now " + now);
+            int now = countFactoryScopeElements();
+            check("FactoryScope scene elements returned to baseline", now <= baselineFactoryScopeElements,
+                "baseline " + baselineFactoryScopeElements + " now " + now);
         });
     }
 
@@ -251,6 +330,7 @@ public class AcceptanceHarness extends Mod{
             Scl.setProduct(scale);
             Core.scene.resize(width, height);
         });
+        queue(() -> checkToggleFollowsHudLayout(width + "x" + height + " @ " + scale + "x"));
         //opened directly: the click path is covered above, and a synthetic click would otherwise mix
         //real window coordinates with a resized scene viewport
         queue(() -> target = place(Blocks.surgeSmelter, tileX() + 14, tileY() + 6));
@@ -310,6 +390,26 @@ public class AcceptanceHarness extends Mod{
      */
     int rx(){
         return areaOriginCaptured ? areaOriginX : tileX() + 5;
+    }
+
+    void checkToggleFollowsHudLayout(String label){
+        Element button = Core.scene.find("factoryscope-toggle");
+        Element slot = Core.scene.find("factoryscope");
+        Element anchor = ui.hudGroup.find("waves/editor");
+        if(button == null || slot == null || anchor == null){
+            check("HUD toggle and vanilla layout anchor exist at " + label, false,
+                "toggle=" + button + " slot=" + slot + " anchor=" + anchor);
+            return;
+        }
+        Vec2 buttonBottomLeft = button.localToStageCoordinates(new Vec2(0f, 0f));
+        Vec2 anchorBottomLeft = anchor.localToStageCoordinates(new Vec2(0f, 0f));
+        float xError = Math.abs(buttonBottomLeft.x - anchorBottomLeft.x);
+        float yError = Math.abs(buttonBottomLeft.y + button.getHeight() - anchorBottomLeft.y);
+        check("HUD toggle remains visible and aligned below the layout anchor at " + label,
+            button.visible && slot.color.a == 1f && slot.touchable == arc.scene.event.Touchable.enabled
+                && xError < 1f && yError < 1f,
+            "toggle=" + buttonBottomLeft + " size=" + button.getWidth() + "x" + button.getHeight()
+                + " anchor=" + anchorBottomLeft + " size=" + anchor.getWidth() + "x" + anchor.getHeight());
     }
 
     int ry(){
@@ -635,7 +735,7 @@ public class AcceptanceHarness extends Mod{
     }
 
     void traceCompletenessScenarios(){
-        int x = rx() + 7, boundaryX = rx() + 12, unsupportedX = rx() + 17, y = ry() + 3;
+        int x = rx() + 7, boundaryX = rx() + 12, unsupportedX = rx() + 5, y = ry() + 3;
         ResourceRef sand = new ResourceRef(ResourceKind.item, "sand", "Sand");
 
         scenario("Supply Trace proves no route only for a complete isolated target");
@@ -650,6 +750,7 @@ public class AcceptanceHarness extends Mod{
         queue(() -> check("the isolated target offers an item trace",
             Core.scene.find("factoryscope-trace-input-sand") != null));
         queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> delayNextAction(30f));
         queue(() -> dragTiles(x, y, x + 1, y + 1));
         queue(() -> {
             AreaDiagnosticResult report = FactoryScopeUI.areaReport();
@@ -672,6 +773,7 @@ public class AcceptanceHarness extends Mod{
         queue(this::armPicker);
         queue(() -> clickBuilding(target));
         queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> delayNextAction(30f));
         queue(() -> dragTiles(boundaryX, y, boundaryX + 1, y + 1));
         queue(() -> {
             AreaDiagnosticResult report = FactoryScopeUI.areaReport();
@@ -693,16 +795,24 @@ public class AcceptanceHarness extends Mod{
             clearRegion();
             placeAt(Blocks.armoredConveyor, unsupportedX - 1, y, 1);
             target = placeAt(Blocks.siliconSmelter, unsupportedX, y);
+            check("unsupported-route fixture keeps both buildings", target != null
+                && world.tile(unsupportedX - 1, y).build != null
+                && world.tile(unsupportedX - 1, y).build.block == Blocks.armoredConveyor,
+                "transport=" + world.tile(unsupportedX - 1, y).build + ", target=" + target);
         });
         queue(this::armPicker);
         queue(() -> clickBuilding(target));
         queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> delayNextAction(30f));
         queue(() -> dragTiles(unsupportedX - 1, y, unsupportedX + 1, y + 1));
         queue(() -> {
             AreaDiagnosticResult report = FactoryScopeUI.areaReport();
             SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(target), sand);
             check("the unsupported transport makes the trace incomplete",
-                trace != null && !trace.complete && !trace.unsupportedInterruptions.isEmpty());
+                trace != null && !trace.complete && !trace.unsupportedInterruptions.isEmpty(),
+                trace == null ? "no trace; picker=" + FactoryScopeUI.picking() + ", report=" + (report != null)
+                    : "complete=" + trace.complete + ", unsupported=" + trace.unsupportedInterruptions.size()
+                        + ", bounds=" + (report == null ? "none" : report.selection));
             check("the UI reports unsupported topology", dialogShows(FsBundle.get("trace.unsupported-area-one")));
             check("unsupported topology is not shown as a dead end or no route", trace != null
                 && !trace.noRouteProven && trace.structuralDeadEnds.isEmpty()
@@ -724,6 +834,7 @@ public class AcceptanceHarness extends Mod{
         queue(this::armPicker);
         queue(() -> clickBuilding(target));
         queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> delayNextAction(30f));
         queue(() -> dragTiles(x - 1, y, x + 1, y + 1));
         queue(() -> check("the unsupported route opens Supply Trace",
             Core.scene.find("factoryscope-trace-unsupported-locate") != null));
@@ -931,15 +1042,19 @@ public class AcceptanceHarness extends Mod{
         queue(() -> check("a network building opens topology detail", Core.scene.find("factoryscope-network-dialog") != null));
         queue(() -> capture("network-view"));
         queue(() -> clickNamed("factoryscope-network-view-world"));
+        queue(() -> delayNextAction(30f));
         queue(() -> {
             check("the static routes can be viewed over the world", Core.scene.find("factoryscope-network-viewing") != null);
             check("the Network view keeps its return control", Core.scene.find("factoryscope-network-return") != null);
         });
         queue(() -> capture("network-world"));
         queue(() -> clickNamed("factoryscope-network-return"));
+        queue(() -> delayNextAction(30f));
         queue(() -> check("return restores the Network view", Core.scene.find("factoryscope-network-dialog") != null));
         queue(() -> clickNamed("factoryscope-network-view-world"));
+        queue(() -> delayNextAction(30f));
         queue(() -> clickNamed("factoryscope-network-dismiss"));
+        queue(() -> delayNextAction(30f));
         queue(() -> {
             check("dismissing the world overlay removes its return control", Core.scene.find("factoryscope-network-viewing") == null);
             check("dismissing the world overlay drops the held report", !FactoryScopeUI.areaReportHeld());
@@ -1005,7 +1120,7 @@ public class AcceptanceHarness extends Mod{
         queue(() -> {
             clearRegion();
             supportedGrid[0] = placeAt(Blocks.solarPanel, batteryX + 3, batteryY + 7);
-            supportedGrid[1] = placeAt(Blocks.battery, batteryX + 7, batteryY + 4);
+            supportedGrid[1] = placeAt(Blocks.batteryLarge, batteryX + 7, batteryY + 4);
             supportedGrid[2] = placeAt(Blocks.siliconSmelter, batteryX + 11, batteryY + 7);
             supportedGrid[3] = placeAt(Blocks.combustionGenerator, batteryX + 7, batteryY + 11);
             Building node = placeAt(Blocks.powerNodeLarge, batteryX + 7, batteryY + 7);
@@ -1055,24 +1170,37 @@ public class AcceptanceHarness extends Mod{
         queue(() -> dragTiles(batteryX + 1, batteryY + 1, batteryX2, batteryY2));
         queue(() -> check("the battery-supported area exposes PowerScope",
             FactoryScopeUI.areaReport() != null && Core.scene.find("factoryscope-area-power") != null));
-        queue(() -> clickNamed("factoryscope-area-power"));
+        queue(() -> {
+            // Refill immediately before taking the snapshot so the UI assertion tests the
+            // battery-covered state rather than how long the preceding real-client steps took.
+            supportedGrid[1].power.status = 1f;
+            supportedGraph[0].update();
+            clickNamed("factoryscope-area-power");
+        });
         queue(() -> {
             PowerGridReport report = FactoryScopeUI.powerReport();
             PowerGridResult result = report == null || report.grids.isEmpty() ? null : report.grids.get(0);
+            String resultDetails = result == null ? "no PowerGridResult"
+                : "state=" + result.state + ", generation=" + result.snapshot.generationPerSecond
+                    + ", demand=" + result.snapshot.demandPerSecond + ", satisfaction=" + result.snapshot.satisfaction
+                    + ", battery=" + result.snapshot.batteryStored + "/" + result.snapshot.batteryCapacity
+                    + ", generatorProblems=" + result.generatorsWithProblems
+                    + ", producers=" + result.snapshot.producers.stream().map(member -> member.ref + ":"
+                        + (member.diagnostic == null ? "unclassified" : member.diagnostic.reason())).collect(java.util.stream.Collectors.joining(","));
             check("PowerScope distinguishes generation below demand while the grid is satisfied",
                 result != null && result.state == PowerGridState.generationBelowDemand
                     && result.snapshot.generationPerSecond < result.snapshot.demandPerSecond
                     && result.snapshot.satisfaction >= 0.999f
-                    && result.has(PowerFinding.BATTERY_RESERVES_PRESENT));
+                    && result.has(PowerFinding.BATTERY_RESERVES_PRESENT), resultDetails);
             check("the UI explicitly labels the battery-supported deficit",
                 dialogShows(FsBundle.get("power.battery-reserves")));
             check("a fuel-starved connected generator retains its FactoryAnalyzer diagnostic",
                 result != null && result.generatorsWithProblems == 1
                     && result.snapshot.producers.stream().anyMatch(member -> member.ref.equals(AreaProbe.refOf(supportedGrid[3]))
                         && member.diagnostic != null
-                        && member.diagnostic.reason() == DiagnosticReason.missingItemInput));
+                        && member.diagnostic.reason() == DiagnosticReason.missingItemInput), resultDetails);
             check("the grid summary reports a generator problem without assigning a cause",
-                result != null && dialogShows(FsBundle.format("power.generator-problems", 1)));
+                result != null && dialogShows(FsBundle.format("power.generator-problems", 1)), resultDetails);
             check("the generator member list is available for navigation",
                 Core.scene.find("factoryscope-power-list-toggle") != null);
             capture("power-battery-supported-deficit");
@@ -1084,7 +1212,9 @@ public class AcceptanceHarness extends Mod{
         queue(() -> clickNamed("factoryscope-locate-return"));
         queue(() -> check("Return restores the same battery-supported grid snapshot",
             FactoryScopeUI.powerReport() != null && FactoryScopeUI.powerReport().grids.size() == 1
-                && FactoryScopeUI.powerReport().grids.get(0).state == PowerGridState.generationBelowDemand));
+                && FactoryScopeUI.powerReport().grids.get(0).state == PowerGridState.generationBelowDemand,
+            FactoryScopeUI.powerReport() == null || FactoryScopeUI.powerReport().grids.isEmpty() ? "no report"
+                : "state=" + FactoryScopeUI.powerReport().grids.get(0).state));
         queue(this::restoreCamera);
         queue(() -> {
             supportedGrid[1].power.status = 0f;
@@ -1811,7 +1941,7 @@ public class AcceptanceHarness extends Mod{
         queue(() -> {
             clearRegion();
             placeAt(Blocks.graphitePress, rx() + 3, ry() + 3);
-            baselineElements = countElements();
+            baselineFactoryScopeElements = countFactoryScopeElements();
         });
 
         for(int i = 0; i < cycles; i++){
@@ -1825,9 +1955,9 @@ public class AcceptanceHarness extends Mod{
             check("still exactly one HUD toggle", countNamed("factoryscope-toggle") == 1);
             check("no leftover selection overlay", countNamed("factoryscope-picker") == 0);
             check("no leftover hint", countNamed("factoryscope-hint") == 0);
-            int now = countElements();
-            check("scene element count returned to baseline after area use", now <= baselineElements,
-                "baseline " + baselineElements + " now " + now);
+            int now = countFactoryScopeElements();
+            check("FactoryScope scene elements returned to baseline after area use", now <= baselineFactoryScopeElements,
+                "baseline " + baselineFactoryScopeElements + " now " + now);
         });
     }
 
@@ -1844,6 +1974,7 @@ public class AcceptanceHarness extends Mod{
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> check("a report is open before the world change", FactoryScopeUI.areaReport() != null));
         queue(() -> Events.fire(new WorldLoadEvent()));
+        queue(() -> delayNextAction(30f));
         queue(() -> {
             check("the area report was cleared on world load", FactoryScopeUI.areaReport() == null);
             check("the bounds were cleared too", FactoryScopeUI.areaBounds() == null);
@@ -1869,6 +2000,7 @@ public class AcceptanceHarness extends Mod{
         queue(() -> check("the Supply Trace is open before the world change",
             Core.scene.getDialog() != null && Core.scene.find("factoryscope-trace-back") != null));
         queue(() -> Events.fire(new WorldLoadEvent()));
+        queue(() -> delayNextAction(30f));
         queue(() -> check("world change releases the trace and its area snapshot",
             FactoryScopeUI.areaReport() == null && !FactoryScopeUI.areaReportHeld()
                 && FactoryScopeUI.areaBounds() == null && Core.scene.getDialog() == null));
@@ -2163,6 +2295,9 @@ public class AcceptanceHarness extends Mod{
         queue(() -> dragTiles(x1, y1, x2, y2));
         queue(() -> clickNamed("factoryscope-area-issue"));
         queue(() -> clickNamed("factoryscope-area-locate"));
+        // BaseDialog hides through a short scene action; the next game update can still observe
+        // the closing dialog before Arc has completed that transition.
+        queue(() -> delayNextAction(30f));
         queue(() -> {
             check("the report stepped out of the way", Core.scene.getDialog() == null);
             check("the world is no longer covered by a report", FactoryScopeUI.areaReport() == null);
@@ -2666,7 +2801,15 @@ public class AcceptanceHarness extends Mod{
     }
 
     void closeAnyDialog(){
-        if(Core.scene.getDialog() != null) Core.scene.getDialog().hide();
+        if(Core.scene.getDialog() != null){
+            Core.scene.getDialog().hide();
+            // BaseDialog remains in the scene during its hide animation. Waiting one full
+            // animation interval prevents the next synthetic input from hitting a stale modal
+            // and prevents lifecycle counts from observing a dialog that is only fading out.
+            delayNextAction(30f);
+        }else if(FactoryScopeUI.picking()){
+            clickToggleButton();
+        }
     }
 
     int tileX(){
@@ -2705,9 +2848,11 @@ public class AcceptanceHarness extends Mod{
         return count[0];
     }
 
-    int countElements(){
+    int countFactoryScopeElements(){
         int[] count = {0};
-        walk(Core.scene.root, element -> count[0]++);
+        walk(Core.scene.root, element -> {
+            if(element.name != null && element.name.startsWith("factoryscope")) count[0]++;
+        });
         return count[0];
     }
 
@@ -2747,6 +2892,10 @@ public class AcceptanceHarness extends Mod{
         actions.add(action);
     }
 
+    void delayNextAction(float ticks){
+        nextActionDelay = Math.max(nextActionDelay, ticks);
+    }
+
     void pump(){
         if(actions.isEmpty()) return;
         Runnable next = actions.remove(0);
@@ -2756,7 +2905,11 @@ public class AcceptanceHarness extends Mod{
             failures.add("action threw " + t);
             Log.err(TAG + " action threw", t);
         }
-        if(!actions.isEmpty()) Time.runTask(TICKS_BETWEEN_ACTIONS, this::pump);
+        if(!actions.isEmpty()){
+            float delay = nextActionDelay;
+            nextActionDelay = TICKS_BETWEEN_ACTIONS;
+            Time.runTask(delay, this::pump);
+        }
     }
 
     void check(String what, boolean ok){

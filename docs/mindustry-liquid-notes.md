@@ -5,22 +5,23 @@ no engine-maintained liquid graph comparable to `PowerGraph`; buildings call liq
 with live buffer, capacity, team, pressure, and receiver-state checks. Those methods are useful as an
 engine oracle in tests, but their current result is not a static topology query.
 
-## Verified behavior and initial support matrix
+## Verified behavior and support matrix
 
-| Family | Structural model | 0.6 status | Why |
+| Family | Structural model | Current status | Why |
 | --- | --- | --- | --- |
 | Conduit | Any of the three non-front sides may enter; output is front-only | Supported | `acceptLiquid` also checks the current buffer, so only its directional side rule is used for topology |
-| Liquid Junction | Independent straight-through N–S and E–W channels | Supported | `getLiquidDestination` preserves the incoming direction; disabled runtime state is not structural topology |
-| Liquid Router, Liquid Container, Liquid Tank | All-side storage/router; structurally connect each distinct input/output side | Supported | Current contents affect acceptance and dumping, not the persistent set of possible routes |
+| Liquid Junction and Reinforced Liquid Junction | Independent straight-through N–S and E–W channels | Supported | Both vanilla blocks use Mindustry's `LiquidJunction`; `getLiquidDestination` preserves the incoming direction, and disabled runtime state is not structural topology |
+| Liquid Router/Container/Tank and reinforced variants | All-side storage/router; structurally connect each distinct input/output side | Supported | These vanilla blocks use `LiquidRouter`; current contents affect acceptance and dumping, not the persistent set of possible routes |
 | Liquid Bridge | Not approximated as a router or simple remote edge | Partial / interruption | `ItemBridgeBuild.updateTile()` chooses remote `updateTransport()` for a valid configured link and local `doDump()` only when the link is invalid; input/output sides also depend on that link and registered incoming bridges |
 | GenericCrafter liquid output | One resource-specific output route for each declared `LiquidStack`, using that stack's `liquidOutputDirections` after rotation; `-1` means unrestricted dump sides | Supported | `dumpOutputs` passes each product's own direction to `dumpLiquid` |
-| Pump | Product from the live placement's `liquidDrop`; external output may dump on neighboring sides | Supported | Floor/footprint state is placement-specific and is read at Refresh |
+| Mechanical/Rotary/Impulse/Reinforced Pump | Product from the live placement's `liquidDrop`; external output may dump on neighboring sides | Supported | These vanilla blocks use `Pump`; floor/footprint state is placement-specific and is read at Refresh |
 | SolidPump / Fracker | Product from configured `result`; inherits Pump's liquid routing | Supported | `SolidPumpBuild.updateTile()` assigns `liquidDrop = result` and uses Pump's dump behavior; the configured product is available before its first update, and Fracker remains a SolidPump output family |
+| `ConsumeGenerator` / `ThermalGenerator` liquid by-product | Exact declared `outputLiquid` product | Supported | The probe records declared product identity only; no network transfer rate is inferred |
 | Exact `ConsumeLiquid` / `ConsumeLiquids` | Declared resource identities, one requirement per declared liquid | Supported | Consumer stacks are static block metadata |
 | `ConsumeLiquidFilter` / coolant filter | Enumerate the filter's accepted content set, preserving each `Liquid` identity | Supported when enumerable | Current `getConsumed` is only a buffer choice and cannot define all structural choices; conventional consumers without liquid-output behavior are terminal input endpoints |
 | `ConsumeLiquidsDynamic` | Evaluate the current building-specific `LiquidStack[]` on each Refresh | Supported when evaluation succeeds | Dynamic requirements are a snapshot fact, not a permanently cached block property |
-| ArmoredConduit | Not approximated as Conduit | Partial / interruption | Acceptance depends on source class/alignment and armored-blending rules |
-| DirectionLiquidBridge | Not approximated as LiquidBridge | Partial / interruption | It uses forward link search, per-direction occupancy, and a local forward fallback when unlinked |
+| Plated/Reinforced Conduit (`ArmoredConduit`) | Not approximated as Conduit | Partial / interruption | Acceptance depends on source class/alignment and armored-blending rules |
+| Reinforced Bridge Conduit (`DirectionLiquidBridge`) | Not approximated as LiquidBridge | Partial / interruption | It uses forward link search, per-direction occupancy, and a local forward fallback when unlinked |
 | Unknown/modded liquid transport | No guessed internal route | Partial / interruption | Liquid-output-capable blocks with unknown routing are not traversed; `hasLiquids` alone does not establish transport semantics |
 
 Liquids and gases both use Mindustry's `Liquid` content type. Resource identity is the content identity,

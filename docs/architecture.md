@@ -8,6 +8,11 @@ is in the state it is in. Everything else either feeds it or reads its answer.
 **Nothing that reasons knows about Mindustry.** The packages that make decisions take plain data and
 return plain data, so they can be tested without a game, a window or a graphics driver.
 
+**FactoryScope observes; it never changes the factory.** Production probes snapshot existing building,
+network, power-grid, and liquid-module state. They do not move resources, configure or rotate buildings,
+change power links, or trigger production. Engine transfer calls appear only in isolated tests that prove
+what a structural edge means.
+
 ## The single-building pipeline
 
 ```
