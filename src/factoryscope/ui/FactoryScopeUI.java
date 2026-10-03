@@ -99,9 +99,10 @@ public final class FactoryScopeUI{
             // HudFragment reserves this named slot for its top-left wave/editor panel on every
             // platform. Place the toggle directly below that live layout element, so resizing and
             // UI scaling move it with the HUD rather than relying on an assumed bottom pixel pad.
-            if(toggleAnchor == null || toggleAnchor.parent == null){
-                toggleAnchor = Vars.ui.hudGroup.find("waves/editor");
-            }
+            // HudFragment may replace its child tables when HUD settings, scaling or the world
+            // layout changes. Re-resolve the stable name so we never keep a still-parented but
+            // obsolete element from the previous layout.
+            toggleAnchor = Vars.ui.hudGroup.find("waves/editor");
             if(toggleAnchor == null){
                 table.visible = false;
                 return;
