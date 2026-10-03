@@ -38,6 +38,7 @@ public final class FactoryScopePanel extends BaseDialog{
 
     public FactoryScopePanel(){
         super("");
+        name = "factoryscope-inspector-dialog";
         addCloseButton();
 
         cont.pane(table -> body = table).grow().with(pane -> pane.setScrollingDisabled(true, false));
