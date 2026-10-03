@@ -253,6 +253,7 @@ final class LiquidDialog extends BaseDialog{
         section("liquid.current-storage");
         body.table(Tex.pane, table -> {
             table.margin(8f).left().defaults().growX().left();
+            table.add(FsBundle.get("liquid.storage-capacity-note")).color(Pal.gray).wrap().padBottom(4f).row();
             int limit = Math.min(stored.size(), shownStored);
             for(int i = 0; i < limit; i++){
                 var entry = stored.get(i);
