@@ -46,9 +46,9 @@ import static mindustry.Vars.*;
  * scene next lays out, and a dialog told to hide is still on screen until its fade finishes, so
  * back-to-back actions would only ever test the harness.
  *
- * <p>Results are written to the game log as {@code [HARNESS]} lines and the process exits when the
- * suite finishes; {@code scripts/acceptance-test.ps1} reads those lines and turns them into an exit
- * code. This is a separate mod: it is never part of the FactoryScope artifact.
+ * <p>Results are written to the game log as {@code [HARNESS]} lines and the portable Java acceptance
+ * launcher reads those lines and turns them into an exit code. This is a separate mod: it is never
+ * part of the FactoryScope artifact.
  */
 public class AcceptanceHarness extends Mod{
     static final float TICKS_BETWEEN_ACTIONS = 12f;
@@ -111,6 +111,8 @@ public class AcceptanceHarness extends Mod{
         areaOriginY = tileY() - 7;
         areaOriginCaptured = true;
         chatVisibilityScenarios();
+        hudVisibilityScenarios();
+        hudAnchorRebuildScenario();
         scenario("the HUD toggle activates the picker");
         queue(this::closeAnyDialog);
         queue(this::ensurePickerOff);
@@ -206,6 +208,58 @@ public class AcceptanceHarness extends Mod{
             ui.chatfrag.hide();
             check("the real chat fragment is hidden", !ui.chatfrag.shown());
             checkToggleFollowsHudLayout("chat hidden");
+        });
+    }
+
+    void hudVisibilityScenarios(){
+        scenario("the FactoryScope toggle follows the vanilla HUD visibility");
+        queue(() -> ui.hudfrag.shown = false);
+        queue(() -> {
+            Element slot = Core.scene.find("factoryscope");
+            check("the toggle is hidden and non-interactive with the vanilla HUD",
+                slot != null && slot.color.a == 0f && slot.touchable == arc.scene.event.Touchable.disabled);
+        });
+        queue(() -> ui.hudfrag.shown = true);
+        queue(() -> {
+            Element slot = Core.scene.find("factoryscope");
+            check("the toggle returns when the vanilla HUD is shown",
+                slot != null && slot.color.a == 1f && slot.touchable == arc.scene.event.Touchable.enabled);
+            checkToggleFollowsHudLayout("HUD restored");
+        });
+    }
+
+    void hudAnchorRebuildScenario(){
+        Element anchor = ui.hudGroup.find("waves/editor");
+        Element replacement = new Element();
+        replacement.name = "waves/editor";
+        replacement.setSize(120f, 60f);
+        replacement.setPosition(25f, 620f);
+        replacement.touchable = arc.scene.event.Touchable.disabled;
+        scenario("the FactoryScope toggle recovers when the HUD layout anchor is rebuilt");
+        queue(() -> {
+            check("the expected vanilla layout anchor exists before rebuild", anchor != null);
+            if(anchor != null) anchor.name = "factoryscope-test-stale-anchor";
+        });
+        queue(() -> {
+            Element slot = Core.scene.find("factoryscope");
+            check("the toggle is hidden while the HUD layout anchor is absent",
+                slot != null && slot.color.a == 0f && slot.touchable == arc.scene.event.Touchable.disabled);
+        });
+        queue(() -> {
+            ui.hudGroup.addChild(replacement);
+        });
+        queue(() -> {
+            Element slot = Core.scene.find("factoryscope");
+            check("the toggle follows a replacement instead of its still-parented stale anchor",
+                slot != null && slot.color.a == 1f && slot.touchable == arc.scene.event.Touchable.enabled);
+            checkToggleFollowsHudLayout("replacement HUD anchor");
+        });
+        queue(() -> {
+            replacement.remove();
+            if(anchor != null) anchor.name = "waves/editor";
+        });
+        queue(() -> {
+            checkToggleFollowsHudLayout("original HUD anchor restored");
         });
     }
 
@@ -340,10 +394,11 @@ public class AcceptanceHarness extends Mod{
 
     void checkToggleFollowsHudLayout(String label){
         Element button = Core.scene.find("factoryscope-toggle");
+        Element slot = Core.scene.find("factoryscope");
         Element anchor = ui.hudGroup.find("waves/editor");
-        if(button == null || anchor == null){
+        if(button == null || slot == null || anchor == null){
             check("HUD toggle and vanilla layout anchor exist at " + label, false,
-                "toggle=" + button + " anchor=" + anchor);
+                "toggle=" + button + " slot=" + slot + " anchor=" + anchor);
             return;
         }
         Vec2 buttonBottomLeft = button.localToStageCoordinates(new Vec2(0f, 0f));
@@ -351,7 +406,8 @@ public class AcceptanceHarness extends Mod{
         float xError = Math.abs(buttonBottomLeft.x - anchorBottomLeft.x);
         float yError = Math.abs(buttonBottomLeft.y + button.getHeight() - anchorBottomLeft.y);
         check("HUD toggle remains visible and aligned below the layout anchor at " + label,
-            button.visible && xError < 1f && yError < 1f,
+            button.visible && slot.color.a == 1f && slot.touchable == arc.scene.event.Touchable.enabled
+                && xError < 1f && yError < 1f,
             "toggle=" + buttonBottomLeft + " size=" + button.getWidth() + "x" + button.getHeight()
                 + " anchor=" + anchorBottomLeft + " size=" + anchor.getWidth() + "x" + anchor.getHeight());
     }

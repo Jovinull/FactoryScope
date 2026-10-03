@@ -4,9 +4,10 @@
 
 ### Changed
 
-- Anchored the FactoryScope HUD toggle to Mindustry's live HUD layout instead of a fixed bottom offset.
-- Replaced the Windows-only acceptance orchestration with a portable Gradle/Java launcher and isolated sandbox.
+- Anchored the FactoryScope HUD toggle to Mindustry's live HUD layout instead of a fixed bottom offset; it follows anchor rebuilds and hides non-interactively with the HUD.
+- Replaced the Windows-only acceptance orchestration with a portable Gradle/Java launcher and isolated sandbox. The launcher verifies the selected official client JAR and rejects malformed or incomplete acceptance logs.
 - Added a v160.5 support matrix for supported, partial, and deferred transport families.
+- Added regressions for HUD visibility/anchor replacement and additional vanilla transport variants.
 
 ### Validation
 

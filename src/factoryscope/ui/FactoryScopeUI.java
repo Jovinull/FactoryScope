@@ -90,6 +90,8 @@ public final class FactoryScopeUI{
         Table table = new Table();
         table.name = "factoryscope";
         table.setSize(BUTTON_SIZE, BUTTON_SIZE);
+        table.color.a = 0f;
+        table.touchable = Touchable.disabled;
         table.button(Icon.production, Styles.clearTogglei, FactoryScopeUI::toggle)
             .size(BUTTON_SIZE)
             .checked(button -> picking())
@@ -103,11 +105,15 @@ public final class FactoryScopeUI{
             // layout changes. Re-resolve the stable name so we never keep a still-parented but
             // obsolete element from the previous layout.
             toggleAnchor = Vars.ui.hudGroup.find("waves/editor");
-            if(toggleAnchor == null){
-                table.visible = false;
+            if(toggleAnchor == null || !Vars.ui.hudfrag.shown()){
+                //Keep this updater attached and acting so the toggle can recover when the HUD
+                //returns. Hiding the element itself would stop Arc from acting it on some parents.
+                table.color.a = 0f;
+                table.touchable = Touchable.disabled;
                 return;
             }
-            table.visible = true;
+            table.color.a = 1f;
+            table.touchable = Touchable.enabled;
             toggleAnchor.localToStageCoordinates(togglePosition.set(0f, 0f));
             Vars.ui.hudGroup.stageToLocalCoordinates(togglePosition);
             table.setPosition(togglePosition.x, togglePosition.y - table.getHeight());
