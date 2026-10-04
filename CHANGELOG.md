@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+### Fixed
+
+- Revalidate live inspection and report navigation against current fog visibility. Previously captured snapshot evidence may remain visible, but it cannot refresh or navigate into currently hidden state.
+- Keep PowerScope overlay geometry tied to its captured snapshot instead of rereading hidden or destroyed buildings.
+- Correct acceptance-launcher completion handling when the client exits as its final result is flushed.
+
 ## 1.0.0
 
 ### Stable release
