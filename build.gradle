@@ -207,7 +207,7 @@ tasks.register("verifyArtifacts"){
     def libs = layout.buildDirectory.dir("libs")
 
     doLast{
-        def required = ["mod.hjson", "bundles/bundle.properties", "bundles/bundle_pt_BR.properties"]
+        def required = ["mod.hjson", "icon.png", "bundles/bundle.properties", "bundles/bundle_pt_BR.properties"]
         def forbidden = ~/^(mindustry|arc|org|com|kotlin|javax)\/|acceptance|Test|fixture|harness|scratch|factoryscope\/tools\//
 
         ["${projectName}Desktop.jar", "${projectName}.jar"].each{ name ->
@@ -267,6 +267,7 @@ jar{
 
     from(projectDir){
         include "mod.hjson"
+        include "icon.png"
     }
 
     from("assets/"){

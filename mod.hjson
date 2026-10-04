@@ -1,7 +1,7 @@
 name: "factory-scope"
 displayName: "FactoryScope"
 author: "Jovinull"
-description: "Diagnose factory efficiency, inputs, outputs and production problems directly in Mindustry."
+description: "Read-only Mindustry factory diagnostics: building state, area reports, supported item/liquid routes, and power-grid evidence."
 subtitle: "Why is this factory not running at full capacity?"
 version: "1.0.0"
 main: "factoryscope.FactoryScope"
