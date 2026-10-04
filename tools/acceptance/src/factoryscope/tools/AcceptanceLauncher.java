@@ -315,6 +315,10 @@ public final class AcceptanceLauncher{
         if(!completed && process.isAlive()) timedOut = true;
         stopProcessTree(process);
         log = readIfPresent(logFile);
+        if(!completed && !timedOut
+            && (log.contains("[HARNESS] RESULT PASS") || log.contains("[HARNESS] RESULT FAIL"))){
+            completed = true;
+        }
         return new ProcessResult(completed, timedOut, log);
     }
 
