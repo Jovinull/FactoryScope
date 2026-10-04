@@ -105,6 +105,7 @@ final class PowerDialog extends BaseDialog{
         bodyCell.width(Math.min(Math.max(1f, available), 760f));
         if(report == null) return;
 
+        body.labelWrap(FsBundle.get("snapshot.note")).color(Pal.gray).padBottom(6f).growX().row();
         body.labelWrap(FsBundle.get("power.scope-note")).color(Pal.lightishGray).padBottom(8f).growX().row();
         body.labelWrap(FsBundle.get("power.diode-scope")).color(Pal.gray).padBottom(8f).growX().row();
         if(report.grids.isEmpty()){
@@ -246,17 +247,17 @@ final class PowerDialog extends BaseDialog{
     }
 
     private void inspect(BuildingRef ref){
-        Building build = AreaProbe.resolve(ref);
+        Building build = FactoryScopeUI.visibleTarget(ref);
         if(build == null){
-            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+            FactoryScopeUI.showTargetUnavailable();
         }else if(onInspect != null){
             onInspect.get(build);
         }
     }
 
     private void locate(BuildingRef ref){
-        if(AreaProbe.resolve(ref) == null){
-            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+        if(FactoryScopeUI.visibleTarget(ref) == null){
+            FactoryScopeUI.showTargetUnavailable();
         }else if(onLocate != null){
             hide();
             onLocate.get(ref);

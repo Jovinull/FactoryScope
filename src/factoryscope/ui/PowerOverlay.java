@@ -4,7 +4,6 @@ import arc.graphics.g2d.*;
 import arc.math.geom.Vec2;
 import factoryscope.area.BuildingRef;
 import factoryscope.power.*;
-import factoryscope.probe.AreaProbe;
 import mindustry.Vars;
 import mindustry.graphics.*;
 
@@ -29,8 +28,11 @@ final class PowerOverlay{
 
     private void capture(BuildingRef ref){
         if(positions.containsKey(ref)) return;
-        var build = AreaProbe.resolve(ref);
-        if(build != null) positions.put(ref, new Vec2(build.x, build.y));
+        //The report is a snapshot. Re-resolving here would let a later hidden destruction alter its
+        //overlay. Mindustry v160.5 places a Building at Tile.drawx/drawy: tile world coordinates plus
+        //Block.offset, whose afterPatch value is derived from the captured block size.
+        float offset = ((ref.size + 1) % 2) * Vars.tilesize / 2f;
+        positions.put(ref, new Vec2(ref.tileX * Vars.tilesize + offset, ref.tileY * Vars.tilesize + offset));
     }
 
     void draw(){

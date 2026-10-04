@@ -199,9 +199,10 @@ public final class FactoryScopeUI{
 
         //tapping empty ground is how the player cancels, so it is not an error worth reporting
         if(build == null) return;
-        if(!inspect(build)){
-            Vars.ui.showInfoToast(FsBundle.get("inspect.not-visible"), 2f);
-        }
+        //Fogged buildings remain in the client world model. Do not confirm their presence by
+        //showing a special toast when the player taps their otherwise empty-looking tile.
+        if(!visibleToCurrentPlayer(build)) return;
+        inspect(build);
     }
 
     private static void pickArea(AreaSelection selection){
@@ -237,17 +238,41 @@ public final class FactoryScopeUI{
         return Vars.player == null ? null : Vars.player.team();
     }
 
+    /** A navigation marker may only be started or retained while a local viewer can see its target. */
+    static boolean visibleToCurrentPlayer(Building build){
+        return Vars.player != null && MindustryFactoryProbe.canInspect(build, Vars.player.team());
+    }
+
+    /** Resolves a report reference only for a navigation action allowed by current fog visibility. */
+    static Building visibleTarget(BuildingRef ref){
+        Building build = AreaProbe.resolve(ref);
+        return build != null && visibleToCurrentPlayer(build) ? build : null;
+    }
+
+    /** Hidden and stale targets intentionally share one response; distinguishing them leaks live state. */
+    static void showTargetUnavailable(){
+        Vars.ui.showInfoToast(FsBundle.get("target.unavailable"), 2f);
+    }
+
+    /** A denied Locate was invoked from a report already animating closed; reopen only after it exits. */
+    private static void returnAfterDialogHides(Runnable action){
+        if(action == null) return;
+        arc.util.Time.runTask(30f, () -> {
+            if(Core.scene != null && Core.scene.getDialog() == null) action.run();
+        });
+    }
+
     // ------------------------------------------------------------------ locating
 
     /** Uncovers the world and marks one building the area report pointed at. */
     private static void startLocating(BuildingRef ref){
         stopLocating();
 
-        Building build = AreaProbe.resolve(ref);
+        Building build = visibleTarget(ref);
         if(build == null){
-            //it went away between the report being drawn and the button being pressed
-            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
-            returnToReport();
+            //The target may be gone or merely hidden; a frozen report must not distinguish those states.
+            showTargetUnavailable();
+            returnAfterDialogHides(FactoryScopeUI::returnToReport);
             return;
         }
 
@@ -256,10 +281,10 @@ public final class FactoryScopeUI{
 
     static void locateFromNetwork(BuildingRef ref, Runnable onReturn){
         stopLocating();
-        Building build = AreaProbe.resolve(ref);
+        Building build = visibleTarget(ref);
         if(build == null){
-            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
-            if(onReturn != null) onReturn.run();
+            showTargetUnavailable();
+            returnAfterDialogHides(onReturn);
             return;
         }
         locate = new LocateOverlay(ref, build, () -> {
@@ -277,7 +302,16 @@ public final class FactoryScopeUI{
 
     private static void returnToReport(){
         stopLocating();
-        if(areaDialog != null) areaDialog.reopen();
+        if(areaDialog == null) return;
+        if(areaDialog.isShown()){
+            //A target can become hidden while the report is still animating closed. Reopening during
+            //that transition is ignored by BaseDialog, so wait for its hide animation to finish.
+            returnAfterDialogHides(() -> {
+                if(areaDialog != null) areaDialog.reopen();
+            });
+        }else{
+            areaDialog.reopen();
+        }
     }
 
     /** True while the world is uncovered with a located building marked. */
@@ -361,7 +395,7 @@ public final class FactoryScopeUI{
         powerDialog.show(MindustryPowerProbe.scan(build, viewerTeam()), () -> {
             Building current = AreaProbe.resolve(ref);
             if(current == null || !MindustryFactoryProbe.canInspect(current, viewerTeam())){
-                Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+                showTargetUnavailable();
                 powerDialog.clearReport();
                 return;
             }

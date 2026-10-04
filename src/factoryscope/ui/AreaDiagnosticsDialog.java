@@ -225,6 +225,7 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
         bodyCell.width(Math.min(available, COLUMN_WIDTH));
         if(result == null || selection == null) return;
 
+        body.labelWrap(FsBundle.get("area.snapshot-note")).color(Pal.gray).growX().padBottom(6f).row();
         buildSummary();
         if(result.empty()){
             buildEmptyState();
@@ -360,18 +361,19 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
     // ------------------------------------------------------------------ navigation
 
     private void inspect(BuildingRef ref){
-        Building build = AreaProbe.resolve(ref);
+        Building build = FactoryScopeUI.visibleTarget(ref);
         if(build == null){
-            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+            FactoryScopeUI.showTargetUnavailable();
             return;
         }
         //the report stays open underneath, so closing the building panel comes straight back to it
         onInspect.get(build);
     }
 
-    private void inspectFromLiquids(Building build){
-        if(build == null || !MindustryFactoryProbe.canInspect(build, Vars.player == null ? null : Vars.player.team())){
-            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+    private void inspectFromLiquids(BuildingRef ref){
+        Building build = FactoryScopeUI.visibleTarget(ref);
+        if(build == null){
+            FactoryScopeUI.showTargetUnavailable();
             liquidDialog.reopen();
             return;
         }
@@ -384,8 +386,8 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
      * appears over the world is what brings it back.
      */
     private void locate(BuildingRef ref){
-        if(AreaProbe.resolve(ref) == null){
-            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+        if(FactoryScopeUI.visibleTarget(ref) == null){
+            FactoryScopeUI.showTargetUnavailable();
             return;
         }
         hide();

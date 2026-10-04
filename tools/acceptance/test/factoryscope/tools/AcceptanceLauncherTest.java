@@ -221,6 +221,16 @@ class AcceptanceLauncherTest{
         assertFalse(exited.timedOut);
     }
 
+    @Test void completionWrittenAsClientExitsIsStillRecognized(){
+        Path log = temp.resolve("last_log.txt");
+        AcceptanceLauncher.ProcessResult result = assertDoesNotThrow(() ->
+            AcceptanceLauncher.await(new ResultOnExitProcess(log), log, 1));
+
+        assertTrue(result.completed, "the final log read must recognize a completion marker written during exit");
+        assertFalse(result.timedOut);
+        assertTrue(result.log.contains("[HARNESS] RESULT PASS"));
+    }
+
     @Test void timeoutStopsTheClientAndIsReportedSeparately() throws Exception{
         FakeProcess process = new FakeProcess(true);
         AcceptanceLauncher.ProcessResult result = AcceptanceLauncher.await(process,
@@ -273,7 +283,7 @@ class AcceptanceLauncherTest{
         }
     }
 
-    private static final class FakeProcess extends Process{
+    private static class FakeProcess extends Process{
         private boolean alive;
         private final ByteArrayOutputStream output = new ByteArrayOutputStream();
 
@@ -288,5 +298,27 @@ class AcceptanceLauncherTest{
         @Override public void destroy(){ alive = false; }
         @Override public Process destroyForcibly(){ alive = false; return this; }
         @Override public boolean isAlive(){ return alive; }
+    }
+
+    private static final class ResultOnExitProcess extends FakeProcess{
+        private final Path log;
+        private boolean published;
+
+        ResultOnExitProcess(Path log){
+            super(false);
+            this.log = log;
+        }
+
+        @Override public boolean isAlive(){
+            if(!published){
+                try{
+                    Files.writeString(log, "[HARNESS] RESULT PASS");
+                    published = true;
+                }catch(IOException e){
+                    throw new java.io.UncheckedIOException(e);
+                }
+            }
+            return false;
+        }
     }
 }
