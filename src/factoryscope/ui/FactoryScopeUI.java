@@ -302,7 +302,16 @@ public final class FactoryScopeUI{
 
     private static void returnToReport(){
         stopLocating();
-        if(areaDialog != null) areaDialog.reopen();
+        if(areaDialog == null) return;
+        if(areaDialog.isShown()){
+            //A target can become hidden while the report is still animating closed. Reopening during
+            //that transition is ignored by BaseDialog, so wait for its hide animation to finish.
+            returnAfterDialogHides(() -> {
+                if(areaDialog != null) areaDialog.reopen();
+            });
+        }else{
+            areaDialog.reopen();
+        }
     }
 
     /** True while the world is uncovered with a located building marked. */

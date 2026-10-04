@@ -381,8 +381,8 @@ public class AcceptanceHarness extends Mod{
                 fogTarget != null && fogTarget.isValid() && !fogTarget.inFogTo(player.team()));
             clickNamed("factoryscope-area-locate");
             check("Locate starts again while the same target is visible", FactoryScopeUI.locating());
-        });
-        queue(() -> {
+            check("the Area Diagnostics dialog is still in its close transition",
+                Core.scene.find("factoryscope-area-dialog") != null);
             player.team(Team.crux);
             fogControl.resetFog();
             boolean hiddenBeforeDestroy = fogTarget != null && fogTarget.inFogTo(player.team());
@@ -392,6 +392,9 @@ public class AcceptanceHarness extends Mod{
         queue(() -> {
             check("an active Locate ends safely if its hidden target is destroyed before the next update",
                 !FactoryScopeUI.locating(), "locating=" + FactoryScopeUI.locating());
+            delayNextAction(45f);
+        });
+        queue(() -> {
             check("the old Area Diagnostics report returns after hidden destruction",
                 Core.scene.find("factoryscope-area-dialog") != null);
             if(Core.scene.find("factoryscope-area-issue") != null) clickNamed("factoryscope-area-issue");
