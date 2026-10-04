@@ -101,7 +101,7 @@ class AcceptanceLauncherTest{
         Path mod = temp.resolve("FactoryScope.jar");
         modArtifact(mod);
         assertTrue(AcceptanceLauncher.reportsInspectorReady(mod,
-            "[FactoryScope] 0.7.0 inspector ready"));
+            "[FactoryScope] 1.0.0 inspector ready"));
         assertFalse(AcceptanceLauncher.reportsInspectorReady(mod,
             "[FactoryScope] 0.6.0 inspector ready"));
     }
@@ -111,7 +111,7 @@ class AcceptanceLauncherTest{
         modArtifact(mod);
         String valid = "[I] [Mindustry] Version: 160.5\n"
             + "[I] Loading mod: factory-scope\n[I] Loading mod: factory-scope-acceptance\n"
-            + "[I] [FactoryScope] 0.7.0 inspector ready\n"
+            + "[I] [FactoryScope] 1.0.0 inspector ready\n"
             + "[I] [HARNESS]   PASS the sandbox loaded no external mods\n"
             + "[I] [HARNESS] ===== 1 checks, 0 failures =====\n[I] [HARNESS] RESULT PASS\n";
         assertTrue(AcceptanceLauncher.acceptanceLogPassed(mod, valid, true));
@@ -245,7 +245,7 @@ class AcceptanceLauncherTest{
     private static void modArtifact(Path path) throws IOException{
         try(JarOutputStream output = new JarOutputStream(Files.newOutputStream(path))){
             output.putNextEntry(new JarEntry("mod.hjson"));
-            output.write("name: \"factory-scope\"\nversion: \"0.7.0\"\n"
+            output.write("name: \"factory-scope\"\nversion: \"1.0.0\"\n"
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8));
             output.closeEntry();
         }
