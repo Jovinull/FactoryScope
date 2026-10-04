@@ -56,8 +56,13 @@ the dexed Android classes.
 Do not release `FactoryScopeDesktop.jar`. It is the same code without the dex, and Android will not load
 it.
 
-`deploy` needs `ANDROID_HOME` and `d8` from the Android SDK build tools. CI has both, so the release
-artifact is normally taken from the workflow run rather than built locally.
+`deploy` needs an Android SDK. It prefers `ANDROID_HOME`; when that is unset it uses
+`ANDROID_SDK_ROOT`. If both are set, `ANDROID_HOME` wins. The build selects the highest numerically
+named installed build-tools directory containing the platform-appropriate `d8` executable, and the
+highest installed Android platform containing `android.jar`. Malformed build-tools directory names are
+ignored. D8 receives an explicit argument list, so SDK, project, dependency, and artifact paths may
+contain spaces. `gradlew test` and `gradlew jar` do not require an Android SDK; only `jarAndroid` and
+`deploy` do. CI builds the universal artifact, so release bytes should still come from the workflow run.
 
 ## Mod Browser
 
