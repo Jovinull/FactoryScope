@@ -144,6 +144,7 @@ final class NetworkDialog extends BaseDialog{
         float available = Core.scene.getWidth() / Scl.scl() - 40f;
         bodyCell.width(Math.min(Math.max(1f, available), 900f));
         if(network == null) return;
+        body.add(FsBundle.get("snapshot.note")).color(Pal.gray).wrap().padBottom(6f).row();
         body.add(FsBundle.get("network.static-note")).color(Pal.lightishGray).wrap().padBottom(10f).row();
         if(trace != null){
             buildTrace();
@@ -357,17 +358,17 @@ final class NetworkDialog extends BaseDialog{
     }
 
     private void inspect(BuildingRef ref){
-        Building build = AreaProbe.resolve(ref);
+        Building build = FactoryScopeUI.visibleTarget(ref);
         if(build == null){
-            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+            FactoryScopeUI.showTargetUnavailable();
         }else{
             FactoryScopeUI.inspect(build);
         }
     }
 
     private void locate(BuildingRef ref){
-        if(AreaProbe.resolve(ref) == null){
-            Vars.ui.showInfoToast(FsBundle.get("area.building-gone"), 2f);
+        if(FactoryScopeUI.visibleTarget(ref) == null){
+            FactoryScopeUI.showTargetUnavailable();
         }else if(onLocate != null){
             hide();
             onLocate.accept(ref);

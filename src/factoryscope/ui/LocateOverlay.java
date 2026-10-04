@@ -29,6 +29,7 @@ final class LocateOverlay{
     private final BuildingRef ref;
     private final Color tint = new Color();
     private final Table bar;
+    private final Runnable onReturn;
     private float remaining = HIGHLIGHT_SECONDS;
 
     /**
@@ -39,6 +40,7 @@ final class LocateOverlay{
      */
     LocateOverlay(BuildingRef ref, Building build, Runnable onReturn, Runnable onDismiss){
         this.ref = ref;
+        this.onReturn = onReturn;
 
         //panCamera is the game's own way of moving the view: it touches the camera and nothing else,
         //and on desktop it also stops the view snapping straight back to the player unit
@@ -69,6 +71,8 @@ final class LocateOverlay{
     /** Counts the highlight down; the bar itself stays until the player uses it. */
     private void update(){
         if(remaining > 0f) remaining -= Time.delta / 60f;
+        Building build = AreaProbe.resolve(ref);
+        if(build == null || !FactoryScopeUI.visibleToCurrentPlayer(build)) onReturn.run();
     }
 
     /**
@@ -84,6 +88,12 @@ final class LocateOverlay{
 
         Building build = AreaProbe.resolve(ref);
         if(build == null){
+            remaining = 0f;
+            return;
+        }
+        if(!FactoryScopeUI.visibleToCurrentPlayer(build)){
+            //A held report may be older than the viewer's current team/vision. Never draw over a
+            //currently hidden building; update() returns to the inert snapshot on the next scene act.
             remaining = 0f;
             return;
         }

@@ -9,7 +9,6 @@ import factoryscope.area.*;
 import factoryscope.liquid.*;
 import factoryscope.model.*;
 import factoryscope.network.NetworkPort;
-import factoryscope.probe.AreaProbe;
 import factoryscope.trace.*;
 import mindustry.gen.*;
 import mindustry.graphics.*;
@@ -33,7 +32,7 @@ final class LiquidDialog extends BaseDialog{
     private Runnable onViewWorld, onRefresh;
     private Consumer<BuildingRef> onLocate;
     private BiConsumer<BuildingRef, ResourceRef> onTraceInput, onTraceOutput;
-    private Cons<Building> onInspect;
+    private Consumer<BuildingRef> onInspect;
 
     LiquidDialog(){
         super("");
@@ -51,7 +50,7 @@ final class LiquidDialog extends BaseDialog{
             .size(180f, 64f).name("factoryscope-liquid-refresh");
     }
 
-    void setActions(Runnable viewWorld, Runnable refresh, Cons<Building> inspect,
+    void setActions(Runnable viewWorld, Runnable refresh, Consumer<BuildingRef> inspect,
                     Consumer<BuildingRef> locate, BiConsumer<BuildingRef, ResourceRef> traceInput,
                     BiConsumer<BuildingRef, ResourceRef> traceOutput){
         onViewWorld = viewWorld;
@@ -138,6 +137,7 @@ final class LiquidDialog extends BaseDialog{
             body.add(FsBundle.get("liquid.unavailable")).color(Pal.lightOrange).wrap().row();
             return;
         }
+        body.labelWrap(FsBundle.get("snapshot.note")).color(Pal.gray).padBottom(6f).growX().row();
         if(trace != null){ buildTrace(); return; }
         buildResourcePicker();
         if(selected != null) buildResourceDetails();
@@ -229,8 +229,7 @@ final class LiquidDialog extends BaseDialog{
                 if(onLocate != null) row.button(Icon.zoomSmall, Styles.emptyi, () -> onLocate.accept(entry.ref))
                     .size(34f).tooltip(FsBundle.ref("area.locate")).name("factoryscope-liquid-locate");
                 if(onInspect != null){
-                    Building build = AreaProbe.resolve(entry.ref);
-                    if(build != null) row.button(Icon.eye, Styles.emptyi, () -> onInspect.get(build))
+                    row.button(Icon.eye, Styles.emptyi, () -> onInspect.accept(entry.ref))
                         .size(34f).tooltip(FsBundle.ref("trace.inspect")).name("factoryscope-liquid-inspect");
                 }
             }).growX().padTop(1f).row();
@@ -353,8 +352,7 @@ final class LiquidDialog extends BaseDialog{
         if(onLocate != null) row.button(Icon.zoomSmall, Styles.emptyi, () -> onLocate.accept(ref)).size(34f)
             .tooltip(FsBundle.ref("area.locate")).name("factoryscope-liquid-" + role + "-locate");
         if(onInspect != null){
-            Building build = AreaProbe.resolve(ref);
-            if(build != null) row.button(Icon.eye, Styles.emptyi, () -> onInspect.get(build))
+            row.button(Icon.eye, Styles.emptyi, () -> onInspect.accept(ref))
                 .size(34f).tooltip(FsBundle.ref("trace.inspect")).name("factoryscope-liquid-" + role + "-inspect");
         }
     }
