@@ -51,6 +51,15 @@ public final class FactoryScopePanel extends BaseDialog{
                 showTargetLost();
                 return;
             }
+            if(!MindustryFactoryProbe.canInspect(target, Vars.player == null ? null : Vars.player.team())){
+                //Fog can change while a live inspector is open; do not retain or refresh hidden state.
+                target = null;
+                onDismiss = null;
+                body.clear();
+                title.setText("");
+                hide();
+                return;
+            }
             if(timer.get(REFRESH_TICKS)) rebuild();
         });
         hidden(() -> {

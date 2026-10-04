@@ -63,6 +63,8 @@ public class AcceptanceHarness extends Mod{
     boolean areaOriginCaptured;
 
     Building upper, lower, target, producer, disabledProducer, disabledRouteBreak;
+    Building fogTarget, fogSource;
+    boolean fogWasEnabled, staticFogWasEnabled;
     AreaDiagnosticResult traceSnapshotBeforeRefresh;
     PowerGridReport refreshedPowerSnapshot;
     int baselineFactoryScopeElements;
@@ -161,6 +163,8 @@ public class AcceptanceHarness extends Mod{
         queue(() -> target.tile.remove());
         queue(() -> check("panel released the destroyed building", FactoryScopeUI.inspected() == null));
 
+        liveFogInspectionScenario();
+
         repeatedUse(8);
         layout(1280, 720, 1f);
         layout(1920, 1080, 1f);
@@ -194,6 +198,51 @@ public class AcceptanceHarness extends Mod{
 
         actions.add(this::finish);
         pump();
+    }
+
+    void liveFogInspectionScenario(){
+        scenario("a live inspector stops following an enemy building after vision is lost");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            fogWasEnabled = state.rules.fog;
+            staticFogWasEnabled = state.rules.staticFog;
+            state.rules.fog = true;
+            state.rules.staticFog = false;
+            fogControl.resetFog();
+
+            int x = world.width() - 10, y = world.height() - 10;
+            Tile targetTile = world.tile(x, y);
+            Tile sourceTile = world.tile(x - 10, y - 10);
+            if(targetTile != null && targetTile.block() != Blocks.air) targetTile.remove();
+            if(sourceTile != null && sourceTile.block() != Blocks.air) sourceTile.remove();
+            if(targetTile != null) targetTile.setBlock(Blocks.graphitePress, Team.crux, 0);
+            fogTarget = targetTile == null ? null : targetTile.build;
+            fogSource = placeAt(Blocks.coreShard, x - 10, y - 10);
+            delayNextAction(120f);
+        });
+        queue(() -> {
+            check("the controlled fog source reveals the enemy factory",
+                fogTarget != null && !fogTarget.inFogTo(player.team()),
+                fogTarget == null ? "target missing" : "inFog=" + fogTarget.inFogTo(player.team()));
+            check("the visible enemy factory can be inspected",
+                fogTarget != null && FactoryScopeUI.inspect(fogTarget));
+            check("the live inspector selects that enemy factory", FactoryScopeUI.inspected() == fogTarget);
+            if(fogSource != null && fogSource.isValid()) fogSource.tile.remove();
+            delayNextAction(120f);
+        });
+        queue(() -> {
+            check("the enemy factory becomes hidden after the fog source is removed",
+                fogTarget != null && fogTarget.inFogTo(player.team()),
+                fogTarget == null ? "target missing" : "inFog=" + fogTarget.inFogTo(player.team()));
+            check("the inspector releases a now-hidden enemy factory",
+                FactoryScopeUI.inspected() != fogTarget,
+                "inspected=" + describe(FactoryScopeUI.inspected()));
+            if(fogTarget != null && fogTarget.isValid()) fogTarget.tile.remove();
+            state.rules.fog = fogWasEnabled;
+            state.rules.staticFog = staticFogWasEnabled;
+            fogControl.resetFog();
+            closeAnyDialog();
+        });
     }
 
     void chatVisibilityScenarios(){
