@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0
+
+### Stable release
+
+- Brings together read-only building and area diagnostics, item Network and Supply Trace, PowerScope,
+  and LiquidScope for Mindustry v8 Build 160.
+- Clarifies the evidence model across diagnostics and networks: engine state and derived rates are
+  distinct from measured transfer; structural routes do not establish flow, sufficiency, or cause.
+- Includes the portable isolated acceptance launcher, v160.5 transport support matrix, and release
+  hardening from 0.7.0.
+
+### Limitations
+
+- Per-edge throughput, quantitative supply sufficiency, root-cause ranking, and recommendations are
+  not provided. Some vanilla and unknown modded transport remains partial; see the support matrix.
+- Android runtime/touch, remote multiplayer behavior, and Linux/macOS graphical Mindustry execution have
+  not been independently validated.
+
 ## 0.7.0 - 2026-10-03
 
 ### Changed

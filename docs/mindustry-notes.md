@@ -261,7 +261,7 @@ PowerScope keeps it as a separate conditional cross-grid relation and does not i
 
 See [PowerScope semantics](power-scope.md) and its real-engine battery tests before changing this adapter.
 
-## Other notes towards later milestones
+## Other useful engine behaviors
 
 - Any area walk has to skip buildings where `efficiencyTracked` is false, or a wall-heavy base will fill
   the results with blocks that have no efficiency to report.
