@@ -114,10 +114,14 @@ def invokeD8 = { File executable, List<String> arguments, File workingDirectory 
 
         Process process = new ProcessBuilder(command)
             .directory(workingDirectory)
-            .inheritIO()
+            .redirectErrorStream(true)
             .start()
+        String processOutput = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim()
         int exitCode = process.waitFor()
-        if(exitCode != 0) throw new GradleException("D8 exited with code ${exitCode}")
+        if(exitCode != 0){
+            String detail = processOutput ? ":\n${processOutput}" : " (no diagnostic output)"
+            throw new GradleException("D8 exited with code ${exitCode}${detail}")
+        }
     }catch(InterruptedException e){
         Thread.currentThread().interrupt()
         throw new GradleException("Interrupted while running D8 at ${executable}", e)
@@ -484,6 +488,13 @@ tasks.register("d8ToolingTest"){
             }
             invokeD8(fakeExecutable, arguments, projectWithSpaces)
             require(invocationMarker.isFile(), "invoke the SDK executable from a path with spaces")
+            if(isWindows){
+                fakeExecutable.text = "@echo off\r\necho synthetic D8 diagnostic 1>&2\r\nexit /b 7\r\n"
+            }else{
+                fakeExecutable.text = "#!/bin/sh\nprintf 'synthetic D8 diagnostic\\n' >&2\nexit 7\n"
+                fakeExecutable.setExecutable(true)
+            }
+            expectFailure("synthetic D8 diagnostic"){ invokeD8(fakeExecutable, arguments, projectWithSpaces) }
             logger.lifecycle("D8 tooling checks passed (SDK precedence, version selection, missing-tool errors, spaced paths)")
         }finally{
             delete(temp)
