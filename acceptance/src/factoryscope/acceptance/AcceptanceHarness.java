@@ -240,6 +240,31 @@ public class AcceptanceHarness extends Mod{
             check("the inspector releases a now-hidden enemy factory",
                 FactoryScopeUI.inspected() != fogTarget,
                 "inspected=" + describe(FactoryScopeUI.inspected()));
+            if(fogTarget != null && fogTarget.isValid()){
+                fogSource = placeAt(Blocks.coreShard, fogTarget.tile.x - 10, fogTarget.tile.y - 10);
+            }
+            delayNextAction(120f);
+        });
+        queue(() -> {
+            check("the same enemy factory becomes visible again when the controlled fog source returns",
+                fogTarget != null && fogTarget.isValid() && !fogTarget.inFogTo(player.team()),
+                fogTarget == null ? "target missing" : "inFog=" + fogTarget.inFogTo(player.team()));
+            check("the live inspector stays closed until the player explicitly opens it again",
+                FactoryScopeUI.inspected() != fogTarget);
+            check("explicitly inspecting the visible factory still works after the fog transition",
+                fogTarget != null && FactoryScopeUI.inspect(fogTarget));
+            check("the explicit reinspection selects the visible factory",
+                FactoryScopeUI.inspected() == fogTarget);
+            if(fogSource != null && fogSource.isValid()) fogSource.tile.remove();
+            delayNextAction(120f);
+        });
+        queue(() -> {
+            check("the re-inspected factory becomes hidden when the restored fog source is removed",
+                fogTarget != null && fogTarget.inFogTo(player.team()),
+                fogTarget == null ? "target missing" : "inFog=" + fogTarget.inFogTo(player.team()));
+            check("the re-opened live inspector also releases its target on the next hidden transition",
+                FactoryScopeUI.inspected() != fogTarget,
+                "inspected=" + describe(FactoryScopeUI.inspected()));
             if(fogTarget != null && fogTarget.isValid()) fogTarget.tile.remove();
             state.rules.fog = fogWasEnabled;
             state.rules.staticFog = staticFogWasEnabled;
