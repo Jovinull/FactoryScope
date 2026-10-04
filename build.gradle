@@ -93,9 +93,10 @@ def findAndroidPlatform = { File sdk ->
     platforms.last()
 }
 
-def d8Arguments = { Collection<File> classpath, File outputJar, File inputJar ->
+def d8Arguments = { Collection<File> classpath, File androidLibrary, File outputJar, File inputJar ->
     List<String> arguments = []
     classpath.each{ File entry -> arguments.addAll(["--classpath", entry.absolutePath]) }
+    arguments.addAll(["--lib", androidLibrary.absolutePath])
     arguments.addAll(["--min-api", "21", "--output", outputJar.absolutePath, inputJar.absolutePath])
     arguments
 }
@@ -403,11 +404,12 @@ tasks.register("jarAndroid"){
         File libs = layout.buildDirectory.dir("libs").get().asFile
         if(!libs.isDirectory() && !libs.mkdirs()) throw new GradleException("Could not create artifact directory: ${libs}")
 
-        List<File> classpath = (configurations.compileClasspath.files + configurations.runtimeClasspath.files
-            + [new File(platform, "android.jar")]).collect{ it.absoluteFile }.unique()
+        List<File> classpath = (configurations.compileClasspath.files + configurations.runtimeClasspath.files)
+            .collect{ it.absoluteFile }.unique()
+        File androidLibrary = new File(platform, "android.jar").absoluteFile
         File output = new File(libs, "${projectName}Android.jar")
         File input = new File(libs, "${projectName}Desktop.jar")
-        List<String> arguments = d8Arguments(classpath, output, input)
+        List<String> arguments = d8Arguments(classpath, androidLibrary, output, input)
 
         invokeD8(d8, arguments, libs)
     }
@@ -471,12 +473,13 @@ tasks.register("d8ToolingTest"){
             File projectWithSpaces = new File(temp, "project path with spaces")
             projectWithSpaces.mkdirs()
             File dependencyWithSpaces = new File(temp, "dependency path with spaces/dependency.jar")
+            File androidLibraryWithSpaces = new File(sdk, "platforms/android-35/android.jar")
             File outputWithSpaces = new File(projectWithSpaces, "build/libs/FactoryScope Android.jar")
             File inputWithSpaces = new File(projectWithSpaces, "build/libs/FactoryScope Desktop.jar")
-            List<String> arguments = d8Arguments([dependencyWithSpaces], outputWithSpaces, inputWithSpaces)
-            require(arguments == ["--classpath", dependencyWithSpaces.absolutePath, "--min-api", "21",
+            List<String> arguments = d8Arguments([dependencyWithSpaces], androidLibraryWithSpaces, outputWithSpaces, inputWithSpaces)
+            require(arguments == ["--classpath", dependencyWithSpaces.absolutePath, "--lib", androidLibraryWithSpaces.absolutePath, "--min-api", "21",
                 "--output", outputWithSpaces.absolutePath, inputWithSpaces.absolutePath],
-                "classpath, project, and output paths with spaces remain individual arguments")
+                "dependency classpath, android library, project, and output paths with spaces remain individual arguments")
 
             File fakeExecutable = new File(latestTools, isWindows ? "d8.bat" : "d8")
             File invocationMarker = new File(temp, "D8 invocation with spaces.txt")

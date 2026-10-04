@@ -61,8 +61,10 @@ it.
 named installed build-tools directory containing the platform-appropriate `d8` executable, and the
 highest installed Android platform containing `android.jar`. Malformed build-tools directory names are
 ignored. D8 receives an explicit argument list, so SDK, project, dependency, and artifact paths may
-contain spaces. `gradlew test` and `gradlew jar` do not require an Android SDK; only `jarAndroid` and
-`deploy` do. CI builds the universal artifact, so release bytes should still come from the workflow run.
+contain spaces. Dependency jars are supplied as D8 classpath entries and the selected `android.jar` as a
+library, matching D8's distinction between project dependencies and platform APIs. `gradlew test` and
+`gradlew jar` do not require an Android SDK; only `jarAndroid` and `deploy` do. CI builds the universal
+artifact, so release bytes should still come from the workflow run.
 
 ## Mod Browser
 
