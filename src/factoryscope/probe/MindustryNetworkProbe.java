@@ -93,7 +93,8 @@ public final class MindustryNetworkProbe{
                 if(isUnknownTransport(neighbor)){
                     interruptions.add(new NetworkInterruption(out, targetRef == null ? AreaProbe.refOf(neighbor) : targetRef,
                         NetworkInterruption.Direction.outgoing));
-                }else if(inputSides(neighbor, viewer, itemSinks).contains(side.opposite()) && acceptsTopologyFrom(neighbor, source)){
+                }else if(inputSides(neighbor, viewer, itemSinks).contains(side.opposite())
+                    && acceptsTopologyFrom(neighbor, source)){
                     if(targetRef == null){
                         boundary.add(out);
                         mergeConstraint(boundaryOutputConstraints, out, outputConstraint(source, itemProducts));
@@ -115,10 +116,12 @@ public final class MindustryNetworkProbe{
                 if(!inputSides(target, viewer, itemSinks).contains(side)) continue;
 
                 if(isUnknownTransport(neighbor)){
+                    if(!acceptsTopologyFrom(target, neighbor)) continue;
                     BuildingRef unsupportedRef = refs.getOrDefault(neighbor, AreaProbe.refOf(neighbor));
                     interruptions.add(new NetworkInterruption(input(targetRef, side), unsupportedRef,
                         NetworkInterruption.Direction.incoming));
                 }else if(!refs.containsKey(neighbor)){
+                    if(!acceptsTopologyFrom(target, neighbor)) continue;
                     ItemConstraint constraint = boundaryInputConstraint(neighbor, side.opposite(), viewer,
                         itemSources, itemProducts);
                     if(constraint != null){
@@ -247,7 +250,9 @@ public final class MindustryNetworkProbe{
             }
         }else if(build instanceof Duct.DuctBuild || build instanceof Conveyor.ConveyorBuild){
             NetworkSide forward = NetworkSide.rotation(build.rotation);
-            for(NetworkSide input : NetworkSide.values()) if(input != forward) add(edges, ref, input, forward, ItemConstraint.any(), false);
+            boolean armoredDuct = build.block instanceof Duct duct && duct.armored;
+            for(NetworkSide input : NetworkSide.values()) if(armoredDuct || input != forward)
+                add(edges, ref, input, forward, ItemConstraint.any(), false);
         }else if(build instanceof ItemBridge.ItemBridgeBuild bridge){
             Building linked = validBridgeTarget(bridge, viewer);
             if(linked != null){
@@ -276,10 +281,10 @@ public final class MindustryNetworkProbe{
     private static NetworkSide right(NetworkSide side){ return NetworkSide.rotation(side.ordinal() - 1); }
 
     private static boolean isKnownTransport(Building build){
-        return !isExplicitlyUnsupported(build) && (build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof Junction.JunctionBuild
+        return build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof Junction.JunctionBuild
             || build instanceof Router.RouterBuild || build instanceof Sorter.SorterBuild || build instanceof DuctRouter.DuctRouterBuild || build instanceof OverflowGate.OverflowGateBuild
             || build instanceof ItemBridge.ItemBridgeBuild
-            || build instanceof OverflowDuct.OverflowDuctBuild);
+            || build instanceof OverflowDuct.OverflowDuctBuild;
     }
 
     private static boolean isEndpoint(Building build){
@@ -289,16 +294,11 @@ public final class MindustryNetworkProbe{
 
     private static boolean isUnknownTransport(Building build){
         return !isKnownTransport(build) && !isEndpoint(build)
-            && (isExplicitlyUnsupported(build) || (build.block.group == BlockGroup.transportation && build.block.hasItems)
+            && ((build.block.group == BlockGroup.transportation && build.block.hasItems)
                 || build instanceof MassDriver.MassDriverBuild || build instanceof Unloader.UnloaderBuild);
     }
 
-    private static boolean isExplicitlyUnsupported(Building build){
-        return build.block instanceof ArmoredConveyor || (build.block instanceof Duct duct && duct.armored);
-    }
-
     private static EnumSet<NetworkSide> outputSides(Building build, Team viewer, Set<Building> itemSources){
-        if(isExplicitlyUnsupported(build)) return EnumSet.noneOf(NetworkSide.class);
         if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild)
             return EnumSet.of(NetworkSide.rotation(build.rotation));
         if(build instanceof OverflowDuct.OverflowDuctBuild){
@@ -320,7 +320,7 @@ public final class MindustryNetworkProbe{
     }
 
     private static EnumSet<NetworkSide> inputSides(Building build, Team viewer, Set<Building> itemSinks){
-        if(isExplicitlyUnsupported(build)) return EnumSet.noneOf(NetworkSide.class);
+        if(build.block instanceof Duct duct && duct.armored) return EnumSet.allOf(NetworkSide.class);
         if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild){
             EnumSet<NetworkSide> sides = EnumSet.allOf(NetworkSide.class);
             sides.remove(NetworkSide.rotation(build.rotation));
@@ -412,7 +412,21 @@ public final class MindustryNetworkProbe{
     }
 
     private static boolean acceptsTopologyFrom(Building target, Building source){
+        if(target.block instanceof ArmoredConveyor){
+            return source.block instanceof Conveyor || alignedArmoredInput(target, source);
+        }
+        if(target.block instanceof Duct duct && duct.armored){
+            boolean ductInput = source.block.rotate && source.block.hasItems && source.block.isDuct
+                && source.front() == target;
+            return ductInput || alignedArmoredInput(target, source);
+        }
         return true;
+    }
+
+    private static boolean alignedArmoredInput(Building target, Building source){
+        if(source.tile == null || target.tile == null) return false;
+        Tile facing = Edges.getFacingEdge(source.tile, target.tile);
+        return facing != null && facing.relativeTo(target.tile) == target.rotation;
     }
 
 }
