@@ -5,13 +5,43 @@ Two rules explain most of the structure.
 **The diagnosis is decided in one place.** `FactoryAnalyzer` is the only code that decides why a factory
 is in the state it is in. Everything else either feeds it or reads its answer.
 
-**Nothing that reasons knows about Mindustry.** The packages that make decisions take plain data and
-return plain data, so they can be tested without a game, a window or a graphics driver.
+**Reasoning is separated from engine access.** Domain and analysis code consumes FactoryScope-owned
+values and returns FactoryScope-owned results. It does not inspect live Mindustry or Arc state, so those
+rules can be tested without a game, a window or a graphics driver.
 
 **FactoryScope observes; it never changes the factory.** Production probes snapshot existing building,
 network, power-grid, and liquid-module state. They do not move resources, configure or rotate buildings,
 change power links, or trigger production. Engine transfer calls appear only in isolated tests that prove
 what a structural edge means.
+
+## The data path
+
+Live engine access is handled by a small family of adapters rather than one universal probe. Each adapter
+owns the conversion for its subject: building diagnostics, area collection, item topology, power graphs,
+or liquid topology. UI and lifecycle code also use Mindustry/Arc APIs at the outer edge to receive input,
+resolve current navigation targets, and render reports; they do not own the underlying diagnostic rules.
+
+```
+Mindustry / Arc live state
+        |
+        v
+engine adapters and probes
+        |
+        v
+FactoryScope-owned snapshots and models
+        |
+        v
+pure analysis
+        |
+        v
+FactoryScope-owned results
+        |
+        v
+UI and presentation
+```
+
+The important boundary is between engine reads and reasoning: immutable snapshots/models carry the values
+needed by analysis without carrying live engine objects.
 
 ## The single-building pipeline
 
@@ -19,7 +49,7 @@ what a structural edge means.
 Building                     a live Mindustry entity
    |
    v
-MindustryFactoryProbe        the only class that reads game types
+MindustryFactoryProbe        reads current building state
    |
    v
 FactorySnapshot              an immutable picture, no Mindustry types
@@ -47,10 +77,10 @@ untouched.
 AreaSelection                normalized, inclusive tile bounds
    |
    v
-AreaProbe.collect            one spatial query, per team
+AreaProbe.collect            team-scoped spatial collection
    |
    v
-for each Building  --->  MindustryFactoryProbe  --->  FactoryAnalyzer
+for each Building  --->  engine adapters  --->  FactoryAnalyzer
    |                                                        |
    |                                                        v
    |                                                  DiagnosticResult
@@ -72,8 +102,10 @@ three things to them: counts buildings by status, groups equivalent findings, an
 it ever grew a rule about shortages, the two analysers could disagree, and the area view would start
 contradicting the panel a player opens from it.
 
-Each building is probed once and analysed once per scan. A refresh re-runs the whole thing, including the
-spatial query, so buildings added or destroyed since the last look are picked up.
+Collection normally visits each matching building once. A probe or adapter failure can take a fallback or
+retry path, so “one probe per building” is not an invariant. Successful entries are diagnosed from the
+captured values; failed entries remain skipped evidence. A refresh repeats collection and probing, so
+buildings added or destroyed since the last look are picked up.
 
 ## Finding the buildings
 

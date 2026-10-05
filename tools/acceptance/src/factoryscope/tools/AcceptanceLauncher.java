@@ -392,7 +392,7 @@ public final class AcceptanceLauncher{
 
     private static void printUsage(){
         System.out.println("Usage: gradlew acceptanceTest [-PmindustryJar=<desktop jar> | -PmindustryPath=<install directory>]"
-            + " [-PmodJar=<artifact>] [-Plocale=en-US|pt-BR] [-Pcapture=true] [-PkeepSandbox=true]"
+            + " [-PmodJar=<artifact>] [-Plocale=en-US|pt-BR] [-PpowerFixtureRepetitions=<count>] [-Pcapture=true] [-PkeepSandbox=true]"
             + " [-PtimeoutSeconds=300]");
     }
 
@@ -435,6 +435,9 @@ public final class AcceptanceLauncher{
                 result.add("-Duser.language=" + locale[0]);
                 if(locale.length == 2) result.add("-Duser.country=" + locale[1]);
             }
+            if(options.powerFixtureRepetitions > 0){
+                result.add("-Dfactoryscope.power-fixture-repetitions=" + options.powerFixtureRepetitions);
+            }
             result.add("-cp");
             result.add(sandbox + System.getProperty("path.separator") + path);
             result.add("mindustry.desktop.DesktopLauncher");
@@ -453,6 +456,7 @@ public final class AcceptanceLauncher{
         boolean keepSandbox;
         boolean help;
         int timeoutSeconds = 300;
+        int powerFixtureRepetitions;
 
         static Options parse(String[] args){
             Options result = new Options();
@@ -473,6 +477,12 @@ public final class AcceptanceLauncher{
                     case "--timeout-seconds":
                         result.timeoutSeconds = Integer.parseInt(value);
                         if(result.timeoutSeconds < 1) throw new IllegalArgumentException("timeout must be positive");
+                        break;
+                    case "--power-fixture-repetitions":
+                        result.powerFixtureRepetitions = Integer.parseInt(value);
+                        if(result.powerFixtureRepetitions < 1 || result.powerFixtureRepetitions > 1000){
+                            throw new IllegalArgumentException("power fixture repetitions must be between 1 and 1000");
+                        }
                         break;
                     default: throw new IllegalArgumentException("Unknown option: " + key);
                 }

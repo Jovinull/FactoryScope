@@ -32,6 +32,8 @@ import mindustry.world.*;
 import mindustry.world.blocks.environment.Floor;
 import mindustry.world.consumers.ConsumeCoolant;
 
+import java.util.Arrays;
+
 import static mindustry.Vars.*;
 
 /**
@@ -113,6 +115,11 @@ public class AcceptanceHarness extends Mod{
         areaOriginX = tileX() + 5;
         areaOriginY = tileY() - 7;
         areaOriginCaptured = true;
+        int powerFixtureRepetitions = Integer.getInteger("factoryscope.power-fixture-repetitions", 0);
+        if(powerFixtureRepetitions > 0){
+            new PowerFixtureStress(powerFixtureRepetitions).start();
+            return;
+        }
         chatVisibilityScenarios();
         hudVisibilityScenarios();
         hudAnchorRebuildScenario();
@@ -1415,6 +1422,130 @@ public class AcceptanceHarness extends Mod{
         queue(() -> renderer.targetscale = renderer.camerascale = 1.5f);
     }
 
+    void checkBatterySupportedFixtureReady(Building[] grid, Building node,
+                                           mindustry.world.blocks.power.PowerGraph graph,
+                                           double setupTick){
+        Building generator = grid[0], battery = grid[1], consumer = grid[2];
+        boolean engineReady = generator != null && generator.getPowerProduction() > 0f
+            && consumer != null && consumer.shouldConsumePower;
+        long engineUpdates = Math.max(0L, Math.round(state.tick - setupTick));
+        if(!engineReady && generator != null && consumer != null && engineUpdates < 120){
+            nextActionDelay = 1f;
+            actions.insert(0, () -> checkBatterySupportedFixtureReady(grid, node, graph, setupTick));
+            return;
+        }
+
+        if(graph != null) graph.update();
+        boolean sameGraph = node != null && graph != null && node.power != null && node.power.graph == graph
+            && Arrays.stream(grid).allMatch(endpoint -> endpoint != null && endpoint.power != null && endpoint.power.graph == graph);
+        boolean deficit = graph != null && graph.getPowerProduced() > 0f
+            && graph.getPowerProduced() < graph.getPowerNeeded()
+            && graph.getSatisfaction() >= 0.999f && battery != null && battery.power.status > 0f;
+        Log.info(TAG + "   INFO battery-supported fixture engineUpdates=@ ready=@ produced=@ needed=@ satisfaction=@ balanceSamples=@",
+            engineUpdates, engineReady, graph == null ? -1f : graph.getPowerProduced(),
+            graph == null ? -1f : graph.getPowerNeeded(), graph == null ? -1f : graph.getSatisfaction(),
+            graph != null && graph.hasPowerBalanceSamples());
+        check("the real engine grid has a generation deficit covered by stored battery power",
+            engineReady && sameGraph && deficit,
+            "engineReady=" + engineReady + ", engineUpdates=" + engineUpdates
+                + ", produced=" + (graph == null ? -1f : graph.getPowerProduced())
+                + ", needed=" + (graph == null ? -1f : graph.getPowerNeeded())
+                + ", satisfaction=" + (graph == null ? -1f : graph.getSatisfaction())
+                + ", batteryStatus=" + (battery == null ? -1f : battery.power.status)
+                + ", balanceSamples=" + (graph != null && graph.hasPowerBalanceSamples())
+                + ", members=" + (graph == null ? -1 : graph.all.size)
+                + ", sameGraph=" + sameGraph);
+    }
+
+    private final class PowerFixtureStress{
+        private final int repetitions;
+        private Building[] current = new Building[4];
+        private Building node;
+        private mindustry.world.blocks.power.PowerGraph graph;
+        private Building[] previous = new Building[0];
+        private mindustry.world.blocks.power.PowerGraph previousGraph;
+        private double setupTick;
+        private int iteration;
+
+        PowerFixtureStress(int repetitions){ this.repetitions = repetitions; }
+
+        void start(){
+            scenarioNow("isolated PowerScope fixture repeated " + repetitions + " times");
+            queue(this::prepare);
+            pump();
+        }
+
+        private void prepare(){
+            clearRegion();
+            int x = rx(), y = ry();
+            current = new Building[6];
+            current[0] = placeAt(Blocks.rtgGenerator, x + 3, y + 7);
+            current[1] = placeAt(Blocks.batteryLarge, x + 7, y + 4);
+            current[2] = placeAt(Blocks.siliconSmelter, x + 11, y + 7);
+            current[3] = placeAt(Blocks.combustionGenerator, x + 7, y + 11);
+            current[4] = placeAt(Blocks.forceProjector, x + 11, y + 2);
+            current[5] = placeAt(Blocks.forceProjector, x + 11, y + 12);
+            node = placeAt(Blocks.powerNodeLarge, x + 7, y + 7);
+            if(current[0] != null){
+                current[0].items.add(Items.thorium, 10);
+                current[0].updateConsumption();
+            }
+            if(current[2] != null){
+                current[2].items.add(Items.sand, 30);
+                current[2].items.add(Items.coal, 30);
+                current[2].updateConsumption();
+            }
+            if(current[3] != null) current[3].updateConsumption();
+            if(node != null){
+                for(Building endpoint : current) if(endpoint != null) node.configureAny(endpoint.pos());
+            }
+            if(current[1] != null) current[1].power.status = 1f;
+            graph = current[0] == null ? null : current[0].power.graph;
+            setupTick = state.tick;
+            nextActionDelay = 1f;
+            actions.insert(0, this::checkReady);
+        }
+
+        private void checkReady(){
+            long engineUpdates = Math.max(0L, Math.round(state.tick - setupTick));
+            boolean ready = current[0] != null && current[0].getPowerProduction() > 0f
+                && current[2] != null && current[2].shouldConsumePower;
+            if(!ready && engineUpdates < 120){
+                nextActionDelay = 1f;
+                actions.insert(0, this::checkReady);
+                return;
+            }
+            if(graph != null) graph.update();
+            boolean sameGraph = graph != null && node != null && node.power != null && node.power.graph == graph
+                && Arrays.stream(current).allMatch(build -> build != null && build.power != null && build.power.graph == graph);
+            boolean priorBuildingsRemoved = Arrays.stream(previous).noneMatch(build -> build != null && build.isValid());
+            boolean newGraph = previousGraph == null || graph != previousGraph;
+            boolean metricsValid = graph != null && graph.getPowerProduced() > 0f
+                && graph.getPowerProduced() < graph.getPowerNeeded() && graph.getSatisfaction() >= 0.999f
+                && current[1] != null && current[1].power.status > 0f;
+            String details = "engineUpdates=" + engineUpdates + ", ready=" + ready
+                + ", produced=" + (graph == null ? -1f : graph.getPowerProduced())
+                + ", needed=" + (graph == null ? -1f : graph.getPowerNeeded())
+                + ", satisfaction=" + (graph == null ? -1f : graph.getSatisfaction())
+                + ", balanceSamples=" + (graph != null && graph.hasPowerBalanceSamples())
+                + ", members=" + (graph == null ? -1 : graph.all.size)
+                + ", sameGraph=" + sameGraph + ", priorBuildingsRemoved=" + priorBuildingsRemoved
+                + ", newGraph=" + newGraph;
+            check("PowerScope repeated fixture " + (iteration + 1) + "/" + repetitions + " has valid current engine metrics",
+                ready && sameGraph && metricsValid && graph.all.size == 7 && priorBuildingsRemoved && newGraph, details);
+            Log.info(TAG + "   INFO Power fixture @/@ @", iteration + 1, repetitions, details);
+            previous = current.clone();
+            previousGraph = graph;
+            iteration++;
+            if(iteration < repetitions){
+                nextActionDelay = 1f;
+                actions.insert(0, this::prepare);
+            }else{
+                actions.add(AcceptanceHarness.this::finish);
+            }
+        }
+    }
+
     void powerScopeScenarios(){
         scenario("a single-building diagnostic opens its complete PowerGraph snapshot");
         queue(this::closeAnyDialog);
@@ -1468,57 +1599,40 @@ public class AcceptanceHarness extends Mod{
 
         scenario("PowerScope separates a battery-supported generation deficit from an underpowered grid");
         int batteryX = rx(), batteryY = ry(), batteryX2 = batteryX + 14, batteryY2 = batteryY + 14;
-        Building[] supportedGrid = new Building[4];
+        Building[] supportedGrid = new Building[6];
+        Building[] supportedNode = new Building[1];
         mindustry.world.blocks.power.PowerGraph[] supportedGraph = new mindustry.world.blocks.power.PowerGraph[1];
+        double[] powerSetupTick = new double[1];
         queue(() -> {
             clearRegion();
-            supportedGrid[0] = placeAt(Blocks.solarPanel, batteryX + 3, batteryY + 7);
+            supportedGrid[0] = placeAt(Blocks.rtgGenerator, batteryX + 3, batteryY + 7);
             supportedGrid[1] = placeAt(Blocks.batteryLarge, batteryX + 7, batteryY + 4);
             supportedGrid[2] = placeAt(Blocks.siliconSmelter, batteryX + 11, batteryY + 7);
             supportedGrid[3] = placeAt(Blocks.combustionGenerator, batteryX + 7, batteryY + 11);
-            Building node = placeAt(Blocks.powerNodeLarge, batteryX + 7, batteryY + 7);
+            supportedGrid[4] = placeAt(Blocks.forceProjector, batteryX + 11, batteryY + 2);
+            supportedGrid[5] = placeAt(Blocks.forceProjector, batteryX + 11, batteryY + 12);
+            supportedNode[0] = placeAt(Blocks.powerNodeLarge, batteryX + 7, batteryY + 7);
             if(supportedGrid[2] != null){
                 supportedGrid[2].items.add(Items.sand, 30);
                 supportedGrid[2].items.add(Items.coal, 30);
                 supportedGrid[2].updateConsumption();
             }
+            if(supportedGrid[0] != null){
+                supportedGrid[0].items.add(Items.thorium, 10);
+                supportedGrid[0].updateConsumption();
+            }
             if(supportedGrid[3] != null) supportedGrid[3].updateConsumption();
-            if(node != null){
+            if(supportedNode[0] != null){
                 for(Building endpoint : supportedGrid){
-                    if(endpoint != null) node.configureAny(endpoint.pos());
+                    if(endpoint != null) supportedNode[0].configureAny(endpoint.pos());
                 }
             }
             if(supportedGrid[1] != null) supportedGrid[1].power.status = 1f;
             supportedGraph[0] = supportedGrid[0] == null ? null : supportedGrid[0].power.graph;
-            if(supportedGraph[0] != null) supportedGraph[0].update();
-            boolean sameGraph = node != null && supportedGraph[0] != null
-                && node.power.graph == supportedGraph[0]
-                && supportedGrid[0] != null && supportedGrid[1] != null
-                && supportedGrid[2] != null && supportedGrid[3] != null
-                && supportedGrid[0].power.graph == supportedGraph[0]
-                && supportedGrid[1].power.graph == supportedGraph[0]
-                && supportedGrid[2].power.graph == supportedGraph[0]
-                && supportedGrid[3].power.graph == supportedGraph[0];
-            check("the real engine grid has a generation deficit covered by stored battery power",
-                sameGraph && supportedGraph[0].getPowerProduced() < supportedGraph[0].getPowerNeeded()
-                    && supportedGraph[0].getSatisfaction() >= 0.999f
-                    && supportedGrid[1].power.status > 0f,
-                "sameGraph=" + sameGraph + ", produced=" + (supportedGraph[0] == null ? -1f : supportedGraph[0].getPowerProduced())
-                    + ", needed=" + (supportedGraph[0] == null ? -1f : supportedGraph[0].getPowerNeeded())
-                    + ", satisfaction=" + (supportedGraph[0] == null ? -1f : supportedGraph[0].getSatisfaction())
-                    + ", batteryStatus=" + (supportedGrid[1] == null ? -1f : supportedGrid[1].power.status)
-                    + ", members=" + (supportedGraph[0] == null ? -1 : supportedGraph[0].all.size)
-                    + ", producers=" + (supportedGraph[0] == null ? -1 : supportedGraph[0].producers.size)
-                    + ", consumers=" + (supportedGraph[0] == null ? -1 : supportedGraph[0].consumers.size)
-                    + ", batteries=" + (supportedGraph[0] == null ? -1 : supportedGraph[0].batteries.size)
-                    + ", nodeLinks=" + (node == null ? -1 : node.power.links.size)
-                    + ", graphMembers=" + (supportedGraph[0] == null ? "none" : supportedGraph[0].all.toString())
-                    + ", placed=" + java.util.Arrays.stream(supportedGrid).map(build -> build == null ? "null"
-                        : build.block.name + "@" + build.tileX() + "," + build.tileY() + "/power=" + (build.power != null)
-                            + "/same=" + (build.power != null && build.power.graph == supportedGraph[0])
-                            + "/connections=" + (build.power == null ? 0 : build.getPowerConnections(new arc.struct.Seq<>()).size))
-                        .collect(java.util.stream.Collectors.joining("; ")));
+            powerSetupTick[0] = state.tick;
+            nextActionDelay = 1f;
         });
+        queue(() -> checkBatterySupportedFixtureReady(supportedGrid, supportedNode[0], supportedGraph[0], powerSetupTick[0]));
         queue(this::armPicker);
         queue(() -> dragTiles(batteryX + 1, batteryY + 1, batteryX2, batteryY2));
         queue(() -> check("the battery-supported area exposes PowerScope",

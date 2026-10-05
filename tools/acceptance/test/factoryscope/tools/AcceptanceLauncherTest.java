@@ -58,6 +58,7 @@ class AcceptanceLauncherTest{
         desktopJar(jar);
         AcceptanceLauncher.Options options = new AcceptanceLauncher.Options();
         options.mindustryJar = jar;
+        options.powerFixtureRepetitions = 50;
         AcceptanceLauncher.Client client = AcceptanceLauncher.resolveClient(options);
         Path sandbox = temp.resolve("sandbox λ");
         Path data = sandbox.resolve("isolated-data");
@@ -69,6 +70,7 @@ class AcceptanceLauncherTest{
         assertFalse(command.stream().anyMatch(argument -> argument.startsWith("\"") || argument.endsWith("\"")));
         assertEquals("mindustry.desktop.DesktopLauncher", command.get(command.size() - 1));
         assertTrue(command.contains("-Dmindustry.data.dir=" + data));
+        assertTrue(command.contains("-Dfactoryscope.power-fixture-repetitions=50"));
     }
 
     @Test void rejectsWrongClientBuildBeforeSandboxVersionOverride() throws Exception{
@@ -181,7 +183,8 @@ class AcceptanceLauncherTest{
         AcceptanceLauncher.Options options = AcceptanceLauncher.Options.parse(new String[]{
             "--project", temp.toString(), "--mindustry-jar", temp.resolve("Mindustry Client.jar").toString(),
             "--mod-jar", temp.resolve("FactoryScope λ.jar").toString(), "--locale", "pt-BR",
-            "--capture", "true", "--keep-sandbox", "true", "--timeout-seconds", "77"
+            "--capture", "true", "--keep-sandbox", "true", "--timeout-seconds", "77",
+            "--power-fixture-repetitions", "50"
         });
         assertEquals(temp.resolve("Mindustry Client.jar"), options.mindustryJar);
         assertEquals(temp.resolve("FactoryScope λ.jar"), options.modJar);
@@ -189,6 +192,9 @@ class AcceptanceLauncherTest{
         assertTrue(options.capture);
         assertTrue(options.keepSandbox);
         assertEquals(77, options.timeoutSeconds);
+        assertEquals(50, options.powerFixtureRepetitions);
+        assertThrows(IllegalArgumentException.class,
+            () -> AcceptanceLauncher.Options.parse(new String[]{"--power-fixture-repetitions", "1001"}));
         assertEquals("pt-BR", AcceptanceLauncher.Options.parse(new String[]{"--locale", "pt_BR"}).locale);
         assertThrows(IllegalArgumentException.class,
             () -> AcceptanceLauncher.Options.parse(new String[]{"--locale", "portuguese"}));

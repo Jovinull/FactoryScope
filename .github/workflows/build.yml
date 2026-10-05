@@ -24,12 +24,12 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           chmod +x ./gradlew
-          ./gradlew acceptanceLauncherTest
+          ./gradlew acceptanceLauncherTest d8ToolingTest
 
       - name: Test launcher portability (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .\gradlew.bat acceptanceLauncherTest
+        run: .\gradlew.bat acceptanceLauncherTest d8ToolingTest
 
   build:
     runs-on: ubuntu-latest
@@ -43,17 +43,6 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: gradle
-
-      # d8 turns the desktop classes into Android-compatible dex; without it only the desktop jar builds
-      - name: Put the Android build tools on PATH
-        run: |
-          if [ -z "$ANDROID_HOME" ] || [ ! -d "$ANDROID_HOME/build-tools" ]; then
-            echo "ANDROID_HOME is not usable on this runner" >&2
-            exit 1
-          fi
-          tools=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
-          echo "using $tools"
-          echo "${tools%/}" >> "$GITHUB_PATH"
 
       - name: Test
         run: |
