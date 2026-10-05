@@ -66,7 +66,10 @@ for its current diagnostics, or drag a rectangle for Area Diagnostics. Open Netw
 LiquidScope from the area report, then trace a resource where supported. Use **Locate**, **Inspect**,
 and **Return** to navigate; use **Refresh** to rebuild snapshot evidence after the factory changes.
 
-The interface is available in English and Brazilian Portuguese.
+FactoryScope includes translations in English, Portuguese (Brazil), Russian, Simplified Chinese,
+Korean, and Spanish. Localization terminology follows Mindustry v160.5 where applicable; see the
+[localization glossary](docs/localization.md). Contributions and corrections are welcome through
+the issue tracker.
 
 ## What the evidence means
 
@@ -87,9 +90,10 @@ valid route or a proven dead end.
 
 FactoryScope targets Mindustry v8 Build 160 (`minGameVersion: 160`); the real-client validation build
 is v160.5. The [support matrix](docs/support-matrix.md) lists modeled, partial, and deferred transport
-families. Common conveyor/conduit routes, junctions, routers, sorters, and configured item bridges
-are modeled. Armored and stateful transports, unloaders, Duct Bridges, Mass Drivers, armored conduits,
-and liquid bridges remain partial; unknown custom routing stays conservative.
+families. Common conveyor/conduit routes, junctions, routers, sorters, configured item bridges, and
+the v160.5 Armored Conveyor/Armored Duct insertion rules are modeled. Stateful stack transports,
+unloaders, Duct Bridges, Mass Drivers, armored conduits, and liquid bridges remain partial; unknown
+custom routing stays conservative.
 
 Desktop graphical acceptance has been performed on Windows. Launcher/path tests run on Windows,
 Linux, and macOS; that is not graphical validation on those platforms. The universal JAR contains a

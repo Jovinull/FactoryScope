@@ -44,17 +44,37 @@ loading/unloading state is intentionally not presented as a live route or rate.
 Overflow gates keep their direct route preferred and their side routes conditional; underflow gates invert
 that relationship. Overflow ducts use the same preferred-versus-fallback distinction.
 
-Armored Conveyors and Armored Ducts have source-sensitive acceptance rules. Plastanium Stack Conveyors have
-load, move and unload states derived from neighbouring blocks and stored items. Mass Drivers depend on
-configured links and a separate state machine. Unloaders choose a source and destination across their full
-neighbouring set rather than behaving as a simple storage output. FactoryScope 0.3 records all of these as
-unsupported transport rather than approximating them as ordinary conveyors.
+## Modded item transports
+
+FactoryScope recognizes a finite set of v160.5 runtime Build implementations. A modded block that reuses
+one of those unchanged Build classes receives that structural model; a custom Build implementation is
+reported as an unsupported interruption instead of being inferred from `hasItems` or its block name.
+This does not validate mod-specific changes to block fields, configuration, or other engine behavior.
+
+## Armored item transports
+
+In v160.5, `ArmoredConveyorBuild.acceptItem` first applies ordinary conveyor capacity/lane and front-side
+checks, then accepts a source when it is a Conveyor-family block or its facing edge aligns with the
+receiver rotation. FactoryScope models the stable source-class/alignment rule and forward route; current
+lane occupancy and item positions remain outside the snapshot model.
+
+Armored `DuctBuild.acceptItem` requires an empty one-item buffer, then accepts either a rotating item
+source whose block is marked as a duct and whose front points into the receiver, or any source whose
+edge aligns with the receiver rotation. The conditions are alternatives: a Duct-family source need not
+face the receiver when it enters through the aligned edge. FactoryScope models both structural
+insertion cases and the duct's forward output; buffer occupancy is not represented as a route
+constraint. A structural edge does not claim an item is currently present or moving.
+
+Plastanium Stack Conveyors have load, move and unload states derived from neighboring blocks and item
+state. Mass Drivers depend on configured links and a separate transfer state machine. Unloaders choose
+a source and destination across their neighboring set rather than behaving as a simple storage output.
+These remain explicit unsupported interruptions rather than ordinary conveyor routes.
 
 ## Scope
 
-The graph is item-only. Liquid conduits and payload logistics are outside 0.3. Ducts are item
-transport, but their direction and bridge rules are kept in the Mindustry adapter rather than assumed
-from conveyor code.
+The item graph is resource-aware structural topology. Duct direction and bridge rules are kept in the
+Mindustry adapter rather than assumed from conveyor code. Liquid and payload families are documented
+separately in the support matrix.
 
 ## 159.7 to 160.5 compatibility check
 

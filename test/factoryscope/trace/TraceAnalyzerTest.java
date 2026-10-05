@@ -354,6 +354,49 @@ class TraceAnalyzerTest{
     }
 
     @Test
+    void skippedBuildingIndexChecksEveryTerminalSideAndPreservesTeamIsolation(){
+        BuildingRef target = new BuildingRef(20, 20, "smelter", "Smelter", 3, 1);
+        List<NetworkPort> inputs = List.of(
+            port(target, NetworkSide.east, "in"), port(target, NetworkSide.north, "in"),
+            port(target, NetworkSide.west, "in"), port(target, NetworkSide.south, "in"));
+        List<BuildingRef> adjacent = List.of(ref("mod-east", 22, 20, 1), ref("mod-north", 20, 22, 1),
+            ref("mod-west", 18, 20, 1), ref("mod-south", 20, 18, 1));
+        AreaDiagnosticResult touchingArea = AreaAnalyzer.analyze(AREA, 5, List.of(consumer(target, sand)))
+            .withNetwork(network(graph(inputs, List.of()))).withSkippedBuildings(adjacent);
+
+        SupplyTrace touching = TraceAnalyzer.input(touchingArea, target, sand);
+
+        assertTrue(touching.diagnosticsIncomplete, "same-team skipped buildings on each terminal side remain relevant");
+        assertFalse(touching.complete);
+        assertFalse(touching.noRouteProven);
+
+        BuildingRef otherTeam = ref("enemy-mod", 18, 20, 2);
+        AreaDiagnosticResult enemyArea = AreaAnalyzer.analyze(AREA, 2, List.of(consumer(target, sand)))
+            .withNetwork(network(graph(inputs, List.of()))).withSkippedBuildings(List.of(otherTeam));
+        SupplyTrace enemyOnly = TraceAnalyzer.input(enemyArea, target, sand);
+
+        assertTrue(enemyOnly.complete, "a different team's adjacent skipped building is not evidence about this route");
+        assertTrue(enemyOnly.noRouteProven);
+    }
+
+    @Test
+    void deadEndClassificationUsesOnlySkippedBuildingsRelevantToTheTrace(){
+        BuildingRef sourcePortBuilding = ref("conveyor", 1), target = ref("smelter", 10);
+        BuildingRef skippedBesideSourceOutput = ref("modded-building", 2);
+        NetworkPort sourceOut = port(sourcePortBuilding, NetworkSide.east, "out");
+        NetworkPort targetIn = port(target, NetworkSide.west, "in");
+        NetworkGraph graph = graph(List.of(sourceOut, targetIn), List.of(edge(sourceOut, targetIn, ItemConstraint.any())));
+        AreaDiagnosticResult area = AreaAnalyzer.analyze(AREA, 2, List.of(consumer(target, sand)))
+            .withNetwork(network(graph)).withSkippedBuildings(List.of(skippedBesideSourceOutput));
+
+        SupplyTrace trace = TraceAnalyzer.input(area, target, sand);
+
+        assertFalse(trace.diagnosticsIncomplete, "existing relevance policy only treats terminal input-side skips as trace uncertainty");
+        assertEquals(List.of(sourcePortBuilding), trace.structuralDeadEnds,
+            "dead-end classification must preserve the prior relevant-skipped subset semantics");
+    }
+
+    @Test
     void itemRequestsForResourcesUnusedByTheTargetProduceNoTraceEndpoints(){
         BuildingRef source = ref("drill", 1), target = ref("factory", 2), downstream = ref("factory", 3);
         NetworkPort sourceOut = port(source, NetworkSide.east, "out"), targetIn = port(target, NetworkSide.west, "in"),
@@ -636,7 +679,8 @@ class TraceAnalyzerTest{
         return new AreaEntry(ref, snapshot.build(), new DiagnosticResult(List.of(Finding.of(DiagnosticReason.active, Severity.normal))));
     }
 
-    private static BuildingRef ref(String block, int x){ return new BuildingRef(x, 10, block, block, 1, 1); }
+    private static BuildingRef ref(String block, int x){ return ref(block, x, 10, 1); }
+    private static BuildingRef ref(String block, int x, int y, int team){ return new BuildingRef(x, y, block, block, 1, team); }
     private static ResourceRef item(String id, String name){ return new ResourceRef(ResourceKind.item, id, name); }
     private static NetworkPort port(BuildingRef ref, NetworkSide side, String channel){ return new NetworkPort(ref, side, channel); }
     private static NetworkEdge edge(NetworkPort from, NetworkPort to, ItemConstraint items){ return new NetworkEdge(from, to, items, false); }

@@ -54,7 +54,9 @@ public final class TraceAnalyzer{
             ? reverseSearch(network.graph, roots, item)
             : forwardSearch(network.graph, roots, item);
         int unlocatedSkipped = Math.max(0, area.summary.skipped() - area.skippedBuildings.size());
-        List<BuildingRef> relevantSkipped = relevantSkipped(area.skippedBuildings, search.visited, target, direction);
+        SkippedBuildingIndex skippedIndex = new SkippedBuildingIndex(area.skippedBuildings);
+        List<BuildingRef> relevantSkipped = relevantSkipped(skippedIndex, search.visited, target, direction);
+        SkippedBuildingIndex relevantSkippedIndex = new SkippedBuildingIndex(relevantSkipped);
         boolean diagnosticsIncomplete = unlocatedSkipped > 0 || !relevantSkipped.isEmpty()
             || targetEntry == null || targetEntry.snapshot == null;
 
@@ -64,7 +66,7 @@ public final class TraceAnalyzer{
         List<NetworkInterruption> interruptions = relevantInterruptions(network, search.visited, direction);
         List<BuildingRef> unsupportedInArea = relevantUnsupported(network, target, interruptions);
         List<BuildingRef> deadEnds = deadEnds(network.graph, search.visited, target, item, direction, endpoints,
-            boundaries, interruptions, relevantSkipped, unlocatedSkipped > 0);
+            boundaries, interruptions, relevantSkippedIndex, unlocatedSkipped > 0);
 
         boolean complete = !diagnosticsIncomplete && !topologyIncomplete && unsupportedInArea.isEmpty()
             && interruptions.isEmpty() && boundaries.isEmpty();
@@ -251,21 +253,15 @@ public final class TraceAnalyzer{
         return List.copyOf(result);
     }
 
-    private static List<BuildingRef> relevantSkipped(Collection<BuildingRef> skipped, Set<NetworkPort> visited,
+    private static List<BuildingRef> relevantSkipped(SkippedBuildingIndex skipped, Set<NetworkPort> visited,
                                                       BuildingRef target, TraceDirection direction){
         String terminalChannel = direction == TraceDirection.input ? "in" : "out";
         TreeSet<BuildingRef> result = new TreeSet<>(BUILDING_ORDER);
-        for(BuildingRef failed : skipped){
-            if(failed.equals(target) || visited.stream().anyMatch(port -> port.building.equals(failed))){
-                result.add(failed);
-                continue;
-            }
-            for(NetworkPort port : visited){
-                if(port.channel.equals(terminalChannel) && port.building.teamId == failed.teamId
-                    && touchesSide(port.building, port.side, failed)){
-                    result.add(failed);
-                    break;
-                }
+        result.addAll(skipped.buildingsAt(visited));
+        if(skipped.contains(target)) result.add(target);
+        for(NetworkPort port : visited){
+            if(port.channel.equals(terminalChannel)){
+                result.addAll(skipped.adjacentTo(port));
             }
         }
         return List.copyOf(result);
@@ -295,7 +291,7 @@ public final class TraceAnalyzer{
     private static List<BuildingRef> deadEnds(NetworkGraph graph, Set<NetworkPort> visited, BuildingRef target,
                                                ResourceRef item, TraceDirection direction, List<TraceEndpoint> endpoints,
                                                List<NetworkPort> boundaries, List<NetworkInterruption> interruptions,
-                                               List<BuildingRef> skipped, boolean hasUnlocatedSkipped){
+                                               SkippedBuildingIndex skipped, boolean hasUnlocatedSkipped){
         if(hasUnlocatedSkipped) return List.of();
         Set<BuildingRef> endpointRefs = new HashSet<>();
         for(TraceEndpoint endpoint : endpoints) endpointRefs.add(endpoint.building);
@@ -305,8 +301,7 @@ public final class TraceAnalyzer{
         for(NetworkPort port : visited){
             if(port.building.equals(target) || endpointRefs.contains(port.building)
                 || continuedOutside.contains(port)) continue;
-            if(skipped.stream().anyMatch(failed -> failed.equals(port.building)
-                || failed.teamId == port.building.teamId && touchesSide(port.building, port.side, failed))) continue;
+            if(skipped.contains(port.building) || !skipped.adjacentTo(port).isEmpty()) continue;
             boolean hasContinuation = direction == TraceDirection.input
                 ? graph.incoming(port).stream().anyMatch(edge -> edge.items.allows(item))
                 : graph.outgoing(port).stream().anyMatch(edge -> edge.items.allows(item));
@@ -314,6 +309,74 @@ public final class TraceAnalyzer{
         }
         return List.copyOf(result);
     }
+
+    /** Spatially narrows skipped-building checks to buildings that occupy the port's adjacent edge. */
+    private static final class SkippedBuildingIndex{
+        private final Set<BuildingRef> buildings;
+        private final Map<SkippedTile, List<BuildingRef>> byTile;
+
+        SkippedBuildingIndex(Collection<BuildingRef> skipped){
+            Set<BuildingRef> refs = new HashSet<>(skipped);
+            Map<SkippedTile, List<BuildingRef>> index = new HashMap<>();
+            for(BuildingRef ref : refs){
+                int size = Math.max(1, ref.size);
+                int offset = -(size - 1) / 2;
+                int minX = ref.tileX + offset, minY = ref.tileY + offset;
+                for(int x = minX; x < minX + size; x++){
+                    for(int y = minY; y < minY + size; y++){
+                        index.computeIfAbsent(new SkippedTile(ref.teamId, x, y), ignored -> new ArrayList<>()).add(ref);
+                    }
+                }
+            }
+            index.replaceAll((tile, refsAtTile) -> List.copyOf(refsAtTile));
+            buildings = Set.copyOf(refs);
+            byTile = Map.copyOf(index);
+        }
+
+        boolean contains(BuildingRef ref){
+            return buildings.contains(ref);
+        }
+
+        Set<BuildingRef> buildingsAt(Set<NetworkPort> ports){
+            Set<BuildingRef> found = new HashSet<>();
+            for(NetworkPort port : ports){
+                if(buildings.contains(port.building)) found.add(port.building);
+            }
+            return found;
+        }
+
+        List<BuildingRef> adjacentTo(NetworkPort port){
+            BuildingRef building = port.building;
+            int size = Math.max(1, building.size);
+            int offset = -(size - 1) / 2;
+            int minX = building.tileX + offset, maxX = minX + size - 1;
+            int minY = building.tileY + offset, maxY = minY + size - 1;
+            int x = switch(port.side){
+                case east -> maxX + 1;
+                case west -> minX - 1;
+                default -> building.tileX;
+            };
+            int y = switch(port.side){
+                case north -> maxY + 1;
+                case south -> minY - 1;
+                default -> building.tileY;
+            };
+            int from = (port.side == NetworkSide.east || port.side == NetworkSide.west) ? minY : minX;
+            int to = (port.side == NetworkSide.east || port.side == NetworkSide.west) ? maxY : maxX;
+            TreeSet<BuildingRef> found = new TreeSet<>(BUILDING_ORDER);
+            for(int coordinate = from; coordinate <= to; coordinate++){
+                SkippedTile tile = port.side == NetworkSide.east || port.side == NetworkSide.west
+                    ? new SkippedTile(building.teamId, x, coordinate)
+                    : new SkippedTile(building.teamId, coordinate, y);
+                for(BuildingRef candidate : byTile.getOrDefault(tile, List.of())){
+                    if(touchesSide(building, port.side, candidate)) found.add(candidate);
+                }
+            }
+            return List.copyOf(found);
+        }
+    }
+
+    private record SkippedTile(int teamId, int x, int y){ }
 
     private static List<NetworkFinding> findings(TraceDirection direction, boolean targetUsesItem, boolean complete,
                                                   List<TraceEndpoint> endpoints, List<NetworkPort> boundaries,

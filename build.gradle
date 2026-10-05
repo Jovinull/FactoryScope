@@ -3,6 +3,10 @@ apply plugin: "java"
 sourceSets.main.java.srcDirs = ["src"]
 sourceSets.test.java.srcDirs = ["test"]
 
+tasks.withType(JavaCompile).configureEach{
+    options.encoding = "UTF-8"
+}
+
 //The acceptance harness is a second Mindustry mod that drives the inspector inside a real client.
 //Keeping it in its own source set is what guarantees it can never reach the release artifact, which is
 //built from sourceSets.main alone.
@@ -28,7 +32,110 @@ ext{
     mindustryVersion = "v160.5"
     junitVersion = "5.11.4"
     isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
-    sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+}
+
+// Keep SDK discovery and command arguments explicit so paths with spaces are never reparsed as a shell string.
+def androidSdkRoot = { Map environment ->
+    def configured = environment.get("ANDROID_HOME")?.trim()
+    if(!configured) configured = environment.get("ANDROID_SDK_ROOT")?.trim()
+    configured ? new File(configured).absoluteFile : null
+}
+
+def requireAndroidSdk = { Map environment ->
+    File sdk = androidSdkRoot(environment)
+    if(sdk == null) throw new GradleException("Android SDK not configured. Set ANDROID_HOME or ANDROID_SDK_ROOT.")
+    if(!sdk.isDirectory()) throw new GradleException("Android SDK directory does not exist: ${sdk}")
+    sdk
+}
+
+def buildToolsVersion = { File directory ->
+    def matcher = directory.name =~ /^(\d+(?:\.\d+){1,3})$/
+    if(!matcher.matches()) return null
+    matcher.group(1).tokenize(".").collect{ Integer.parseInt(it) }
+}
+
+def compareBuildTools = { File left, File right ->
+    List<Integer> a = buildToolsVersion(left), b = buildToolsVersion(right)
+    int parts = Math.max(a.size(), b.size())
+    for(int i = 0; i < parts; i++){
+        int difference = Integer.compare(i < a.size() ? a[i] : 0, i < b.size() ? b[i] : 0)
+        if(difference != 0) return difference
+    }
+    0
+}
+
+def findAndroidBuildTools = { File sdk, boolean windows ->
+    File root = new File(sdk, "build-tools")
+    List<File> versions = root.isDirectory()
+        ? (root.listFiles() ?: [] as File[]).findAll{ it.isDirectory() && buildToolsVersion(it) != null }
+            .sort{ File a, File b -> compareBuildTools(a, b) }
+        : []
+    if(versions.isEmpty()) throw new GradleException("No Android build-tools installation found under ${root}")
+
+    String executableName = windows ? "d8.bat" : "d8"
+    File selected = versions.reverse().find{ version ->
+        File executable = new File(version, executableName)
+        executable.isFile() && (windows || executable.canExecute())
+    }
+    if(selected == null) throw new GradleException("d8 executable not found in Android build-tools under ${root}")
+    File executable = new File(selected, executableName)
+    logger.lifecycle("Using Android D8 ${selected.name} from ${executable}")
+    executable
+}
+
+def findAndroidPlatform = { File sdk ->
+    File root = new File(sdk, "platforms")
+    def platforms = root.isDirectory() ? (root.listFiles() ?: [] as File[]) : []
+    platforms = platforms.findAll{ File directory ->
+        directory.isDirectory() && (directory.name =~ /^android-\d+$/).matches()
+            && new File(directory, "android.jar").isFile()
+    }
+    platforms.sort{ File a, File b ->
+        Integer.parseInt(a.name.substring("android-".length())) <=> Integer.parseInt(b.name.substring("android-".length()))
+    }
+    if(platforms.isEmpty()) throw new GradleException("No Android platform with android.jar found under ${root}")
+    platforms.last()
+}
+
+def d8Arguments = { Collection<File> classpath, File androidLibrary, File outputJar, File inputJar ->
+    List<String> arguments = []
+    classpath.each{ File entry -> arguments.addAll(["--classpath", entry.absolutePath]) }
+    arguments.addAll(["--lib", androidLibrary.absolutePath])
+    arguments.addAll(["--min-api", "21", "--output", outputJar.absolutePath, inputJar.absolutePath])
+    arguments
+}
+
+def invokeD8 = { File executable, List<String> arguments, File workingDirectory ->
+    try{
+        List<String> command = [executable.absolutePath] + arguments
+        if(isWindows){
+            String quotedCommand = command.collect{ String argument ->
+                "\"${argument.replace('"', '""')}\""
+            }.join(" ")
+            String commandShell = System.getenv("ComSpec") ?: "cmd.exe"
+            String commandForCmd = "\"${quotedCommand}\"".toString()
+            command = [commandShell, "/d", "/s", "/c", commandForCmd]
+        }
+
+        Process process = new ProcessBuilder(command)
+            .directory(workingDirectory)
+            .redirectErrorStream(true)
+            .start()
+        String processOutput = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim()
+        int exitCode = process.waitFor()
+        if(exitCode != 0){
+            String detail = processOutput ? ":\n${processOutput}" : " (no diagnostic output)"
+            throw new GradleException("D8 exited with code ${exitCode}${detail}")
+        }
+    }catch(InterruptedException e){
+        Thread.currentThread().interrupt()
+        throw new GradleException("Interrupted while running D8 at ${executable}", e)
+    }catch(IOException e){
+        throw new GradleException("Could not start D8 executable ${executable}: ${e.message}", e)
+    }catch(Exception e){
+        if(e instanceof GradleException) throw e
+        throw new GradleException("D8 failed while running ${executable}", e)
+    }
 }
 
 repositories{
@@ -95,7 +202,7 @@ tasks.named("test"){
     dependsOn "extractMindustryAssets"
     classpath += files(mindustryAssetsDir.map{ it.dir("assets") })
     //the benchmark is a measurement, not a check; it would only make an ordinary test run slower
-    useJUnitPlatform{ excludeTags "area-benchmark", "network-benchmark", "trace-benchmark", "power-benchmark", "liquid-benchmark" }
+    useJUnitPlatform{ excludeTags "area-benchmark", "network-benchmark", "trace-benchmark", "trace-skipped-benchmark", "power-benchmark", "liquid-benchmark" }
     testLogging{
         events = ["failed"]
         exceptionFormat = "full"
@@ -141,6 +248,20 @@ tasks.register("traceBenchmark", Test){
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath + files(mindustryAssetsDir.map{ it.dir("assets") })
     useJUnitPlatform{ includeTags "trace-benchmark" }
+    testLogging{
+        showStandardStreams = true
+        events = ["failed", "standard_out"]
+        exceptionFormat = "full"
+    }
+    outputs.upToDateWhen{ false }
+}
+
+tasks.register("traceSkippedBenchmark", Test){
+    group = "verification"
+    description = "Measures Supply Trace with long visited routes and irrelevant, relevant, or mixed skipped-building populations."
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform{ includeTags "trace-skipped-benchmark" }
     testLogging{
         showStandardStreams = true
         events = ["failed", "standard_out"]
@@ -207,7 +328,9 @@ tasks.register("verifyArtifacts"){
     def libs = layout.buildDirectory.dir("libs")
 
     doLast{
-        def required = ["mod.hjson", "icon.png", "bundles/bundle.properties", "bundles/bundle_pt_BR.properties"]
+        def required = ["mod.hjson", "icon.png", "bundles/bundle.properties", "bundles/bundle_pt_BR.properties",
+            "bundles/bundle_ru.properties", "bundles/bundle_zh_CN.properties", "bundles/bundle_ko.properties",
+            "bundles/bundle_es.properties"]
         def forbidden = ~/^(mindustry|arc|org|com|kotlin|javax)\/|acceptance|Test|fixture|harness|scratch|factoryscope\/tools\//
 
         ["${projectName}Desktop.jar", "${projectName}.jar"].each{ name ->
@@ -258,6 +381,7 @@ tasks.register("acceptanceTest", JavaExec){
         if(project.hasProperty("capture")) arguments += ["--capture", project.property("capture").toString()]
         if(project.hasProperty("keepSandbox")) arguments += ["--keep-sandbox", project.property("keepSandbox").toString()]
         if(project.hasProperty("timeoutSeconds")) arguments += ["--timeout-seconds", project.property("timeoutSeconds").toString()]
+        if(project.hasProperty("powerFixtureRepetitions")) arguments += ["--power-fixture-repetitions", project.property("powerFixtureRepetitions").toString()]
         setArgs(arguments)
     }
 }
@@ -280,19 +404,110 @@ tasks.register("jarAndroid"){
     def projectName = project.name
 
     doLast{
-        if(!sdkRoot || !new File(sdkRoot).exists()) throw new GradleException("No valid Android SDK found. Ensure that ANDROID_HOME is set to your Android SDK directory.")
+        File sdk = requireAndroidSdk(System.getenv())
+        File d8 = findAndroidBuildTools(sdk, isWindows)
+        File platform = findAndroidPlatform(sdk)
+        File libs = layout.buildDirectory.dir("libs").get().asFile
+        if(!libs.isDirectory() && !libs.mkdirs()) throw new GradleException("Could not create artifact directory: ${libs}")
 
-        def platformRoot = new File("$sdkRoot/platforms/").listFiles().sort().reverse().find{ f -> new File(f, "android.jar").exists() }
-        if(!platformRoot) throw new GradleException("No android.jar found. Ensure that you have an Android platform installed.")
+        List<File> classpath = (configurations.compileClasspath.files + configurations.runtimeClasspath.files)
+            .collect{ it.absoluteFile }.unique()
+        File androidLibrary = new File(platform, "android.jar").absoluteFile
+        File output = new File(libs, "${projectName}Android.jar")
+        File input = new File(libs, "${projectName}Desktop.jar")
+        List<String> arguments = d8Arguments(classpath, androidLibrary, output, input)
 
-        def dependencies = (configurations.compileClasspath.asList() + configurations.runtimeClasspath.asList() + [new File(platformRoot, "android.jar")]).collect{ "--classpath $it.path" }.join(" ")
-        def d8 = isWindows ? "d8.bat" : "d8"
+        invokeD8(d8, arguments, libs)
+    }
+}
 
-        def dexing = "$d8 $dependencies --min-api 21 --output ${projectName}Android.jar ${projectName}Desktop.jar"
-            .execute(null, new File("build/libs"))
-        dexing.waitForProcessOutput(System.out, System.err)
-        //the template ignores this, which turns a dexing failure into a confusing error in deploy
-        if(dexing.exitValue() != 0) throw new GradleException("d8 failed with exit code ${dexing.exitValue()}")
+tasks.register("d8ToolingTest"){
+    group = "verification"
+    description = "Tests Android SDK/D8 discovery and argument construction without requiring the Android SDK."
+    doLast{
+        def require = { boolean condition, String message ->
+            if(!condition) throw new GradleException("D8 tooling test failed: ${message}")
+        }
+        def expectFailure = { String expected, Closure action ->
+            try{
+                action.call()
+            }catch(GradleException failure){
+                if(failure.message.contains(expected)) return
+                throw new GradleException("Expected '${expected}', got '${failure.message}'", failure)
+            }
+            throw new GradleException("Expected D8 tooling failure containing '${expected}'")
+        }
+
+        File temp = java.nio.file.Files.createTempDirectory("FactoryScope build tooling ").toFile()
+        try{
+            File sdk = new File(temp, "Android SDK with spaces")
+            File oldTools = new File(sdk, "build-tools/34.0.0")
+            File latestTools = new File(sdk, "build-tools/35.0.0")
+            File malformedTools = new File(sdk, "build-tools/35.latest")
+            File olderPlatform = new File(sdk, "platforms/android-34")
+            File latestPlatform = new File(sdk, "platforms/android-35")
+            [oldTools, latestTools, malformedTools, olderPlatform, latestPlatform].each{ it.mkdirs() }
+            [oldTools, latestTools].each{ directory ->
+                new File(directory, "d8").createNewFile()
+                new File(directory, "d8.bat").createNewFile()
+            }
+            new File(olderPlatform, "android.jar").createNewFile()
+            new File(latestPlatform, "android.jar").createNewFile()
+            [oldTools, latestTools].each{ directory -> new File(directory, "d8").setExecutable(true) }
+
+            require(androidSdkRoot([ANDROID_HOME: sdk.absolutePath, ANDROID_SDK_ROOT: temp.absolutePath]) == sdk.absoluteFile,
+                "ANDROID_HOME must take precedence when both SDK variables are set")
+            require(androidSdkRoot([ANDROID_SDK_ROOT: sdk.absolutePath]) == sdk.absoluteFile,
+                "ANDROID_SDK_ROOT fallback")
+            expectFailure("Android SDK not configured"){ requireAndroidSdk([:]) }
+            expectFailure("No Android build-tools installation found"){
+                findAndroidBuildTools(new File(temp, "no build tools"), isWindows)
+            }
+
+            File selectedD8 = findAndroidBuildTools(sdk, false)
+            require(selectedD8.name == "d8" && selectedD8.parentFile.name == "35.0.0",
+                "select numerically newest Unix build-tools executable")
+            File selectedWindowsD8 = findAndroidBuildTools(sdk, true)
+            require(selectedWindowsD8.name == "d8.bat" && selectedWindowsD8.parentFile.name == "35.0.0",
+                "select numerically newest Windows build-tools executable")
+            require(findAndroidPlatform(sdk).name == "android-35", "select numerically newest platform with android.jar")
+
+            File missingD8Sdk = new File(temp, "SDK with missing D8")
+            new File(missingD8Sdk, "build-tools/36.0.0").mkdirs()
+            expectFailure("d8 executable not found") { findAndroidBuildTools(missingD8Sdk, isWindows) }
+
+            File projectWithSpaces = new File(temp, "project path with spaces")
+            projectWithSpaces.mkdirs()
+            File dependencyWithSpaces = new File(temp, "dependency path with spaces/dependency.jar")
+            File androidLibraryWithSpaces = new File(sdk, "platforms/android-35/android.jar")
+            File outputWithSpaces = new File(projectWithSpaces, "build/libs/FactoryScope Android.jar")
+            File inputWithSpaces = new File(projectWithSpaces, "build/libs/FactoryScope Desktop.jar")
+            List<String> arguments = d8Arguments([dependencyWithSpaces], androidLibraryWithSpaces, outputWithSpaces, inputWithSpaces)
+            require(arguments == ["--classpath", dependencyWithSpaces.absolutePath, "--lib", androidLibraryWithSpaces.absolutePath, "--min-api", "21",
+                "--output", outputWithSpaces.absolutePath, inputWithSpaces.absolutePath],
+                "dependency classpath, android library, project, and output paths with spaces remain individual arguments")
+
+            File fakeExecutable = new File(latestTools, isWindows ? "d8.bat" : "d8")
+            File invocationMarker = new File(temp, "D8 invocation with spaces.txt")
+            if(isWindows){
+                fakeExecutable.text = "@echo off\r\necho invoked > \"${invocationMarker.absolutePath}\"\r\nexit /b 0\r\n"
+            }else{
+                fakeExecutable.text = "#!/bin/sh\nprintf invoked > '${invocationMarker.absolutePath}'\n"
+                fakeExecutable.setExecutable(true)
+            }
+            invokeD8(fakeExecutable, arguments, projectWithSpaces)
+            require(invocationMarker.isFile(), "invoke the SDK executable from a path with spaces")
+            if(isWindows){
+                fakeExecutable.text = "@echo off\r\necho synthetic D8 diagnostic 1>&2\r\nexit /b 7\r\n"
+            }else{
+                fakeExecutable.text = "#!/bin/sh\nprintf 'synthetic D8 diagnostic\\n' >&2\nexit 7\n"
+                fakeExecutable.setExecutable(true)
+            }
+            expectFailure("synthetic D8 diagnostic"){ invokeD8(fakeExecutable, arguments, projectWithSpaces) }
+            logger.lifecycle("D8 tooling checks passed (SDK precedence, version selection, missing-tool errors, spaced paths)")
+        }finally{
+            delete(temp)
+        }
     }
 }
 
