@@ -47,15 +47,164 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
-    void armoredConveyorsAndDuctsArePartialUntilTheirInputRulesAreModeled(){
-        Building conveyor = place(Blocks.armoredConveyor, 10, 10, 0);
-        Building duct = place(Blocks.armoredDuct, 14, 10, 0);
+    void armoredItemAcceptanceMatchesEngineClassAndAlignmentRulesAcrossRotations(){
+        for(int rotation = 0; rotation < 4; rotation++){
+            NetworkSide forward = NetworkSide.rotation(rotation);
+            for(NetworkSide sourceSide : NetworkSide.values()){
+                assertArmoredAcceptance(Blocks.armoredConveyor, rotation, sourceSide, Blocks.conveyor,
+                    sourceSide != forward, "Armored Conveyor accepts Conveyor-family insertion except from its front");
+                assertArmoredAcceptance(Blocks.armoredConveyor, rotation, sourceSide, Blocks.router,
+                    sourceSide == forward.opposite(), "Armored Conveyor accepts non-Conveyor insertion only on its aligned side");
+                assertArmoredAcceptance(Blocks.armoredDuct, rotation, sourceSide, Blocks.duct,
+                    true, "Armored Duct accepts a Duct whose forward points into it");
+                assertArmoredAcceptance(Blocks.armoredDuct, rotation, sourceSide, Blocks.router,
+                    sourceSide == forward.opposite(), "Armored Duct accepts non-Duct insertion only on its aligned side");
+            }
+        }
+    }
 
-        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 16, 12), Team.sharded);
+    @Test
+    void armoredDuctAcceptsAlignedDuctSourcesEvenWhenTheirFrontDoesNotPointIntoIt(){
+        for(int rotation = 0; rotation < 4; rotation++){
+            NetworkSide forward = NetworkSide.rotation(rotation);
+            for(NetworkSide sourceSide : NetworkSide.values()){
+                HeadlessGame.newWorld(32);
+                Building target = place(Blocks.armoredDuct, 16, 16, rotation);
+                int sourceRotation = (sourceSide.opposite().ordinal() + 2) % 4;
+                Building source = place(Blocks.duct, 16 + dx(sourceSide), 16 + dy(sourceSide), sourceRotation);
+                boolean alignedEdge = sourceSide == forward.opposite();
+                assertEquals(alignedEdge, target.acceptItem(source, Items.copper),
+                    "Armored Duct rotation=" + rotation + " accepts a misoriented Duct only on its aligned edge from " + sourceSide);
+            }
+        }
+    }
 
-        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
-        assertEquals(Set.of(AreaProbe.refOf(conveyor), AreaProbe.refOf(duct)), new HashSet<>(network.unsupportedTransport));
-        assertTrue(network.graph.edges.isEmpty());
+    @Test
+    void armoredItemTopologyMatchesEngineAcceptedNeighborPairsAcrossRotations(){
+        for(int rotation = 0; rotation < 4; rotation++){
+            for(NetworkSide sourceSide : NetworkSide.values()){
+                assertArmoredTopology(Blocks.armoredConveyor, rotation, sourceSide, Blocks.conveyor);
+                assertArmoredTopology(Blocks.armoredConveyor, rotation, sourceSide, Blocks.router);
+                assertArmoredTopology(Blocks.armoredDuct, rotation, sourceSide, Blocks.duct);
+                assertArmoredTopology(Blocks.armoredDuct, rotation, sourceSide, Blocks.router);
+            }
+        }
+    }
+
+    @Test
+    void armoredDuctCarriesAnAcceptedFrontInsertionThroughItsForwardOutput(){
+        for(int rotation = 0; rotation < 4; rotation++){
+            HeadlessGame.newWorld(32);
+            Building armored = place(Blocks.armoredDuct, 16, 16, rotation);
+            NetworkSide forward = NetworkSide.rotation(rotation);
+            Building armoredSource = place(Blocks.duct, 16 + forward.dx, 16 + forward.dy, forward.opposite().ordinal());
+            Building ordinary = place(Blocks.duct, 21, 16, rotation);
+            Building ordinarySource = place(Blocks.duct, 21 + forward.dx, 16 + forward.dy, forward.opposite().ordinal());
+            ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(14, 14, 23, 18), Team.sharded);
+            BuildingRef armoredRef = AreaProbe.refOf(armored), ordinaryRef = AreaProbe.refOf(ordinary);
+
+            assertTrue(armored.acceptItem(armoredSource, Items.copper), "engine accepts the aligned duct into armored front");
+            assertFalse(ordinary.acceptItem(ordinarySource, Items.copper), "engine rejects insertion into ordinary duct front");
+            assertTrue(network.graph.isReachable(input(armoredRef, forward), output(armoredRef, forward), copper),
+                "Armored Duct's engine-accepted front insertion exits through its fixed forward route");
+            assertFalse(network.graph.isReachable(input(ordinaryRef, forward), output(ordinaryRef, forward), copper),
+                "ordinary Duct still rejects its front side");
+        }
+    }
+
+    @Test
+    void armoredItemRoutesPreserveUpstreamSorterResourceConstraints(){
+        for(Block transport : new Block[]{Blocks.armoredConveyor, Blocks.armoredDuct}){
+            HeadlessGame.newWorld(32);
+            Building sorter = place(Blocks.sorter, 9, 10, 0);
+            sorter.configure(Items.copper);
+            Building armored = place(transport, 10, 10, 0);
+            Building downstream = place(Blocks.conveyor, 11, 10, 0);
+
+            ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(7, 8, 14, 12), Team.sharded);
+            BuildingRef sorterRef = AreaProbe.refOf(sorter), downstreamRef = AreaProbe.refOf(downstream);
+
+            assertTrue(network.graph.isReachable(input(sorterRef, NetworkSide.west),
+                output(downstreamRef, NetworkSide.east), copper), transport.name + " preserves the configured Copper route");
+            assertFalse(network.graph.isReachable(input(sorterRef, NetworkSide.west),
+                output(downstreamRef, NetworkSide.east), lead), transport.name + " does not invent a Lead route");
+        }
+    }
+
+    @Test
+    void armoredConveyorAndDuctPreserveProducerTraceAndAreaBoundaryEvidence(){
+        for(Block transport : new Block[]{Blocks.armoredConveyor, Blocks.armoredDuct}){
+            HeadlessGame.newWorld(32);
+            Building source = place(ModdedBlocks.conventional, 9, 10, 0);
+            Building transportBuild = place(transport, 10, 10, 0);
+            Building consumer = place(ModdedBlocks.traceConsumer, 11, 10, 0);
+            assertTrue(transportBuild.acceptItem(source, Items.graphite), transport.name + " accepts the aligned producer in Mindustry");
+
+            AreaDiagnosticResult complete = AreaProbe.scan(AreaSelection.of(7, 7, 13, 13), Team.sharded);
+            SupplyTrace trace = TraceAnalyzer.input(complete, AreaProbe.refOf(consumer),
+                new ResourceRef(ResourceKind.item, "graphite", "Graphite"));
+            assertEquals(List.of(AreaProbe.refOf(source)), trace.producers().stream().map(endpoint -> endpoint.building).toList());
+            assertTrue(trace.complete);
+
+            HeadlessGame.newWorld(32);
+            Building outsideSource = place(ModdedBlocks.conventional, 9, 10, 0);
+            Building insideTransport = place(transport, 10, 10, 0);
+            place(Blocks.conveyor, 11, 10, 0);
+            AreaDiagnosticResult boundary = AreaProbe.scan(AreaSelection.of(10, 10, 10, 10), Team.sharded);
+            NetworkPort targetInput = input(AreaProbe.refOf(insideTransport), NetworkSide.west);
+            assertTrue(boundary.network.boundaryInputs.contains(targetInput), transport.name + " preserves an aligned outside producer as a boundary");
+            assertTrue(boundary.network.boundaryPorts.contains(output(AreaProbe.refOf(insideTransport), NetworkSide.east)),
+                transport.name + " preserves its forward exit as a boundary: " + boundary.network.boundaryPorts
+                    + " edges=" + boundary.network.graph.edges + " refs=" + boundary.entries.stream().map(entry -> entry.ref).toList());
+            assertNotNull(outsideSource);
+
+            HeadlessGame.newWorld(32);
+            Building sideSource = place(ModdedBlocks.conventional, 10, 9, 0);
+            Building isolated = place(transport, 10, 10, 0);
+            AreaDiagnosticResult rejectedSide = AreaProbe.scan(AreaSelection.of(10, 10, 10, 10), Team.sharded);
+            assertFalse(rejectedSide.network.boundaryInputs.contains(input(AreaProbe.refOf(isolated), NetworkSide.south)),
+                transport.name + " does not invent an input boundary from a rejected side source");
+            assertNotNull(sideSource);
+        }
+    }
+
+    @Test
+    void armoredTransportsTraceFromAnAlignedMultitileDrillInMindustry(){
+        for(Block transport : new Block[]{Blocks.armoredConveyor, Blocks.armoredDuct}){
+            HeadlessGame.newWorld(32);
+            for(int x = 8; x <= 9; x++) for(int y = 10; y <= 11; y++)
+                world.tile(x, y).setFloor((Floor)Blocks.sand);
+            Building drill = place(Blocks.mechanicalDrill, 8, 10, 0);
+            Building transportBuild = place(transport, 10, 10, 0);
+            Building smelter = place(Blocks.siliconSmelter, 11, 10, 0);
+
+            assertTrue(drill.isValid() && transportBuild.isValid() && smelter.isValid());
+            assertEquals(List.of("sand"), MindustryFactoryProbe.probe(drill).producedItems.stream()
+                .map(resource -> resource.id).toList());
+            assertTrue(transportBuild.acceptItem(drill, Items.sand), transport.name + " accepts an aligned drill in the engine");
+
+            AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(7, 9, 14, 13), Team.sharded);
+            SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(smelter), sand);
+            assertEquals(List.of(AreaProbe.refOf(drill)), trace.producers().stream().map(endpoint -> endpoint.building).toList(),
+                transport.name + " remains visible as a structural route in Supply Trace");
+            assertTrue(trace.complete);
+        }
+    }
+
+    @Test
+    void armoredTransportsRejectAnUnalignedMultitileDrillRoute(){
+        for(Block transport : new Block[]{Blocks.armoredConveyor, Blocks.armoredDuct}){
+            HeadlessGame.newWorld(32);
+            for(int x = 10; x <= 11; x++) for(int y = 8; y <= 9; y++)
+                world.tile(x, y).setFloor((Floor)Blocks.sand);
+            Building drill = place(Blocks.mechanicalDrill, 10, 8, 1);
+            Building transportBuild = place(transport, 10, 10, 0);
+
+            assertFalse(transportBuild.acceptItem(drill, Items.sand), transport.name + " rejects the side-aligned mismatch in Mindustry");
+            AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 7, 14, 13), Team.sharded);
+            assertTrue(area.network.graph.edges.stream().noneMatch(edge -> edge.from.building.equals(AreaProbe.refOf(drill))
+                && edge.to.building.equals(AreaProbe.refOf(transportBuild))), transport.name + " has no edge for the engine-rejected source");
+        }
     }
 
     @Test
@@ -374,7 +523,7 @@ class MindustryNetworkProbeTest{
 
     @Test
     void anUnsupportedNeighborIsAnInterruptionRatherThanADeadEndOrGuessedEdge(){
-        Building unknown = place(Blocks.armoredConveyor, 10, 10, 0);
+        Building unknown = place(Blocks.plastaniumConveyor, 10, 10, 0);
         Building inside = place(Blocks.conveyor, 11, 10, 0);
 
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(11, 10, 11, 10), Team.sharded);
@@ -533,6 +682,47 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void moddedConveyorWithCustomBuildRoutingIsNotTreatedAsVanillaTopology(){
+        HeadlessGame.newWorld(32);
+        Building source = place(Blocks.router, 9, 10, 0);
+        Building custom = place(ModdedBlocks.rejectingConveyor, 10, 10, 0);
+        Building destination = place(Blocks.conveyor, 11, 10, 0);
+        Building inheritedSource = place(Blocks.router, 9, 14, 0);
+        Building inherited = place(ModdedBlocks.inheritedConveyor, 10, 14, 0);
+        place(Blocks.conveyor, 11, 14, 0);
+
+        assertInstanceOf(ModdedBlocks.RejectingConveyor.RejectingConveyorBuild.class, custom);
+        assertFalse(custom.acceptItem(source, Items.copper), "the modded engine build rejects this input");
+        custom.items.add(Items.copper, 1);
+        custom.updateTile();
+        assertEquals(0, destination.items.get(Items.copper), "the custom engine build also suppresses forward transfer");
+        assertTrue(inherited.acceptItem(inheritedSource, Items.copper), "the unmodified vanilla build accepts inherited routing");
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(7, 8, 14, 16), Team.sharded);
+        BuildingRef customRef = AreaProbe.refOf(custom);
+        BuildingRef inheritedRef = AreaProbe.refOf(inherited);
+        assertFalse(network.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
+            output(AreaProbe.refOf(destination), NetworkSide.east), copper),
+            "the custom engine rejection must not become a supported structural route");
+        assertTrue(network.unsupportedTransport.contains(customRef), "custom routing is an explicit interruption");
+        assertTrue(network.graph.ports.stream().noneMatch(port -> port.building.equals(customRef)));
+        assertTrue(network.unsupportedConnections.stream().anyMatch(interruption ->
+                interruption.transport.equals(customRef) && interruption.direction == NetworkInterruption.Direction.incoming
+                    && interruption.port.building.equals(AreaProbe.refOf(destination))),
+            "the adjacent vanilla route retains an explicit incoming interruption");
+        assertFalse(network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(AreaProbe.refOf(source))
+            && edge.to.building.equals(customRef)), "the graph must not invent the engine-rejected route");
+        assertFalse(network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(customRef)
+            && edge.to.building.equals(AreaProbe.refOf(destination))),
+            "custom Build routing must not produce a modeled outgoing route");
+        assertTrue(network.graph.ports.stream().anyMatch(port -> port.building.equals(inheritedRef)),
+            "a modded block using the inherited vanilla build remains compatible");
+        assertTrue(network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(AreaProbe.refOf(inheritedSource))
+            && edge.to.building.equals(inheritedRef)));
+        assertNotNull(destination);
+    }
+
+    @Test
     void unknownItemConsumingTransportIsTopologyIncompleteNotDiagnosisIncomplete(){
         Building unknown = place(ModdedBlocks.unknownTransport, 10, 10, 0);
         AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
@@ -656,6 +846,35 @@ class MindustryNetworkProbeTest{
 
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort output(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
+
+    private static void assertArmoredAcceptance(Block targetBlock, int rotation, NetworkSide sourceSide,
+                                                Block sourceBlock, boolean expected, String reason){
+        HeadlessGame.newWorld(32);
+        int x = 16, y = 16;
+        Building target = place(targetBlock, x, y, rotation);
+        Building source = place(sourceBlock, x + dx(sourceSide), y + dy(sourceSide),
+            sourceSide.opposite().ordinal());
+        assertEquals(expected, target.acceptItem(source, Items.copper),
+            targetBlock.name + " rotation=" + rotation + " source=" + sourceBlock.name + " side=" + sourceSide + ": " + reason);
+    }
+
+    private static void assertArmoredTopology(Block targetBlock, int rotation, NetworkSide sourceSide, Block sourceBlock){
+        HeadlessGame.newWorld(32);
+        int x = 16, y = 16;
+        Building target = place(targetBlock, x, y, rotation);
+        Building source = place(sourceBlock, x + dx(sourceSide), y + dy(sourceSide),
+            sourceSide.opposite().ordinal());
+        boolean engineAccepts = target.acceptItem(source, Items.copper);
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(12, 12, 20, 20), Team.sharded);
+        BuildingRef sourceRef = AreaProbe.refOf(source), targetRef = AreaProbe.refOf(target);
+        boolean modeled = network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(sourceRef)
+            && edge.to.building.equals(targetRef));
+        assertEquals(engineAccepts, modeled, targetBlock.name + " rotation=" + rotation + " source="
+            + sourceBlock.name + " side=" + sourceSide + " edges=" + network.graph.edges);
+    }
+
+    private static int dx(NetworkSide side){ return switch(side){ case east -> 1; case west -> -1; default -> 0; }; }
+    private static int dy(NetworkSide side){ return switch(side){ case north -> 1; case south -> -1; default -> 0; }; }
 
     private static NetworkEdge edge(ItemNetwork network, BuildingRef ref, NetworkSide from, NetworkSide to){
         return network.graph.edges.stream().filter(edge -> edge.from.equals(input(ref, from)) && edge.to.equals(output(ref, to)))

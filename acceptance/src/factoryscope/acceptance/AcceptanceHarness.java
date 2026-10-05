@@ -33,6 +33,8 @@ import mindustry.world.blocks.environment.Floor;
 import mindustry.world.consumers.ConsumeCoolant;
 
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 
 import static mindustry.Vars.*;
 
@@ -799,6 +801,7 @@ public class AcceptanceHarness extends Mod{
         multiTileEdge();
         singleClickStillInspects();
         singlePanelSupplyTrace();
+        armoredItemTransportTrace();
         traceCompletenessScenarios();
         outputTraceBoundary();
         outputTraceDeadEnd();
@@ -1094,6 +1097,162 @@ public class AcceptanceHarness extends Mod{
         queue(this::closeAnyDialog);
     }
 
+    void armoredItemTransportTrace(){
+        int x = rx() + 2, y = ry() + 3;
+        Building[] drills = new Building[2], transports = new Building[2], targets = new Building[2];
+        Block[] transportBlocks = {Blocks.armoredConveyor, Blocks.armoredDuct};
+
+        scenario("Armored Conveyor and Armored Duct expose their proven structural routes");
+        queue(this::closeAnyDialog);
+        queue(this::ensurePickerOff);
+        queue(() -> {
+            clearRegion();
+            for(int route = 0; route < 2; route++){
+                int routeY = y + route * 6;
+                for(int floorX = x; floorX <= x + 1; floorX++) for(int floorY = routeY; floorY <= routeY + 1; floorY++){
+                    Tile tile = world.tile(floorX, floorY);
+                    tile.setFloor((Floor)Blocks.sand);
+                    tile.clearOverlay();
+                }
+                drills[route] = placeAt(Blocks.mechanicalDrill, x, routeY);
+                transports[route] = placeAt(transportBlocks[route], x + 2, routeY, 0);
+                placeAt(Blocks.conveyor, x + 3, routeY, 0);
+                placeAt(Blocks.conveyor, x + 4, routeY, 0);
+                targets[route] = placeAt(Blocks.siliconSmelter, x + 5, routeY);
+                check(transportBlocks[route].name + " accepts the aligned drill in Mindustry",
+                    transports[route].acceptItem(drills[route], Items.sand));
+            }
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x - 1, y - 1, x + 9, y + 10));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            ResourceRef sand = new ResourceRef(ResourceKind.item, "sand", "Sand");
+            check("the real area-selection drag ends picker mode", !FactoryScopeUI.picking());
+            check("the real area-selection drag opens Area Diagnostics",
+                Core.scene.getDialog() != null && Core.scene.getDialog().name.equals("factoryscope-area-dialog"));
+            check("the selected area contains both armored routes",
+                report != null && report.network != null
+                    && report.entries.stream().anyMatch(entry -> entry.ref.equals(AreaProbe.refOf(targets[0])))
+                    && report.entries.stream().anyMatch(entry -> entry.ref.equals(AreaProbe.refOf(targets[1]))));
+            for(int route = 0; route < 2; route++){
+                int index = route;
+                SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(targets[index]), sand);
+                boolean producer = trace != null && trace.producers().stream()
+                    .anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(drills[index])));
+                boolean includesTransport = trace != null && trace.producers().stream().anyMatch(endpoint -> endpoint.path.ports().stream()
+                    .anyMatch(port -> port.building.equals(AreaProbe.refOf(transports[index]))));
+                check(transportBlocks[index].localizedName + " has a complete structural trace from its drill",
+                    trace != null && trace.complete && producer && includesTransport,
+                    trace == null ? "no trace" : "complete=" + trace.complete + " producers=" + trace.producers().size());
+            }
+        });
+        queue(() -> {
+            check("Area Diagnostics exposes its Network view", dialogHasNamed("factoryscope-area-network"));
+            if(dialogHasNamed("factoryscope-area-network")) clickNamedInDialog("factoryscope-area-network");
+        });
+        queue(() -> check("the active dialog is the production Network view",
+            Core.scene.getDialog() != null && Core.scene.getDialog().name.equals("factoryscope-network-dialog")));
+        queue(() -> {
+            check("Network offers the Sand resource filter", dialogHasNamed("factoryscope-network-item-sand"));
+            if(dialogHasNamed("factoryscope-network-item-sand")) clickNamedInDialog("factoryscope-network-item-sand");
+        });
+        queue(this::scrollReportToBottom);
+        queue(() -> {
+            if(dialogHasNamed("factoryscope-network-more")) clickNamedInDialog("factoryscope-network-more");
+        });
+        queue(this::scrollReportToBottom);
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            List<BuildingRef> buildings = report == null || report.network == null ? List.of()
+                : report.network.graph.edges.stream()
+                    .flatMap(edge -> java.util.stream.Stream.of(edge.from.building, edge.to.building))
+                    .distinct()
+                    .sorted(Comparator.comparingInt((BuildingRef ref) -> ref.tileX)
+                        .thenComparingInt(ref -> ref.tileY).thenComparing(ref -> ref.blockId).thenComparingInt(ref -> ref.teamId))
+                    .toList();
+            int targetIndex = buildings.indexOf(AreaProbe.refOf(targets[0]));
+            check("the Armored Conveyor consumer appears in Network", targetIndex >= 0, "buildings=" + buildings);
+            if(targetIndex >= 0) clickNamedInDialog("factoryscope-network-building", targetIndex);
+        });
+        for(int route = 0; route < 2; route++){
+            int index = route;
+            if(route == 1){
+                queue(() -> {
+                    check("return from Armored Conveyor trace restores Network details",
+                        Core.scene.getDialog() != null && Core.scene.getDialog().name.equals("factoryscope-network-dialog"));
+                    if(dialogHasNamed("factoryscope-trace-back")) clickNamedInDialog("factoryscope-trace-back");
+                });
+                queue(this::scrollReportToBottom);
+                queue(() -> {
+                    AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+                    List<BuildingRef> buildings = report == null || report.network == null ? List.of()
+                        : report.network.graph.edges.stream()
+                            .flatMap(edge -> java.util.stream.Stream.of(edge.from.building, edge.to.building))
+                            .distinct()
+                            .sorted(Comparator.comparingInt((BuildingRef ref) -> ref.tileX)
+                                .thenComparingInt(ref -> ref.tileY).thenComparing(ref -> ref.blockId).thenComparingInt(ref -> ref.teamId))
+                            .toList();
+                    int targetIndex = buildings.indexOf(AreaProbe.refOf(targets[1]));
+                    check("the Armored Duct consumer appears in Network", targetIndex >= 0, "buildings=" + buildings);
+                    if(targetIndex >= 0) clickNamedInDialog("factoryscope-network-building", targetIndex);
+                });
+            }
+            queue(() -> {
+                AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+                ResourceRef sand = new ResourceRef(ResourceKind.item, "sand", "Sand");
+                int occurrence = traceInputOccurrence(report, AreaProbe.refOf(targets[index]), sand);
+                check(transportBlocks[index].localizedName + " detail offers its Sand trace",
+                    occurrence >= 0 && dialogHasNamed("factoryscope-network-trace-input"), "occurrence=" + occurrence);
+                if(occurrence >= 0 && dialogHasNamed("factoryscope-network-trace-input")){
+                    scrollReportToBottom();
+                    clickNamedInDialog("factoryscope-network-trace-input", occurrence);
+                }
+            });
+            queue(() -> {
+                AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+                ResourceRef sand = new ResourceRef(ResourceKind.item, "sand", "Sand");
+                SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(targets[index]), sand);
+                check(transportBlocks[index].localizedName + " Network action opens the selected trace",
+                    Core.scene.getDialog() != null && Core.scene.getDialog().name.equals("factoryscope-network-dialog")
+                        && dialogShows(FsBundle.format("trace.target", AreaProbe.refOf(targets[index]).blockName))
+                        && dialogShows(Items.sand.localizedName));
+                check(transportBlocks[index].localizedName + " route is complete from its engine producer",
+                    trace != null && trace.complete
+                        && trace.producers().stream().anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(drills[index]))),
+                    trace == null ? "no trace" : "complete=" + trace.complete + " producers=" + trace.producers().size());
+                check(transportBlocks[index].localizedName + " trace renders its producer endpoint row",
+                    dialogHasNamed("factoryscope-trace-endpoint-" + drills[index].tile.x + "-" + drills[index].tile.y));
+                check(transportBlocks[index].localizedName + " trace exposes producer Inspect",
+                    dialogHasNamed("factoryscope-trace-inspect"));
+            });
+            queue(() -> capture("armored-route-" + index));
+            queue(this::scrollReportToBottom);
+            queue(() -> clickNamedInDialog("factoryscope-trace-inspect"));
+            queue(() -> check("Inspect opens the producer for " + transportBlocks[index].localizedName,
+                FactoryScopeUI.inspected() == drills[index]));
+            queue(this::closeAnyDialog);
+            if(route == 0) queue(() -> capture("armored-item-transport-traces"));
+        }
+        queue(this::closeAnyDialog);
+    }
+
+    int traceInputOccurrence(AreaDiagnosticResult report, BuildingRef targetRef, ResourceRef resource){
+        if(report == null) return -1;
+        for(AreaEntry entry : report.entries){
+            if(!entry.ref.equals(targetRef) || entry.snapshot == null) continue;
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            int occurrence = 0;
+            for(ResourceState input : entry.snapshot.inputs){
+                if(input.kind != ResourceKind.item || input.contentId == null || !seen.add(input.ref().key())) continue;
+                if(input.ref().equals(resource)) return occurrence;
+                occurrence++;
+            }
+            return -1;
+        }
+        return -1;
+    }
+
     void traceCompletenessScenarios(){
         int x = rx() + 7, boundaryX = rx() + 12, unsupportedX = rx() + 5, y = ry() + 3;
         ResourceRef sand = new ResourceRef(ResourceKind.item, "sand", "Sand");
@@ -1153,11 +1312,11 @@ public class AcceptanceHarness extends Mod{
         queue(this::closeAnyDialog);
         queue(() -> {
             clearRegion();
-            placeAt(Blocks.armoredConveyor, unsupportedX - 1, y, 1);
+            placeAt(Blocks.plastaniumConveyor, unsupportedX - 1, y, 1);
             target = placeAt(Blocks.siliconSmelter, unsupportedX, y);
             check("unsupported-route fixture keeps both buildings", target != null
                 && world.tile(unsupportedX - 1, y).build != null
-                && world.tile(unsupportedX - 1, y).build.block == Blocks.armoredConveyor,
+                && world.tile(unsupportedX - 1, y).build.block == Blocks.plastaniumConveyor,
                 "transport=" + world.tile(unsupportedX - 1, y).build + ", target=" + target);
         });
         queue(this::armPicker);
@@ -1188,7 +1347,7 @@ public class AcceptanceHarness extends Mod{
         queue(this::closeAnyDialog);
         queue(() -> {
             clearRegion();
-            placeAt(Blocks.armoredConveyor, x - 1, y, 1);
+            placeAt(Blocks.plastaniumConveyor, x - 1, y, 1);
             target = placeAt(Blocks.siliconSmelter, x, y);
         });
         queue(this::armPicker);
@@ -2665,7 +2824,7 @@ public class AcceptanceHarness extends Mod{
         for(String[] entry : new String[][]{
             {"trace.target", "Silicon Smelter"}, {"trace.boundary-many", "3"},
             {"trace.boundary-at", "123", "61"}, {"trace.unsupported-area-many", "2"},
-            {"trace.unsupported-at", "Armored Conveyor", "123", "61"}, {"trace.endpoints", "2"},
+            {"trace.unsupported-at", Blocks.plastaniumConveyor.localizedName, "123", "61"}, {"trace.endpoints", "2"},
             {"trace.dead-ends", "3"}, {"trace.dead-end", "Conveyor", "123", "61"}, {"trace.input-action", "Sand"},
             {"trace.output-action", "Silicon"}}){
             Object[] args = new Object[entry.length - 1];
@@ -3199,6 +3358,33 @@ public class AcceptanceHarness extends Mod{
             check("element " + name + " exists at index " + occurrence, false);
             return;
         }
+        Vec2 stage = element.localToStageCoordinates(new Vec2(element.getWidth() / 2f, element.getHeight() / 2f));
+        Vec2 screen = Core.scene.getViewport().project(stage);
+        touch(Mathf.round(screen.x), Mathf.round(screen.y));
+    }
+
+    boolean dialogHasNamed(String name){
+        Dialog dialog = Core.scene.getDialog();
+        if(dialog == null) return false;
+        boolean[] found = {false};
+        walk(dialog, element -> { if(name.equals(element.name)) found[0] = true; });
+        return found[0];
+    }
+
+    void clickNamedInDialog(String name){
+        clickNamedInDialog(name, 0);
+    }
+
+    void clickNamedInDialog(String name, int occurrence){
+        Dialog dialog = Core.scene.getDialog();
+        Element[] found = {null};
+        int[] matches = {0};
+        if(dialog != null) walk(dialog, element -> {
+            if(found[0] == null && name.equals(element.name) && matches[0]++ == occurrence) found[0] = element;
+        });
+        Element element = found[0];
+        check("dialog element " + name + " exists at index " + occurrence, element != null);
+        if(element == null) return;
         Vec2 stage = element.localToStageCoordinates(new Vec2(element.getWidth() / 2f, element.getHeight() / 2f));
         Vec2 screen = Core.scene.getViewport().project(stage);
         touch(Mathf.round(screen.x), Mathf.round(screen.y));

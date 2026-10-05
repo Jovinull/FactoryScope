@@ -27,13 +27,13 @@ does not fill in an unknown route. “Deferred” means no current topology clai
 | Duct, duct router, overflow duct, underflow duct, Surge Router | SUPPORTED | Models standard duct ports and configured item constraints. Surge Router shares Duct Router port/configuration semantics; its transient loading/unloading state is not reported. |
 | Item Bridge and Phase Conveyor | SUPPORTED | Uses the configured, engine-valid link; a remote edge means structural connectivity, not current transfer. |
 | Drill, conventional crafter, known consumer, core/storage | SUPPORTED | Uses captured producer/consumer resource identities and keeps storage distinct from production. |
-| Armored Conveyor | PARTIAL | Its source-class and alignment acceptance is not represented as an ordinary conveyor. |
-| Armored Duct (armored Duct block variant) | PARTIAL | Its armored insertion/blending rules are not represented as an ordinary duct. |
+| Armored Conveyor | SUPPORTED | Models the forward route and Mindustry's source-sensitive insertion: Conveyor sources may enter through non-front sides, while other sources require the engine-aligned side. Transient belt capacity/position is not modeled. |
+| Armored Duct | SUPPORTED | Models the forward route; v160.5 accepts a rotating Duct source facing into it, or any source at the engine-aligned edge. Transient one-item occupancy is not modeled. |
 | Plastanium Conveyor and Surge Conveyor | PARTIAL | Their load/move/unload state machines are not flattened into an ordinary conveyor route. |
 | Duct Bridge | PARTIAL | Remote-link, occupancy, and local-fallback semantics are surfaced as incomplete rather than inferred. |
 | Unloader and Duct Unloader | PARTIAL | Dynamic source selection and storage extraction are not treated as a fixed producer route. |
 | Mass Driver | PARTIAL | Reload, queue, target, and receiver state are not represented as an always-available edge. |
-| Unknown modded item transport | PARTIAL | A transport-shaped block is not assumed to be a router or conveyor. |
+| Unknown modded item transport | PARTIAL | A custom runtime Build class is an interruption. Blocks that reuse a recognized vanilla Build class use that structural model, but mod-specific field/configuration changes are not independently verified. |
 | Unit Cargo Loader and Unit Cargo Unload Point | DEFERRED | These move units/cargo rather than item resources and are outside the item topology model. |
 | Payload Conveyor/Router, reinforced payload variants, Payload/Large Payload Mass Driver, Payload Loader/Unloader | DEFERRED | Payload logistics move whole blocks/units rather than item or liquid resources and are outside the Network resource model. |
 
@@ -49,10 +49,10 @@ does not fill in an unknown route. “Deferred” means no current topology clai
 | Conventional crafter liquid outputs | SUPPORTED | Keeps products resource-specific and applies each product's declared output direction. |
 | Liquid by-products from power generators | SUPPORTED | Uses the generator's declared `outputLiquid` identity; this does not model a transport rate through the connected network. |
 | Declared liquid consumers and enumerable filters | SUPPORTED | Uses exact resource identities; dynamic requirements are re-read on Refresh and optional inputs remain optional. |
-| Plated Conduit and Reinforced Conduit (Armored Conduit variants) | PARTIAL | Their source-class and armored acceptance behavior is not approximated as ordinary Conduit. |
+| Plated Conduit and Reinforced Conduit (Armored Conduit variants) | PARTIAL | Their `acceptLiquid` rule combines the ordinary conduit direction/resource state with source class, source-relative alignment, and a proximity-membership exception; this combination is not yet represented as static topology. |
 | Bridge Conduit and Phase Conduit (Liquid Bridge variants) | PARTIAL | The state-dependent remote-versus-local behavior is not reconstructed as a complete route. |
 | Reinforced Bridge Conduit (Direction Liquid Bridge) | PARTIAL | Directional link search, occupied directions, and local fallback are not approximated as a normal bridge. |
-| Unknown modded liquid transport | PARTIAL | `hasLiquids` or `outputsLiquid` alone does not establish internal routing. |
+| Unknown modded liquid transport | PARTIAL | A custom runtime Build class is an interruption. A block reusing a recognized vanilla Conduit, Liquid Junction, or Liquid Router Build uses that structural model, but mod-specific field/configuration changes are not independently verified. |
 
 Liquids and Erekir gases share Mindustry's `Liquid` resource identity. Current module contents are a
 separate snapshot annotation; they do not create or remove structural routes. LiquidScope does not
