@@ -59,6 +59,7 @@ class AcceptanceLauncherTest{
         AcceptanceLauncher.Options options = new AcceptanceLauncher.Options();
         options.mindustryJar = jar;
         options.powerFixtureRepetitions = 50;
+        options.locale = "zh-CN";
         AcceptanceLauncher.Client client = AcceptanceLauncher.resolveClient(options);
         Path sandbox = temp.resolve("sandbox λ");
         Path data = sandbox.resolve("isolated-data");
@@ -71,6 +72,9 @@ class AcceptanceLauncherTest{
         assertEquals("mindustry.desktop.DesktopLauncher", command.get(command.size() - 1));
         assertTrue(command.contains("-Dmindustry.data.dir=" + data));
         assertTrue(command.contains("-Dfactoryscope.power-fixture-repetitions=50"));
+        assertTrue(command.contains("-Dfactoryscope.acceptance.locale=zh-CN"));
+        assertTrue(command.contains("-Duser.language=zh"));
+        assertTrue(command.contains("-Duser.country=CN"));
     }
 
     @Test void rejectsWrongClientBuildBeforeSandboxVersionOverride() throws Exception{
@@ -196,6 +200,11 @@ class AcceptanceLauncherTest{
         assertThrows(IllegalArgumentException.class,
             () -> AcceptanceLauncher.Options.parse(new String[]{"--power-fixture-repetitions", "1001"}));
         assertEquals("pt-BR", AcceptanceLauncher.Options.parse(new String[]{"--locale", "pt_BR"}).locale);
+        assertEquals("en", AcceptanceLauncher.Options.parse(new String[]{"--locale", "en"}).locale);
+        assertEquals("ru", AcceptanceLauncher.Options.parse(new String[]{"--locale", "RU"}).locale);
+        assertEquals("zh-CN", AcceptanceLauncher.Options.parse(new String[]{"--locale", "zh_CN"}).locale);
+        assertEquals("ko", AcceptanceLauncher.Options.parse(new String[]{"--locale", "ko"}).locale);
+        assertEquals("es", AcceptanceLauncher.Options.parse(new String[]{"--locale", "es"}).locale);
         assertThrows(IllegalArgumentException.class,
             () -> AcceptanceLauncher.Options.parse(new String[]{"--locale", "portuguese"}));
     }

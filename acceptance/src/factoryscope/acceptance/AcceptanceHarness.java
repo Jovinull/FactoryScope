@@ -35,6 +35,7 @@ import mindustry.world.consumers.ConsumeCoolant;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 import static mindustry.Vars.*;
 
@@ -735,10 +736,40 @@ public class AcceptanceHarness extends Mod{
             check("'" + key + "' resolves", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
         }
         Log.info(TAG + " locale @ -> status.active = '@'", Core.bundle.getLocale(), FsBundle.get("status.active"));
+        checkRequestedLocaleResolution();
 
         //format() resolves through I18NBundle.get(), which renders an absent key as ???key???
         String absent = FsBundle.format("definitely.not.a.key", 1);
         check("an absent key never leaks ??? into the panel", !absent.contains("???"), absent);
+    }
+
+    void checkRequestedLocaleResolution(){
+        String requested = System.getProperty("factoryscope.acceptance.locale");
+        if(requested == null) return;
+
+        java.util.Map<String, String> activeText = java.util.Map.of(
+            "en", "Running", "en-us", "Running", "pt-br", "Em funcionamento",
+            "ru", "Работает", "zh-cn", "正在运行", "ko", "작동 중", "es", "En funcionamiento"
+        );
+        String requestedTag = requested.replace('_', '-').toLowerCase(Locale.ROOT);
+        String requestedLanguage = Locale.forLanguageTag(requestedTag).getLanguage();
+        String resolved = String.valueOf(Core.bundle.getLocale());
+        if(resolved.equals("null") || resolved.isBlank()) resolved = "en";
+        String resolvedTag = resolved.replace('_', '-').toLowerCase(Locale.ROOT);
+        String resolvedLanguage = Locale.forLanguageTag(resolvedTag).getLanguage();
+        boolean localeMatches = requestedTag.contains("-")
+            ? requestedTag.equals(resolvedTag)
+            : requestedLanguage.equals(resolvedLanguage);
+
+        check("Mindustry resolves the requested acceptance locale",
+            localeMatches, requested + " -> " + resolved);
+        String expected = activeText.get(requestedTag);
+        String actual = FsBundle.get("status.active");
+        check("FactoryScope loads the requested locale bundle",
+            expected != null && expected.equals(actual), "requested=" + requested + ", status.active=" + actual);
+        Log.info(TAG + " locale evidence: requested @, resolved @, area.title '@', network.title '@', trace.title '@', power.title '@', liquid.title '@'",
+            requested, resolved, FsBundle.get("area.title"), FsBundle.get("network.title"), FsBundle.get("trace.title"),
+            FsBundle.get("power.title"), FsBundle.get("liquid.title"));
     }
 
 
@@ -952,6 +983,7 @@ public class AcceptanceHarness extends Mod{
             check("the single-building panel opened", FactoryScopeUI.inspected() == target);
             check("no area report was opened by a click", FactoryScopeUI.areaBounds() == null);
         });
+        queue(() -> capture("single-building-inspector"));
     }
 
     void singlePanelSupplyTrace(){
@@ -2860,14 +2892,7 @@ public class AcceptanceHarness extends Mod{
             check("'" + entry[0] + "' formats", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
         }
         String oneMember = FsBundle.format("power.members", 1, 1);
-        String locale = String.valueOf(Core.bundle.getLocale()).toLowerCase(java.util.Locale.ROOT);
-        if(locale.startsWith("pt")){
-            check("single-member PowerScope counts use neutral Portuguese wording",
-                oneMember.equals("1 / 1"), oneMember);
-        }else{
-            check("single-member PowerScope counts avoid plural agreement errors",
-                oneMember.equals("1 / 1"), oneMember);
-        }
+        check("single-member PowerScope counts avoid plural agreement errors", oneMember.equals("1 / 1"), oneMember);
     }
 
     void checkLiquidLocalization(){
