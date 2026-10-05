@@ -5,7 +5,9 @@ import mindustry.content.*;
 import mindustry.gen.*;
 import mindustry.type.*;
 import mindustry.world.*;
+import mindustry.world.blocks.distribution.Conveyor;
 import mindustry.world.blocks.distribution.ItemBridge;
+import mindustry.world.blocks.liquid.Conduit;
 import mindustry.world.blocks.production.*;
 import mindustry.world.blocks.power.PowerGenerator;
 import mindustry.world.consumers.*;
@@ -24,6 +26,10 @@ final class ModdedBlocks{
     static Block oddBuilding;
     static Block coalConsumer;
     static Block unknownTransport;
+    static Conveyor inheritedConveyor;
+    static Conveyor rejectingConveyor;
+    static Conduit inheritedConduit;
+    static Conduit rejectingConduit;
     static ItemBridge crossTypeBridge;
     static ItemBridge otherCrossTypeBridge;
     static ItemBridge sameTypeBridge;
@@ -97,6 +103,10 @@ final class ModdedBlocks{
         oddBuilding = new OddBlock("fs-test-odd");
         coalConsumer = new ItemConsumerBlock("fs-test-item-consumer", Items.coal);
         unknownTransport = new UnknownTransportBlock("fs-test-unknown-transport");
+        inheritedConveyor = new Conveyor("fs-test-inherited-conveyor");
+        rejectingConveyor = new RejectingConveyor("fs-test-rejecting-conveyor");
+        inheritedConduit = new Conduit("fs-test-inherited-conduit");
+        rejectingConduit = new RejectingConduit("fs-test-rejecting-conduit");
         crossTypeBridge = new ItemBridge("fs-test-cross-type-bridge"){{
             linkSameType = false;
             range = 6;
@@ -193,6 +203,40 @@ final class ModdedBlocks{
             outputsLiquid = true;
             consumeLiquid(Liquids.water, 0.1f);
         }};
+    }
+
+    /** A modded subclass with a custom build-level route rule. */
+    static final class RejectingConveyor extends Conveyor{
+        RejectingConveyor(String name){
+            super(name);
+        }
+
+        public class RejectingConveyorBuild extends ConveyorBuild{
+            @Override
+            public boolean acceptItem(Building source, Item item){
+                return false;
+            }
+
+            @Override
+            public void updateTile(){
+                // Deliberately no output transfer: the probe must not infer one from instanceof alone.
+            }
+        }
+    }
+
+    /** A modded Conduit whose custom Build rejects an otherwise ordinary engine route. */
+    static final class RejectingConduit extends Conduit{
+        RejectingConduit(String name){
+            super(name);
+            buildType = (Prov<Building>)RejectingConduitBuild::new;
+        }
+
+        class RejectingConduitBuild extends ConduitBuild{
+            @Override
+            public boolean acceptLiquid(Building source, Liquid liquid){
+                return false;
+            }
+        }
     }
 
     /** A consumer type FactoryScope has never heard of, with a satisfaction the test can steer. */

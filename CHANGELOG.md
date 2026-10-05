@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.0
+
+### Added
+
+- Evidence-backed structural routing for vanilla Armored Conveyor and Armored Duct behavior in Mindustry v160.5.
+- Russian, Simplified Chinese, Korean, and Spanish bundles, alongside English and Portuguese (Brazil); vanilla terminology is aligned with Mindustry v160.5 official localization bundles where applicable.
+- Conservative handling for custom runtime transport builds whose routing behavior is not recognized: they remain explicit incomplete/unsupported interruptions rather than inferred vanilla routes.
+
+### Improved
+
+- Supply Trace skipped-building lookup now uses a spatial index to avoid pathological route-by-skipped-building scans.
+- Universal DEX deployment resolves Android build tools more robustly and invokes D8 with argument-safe paths.
+- Expanded acceptance and localization integrity checks across six locales.
+
+### Limitations
+
+- Armored/reinforced liquid conduits, Duct Bridge, Direction Liquid Bridge, unloaders, stack/load-state conveyors, liquid bridges, and Mass Drivers remain partial; Unit Cargo and payload logistics remain deferred.
+- Structural routes do not measure transfer or throughput, establish sufficient supply, or identify root cause. Android runtime/touch and remote multiplayer remain unvalidated.
+
 ## 1.0.1
 
 ### Fixed

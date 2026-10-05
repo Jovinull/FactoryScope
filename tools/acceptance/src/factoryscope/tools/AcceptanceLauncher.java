@@ -20,6 +20,9 @@ public final class AcceptanceLauncher{
     private static final String GAME_VERSION = "160.5";
     private static final String MOD_NAME = "factory-scope";
     private static final String HARNESS_NAME = "factory-scope-acceptance";
+    private static final Map<String, String> ACCEPTANCE_LOCALES = Map.of(
+        "en", "en", "en-us", "en-US", "pt-br", "pt-BR", "ru", "ru", "zh-cn", "zh-CN", "ko", "ko", "es", "es"
+    );
 
     private AcceptanceLauncher(){
     }
@@ -392,7 +395,7 @@ public final class AcceptanceLauncher{
 
     private static void printUsage(){
         System.out.println("Usage: gradlew acceptanceTest [-PmindustryJar=<desktop jar> | -PmindustryPath=<install directory>]"
-            + " [-PmodJar=<artifact>] [-Plocale=en-US|pt-BR] [-Pcapture=true] [-PkeepSandbox=true]"
+            + " [-PmodJar=<artifact>] [-Plocale=en|pt-BR|ru|zh-CN|ko|es] [-PpowerFixtureRepetitions=<count>] [-Pcapture=true] [-PkeepSandbox=true]"
             + " [-PtimeoutSeconds=300]");
     }
 
@@ -431,9 +434,13 @@ public final class AcceptanceLauncher{
             result.add("-Dmindustry.data.dir=" + dataDirectory);
             if(options.capture) result.add("-Dfactoryscope.capture=true");
             if(options.locale != null){
+                result.add("-Dfactoryscope.acceptance.locale=" + options.locale);
                 String[] locale = options.locale.split("[-_]", 2);
                 result.add("-Duser.language=" + locale[0]);
                 if(locale.length == 2) result.add("-Duser.country=" + locale[1]);
+            }
+            if(options.powerFixtureRepetitions > 0){
+                result.add("-Dfactoryscope.power-fixture-repetitions=" + options.powerFixtureRepetitions);
             }
             result.add("-cp");
             result.add(sandbox + System.getProperty("path.separator") + path);
@@ -453,6 +460,7 @@ public final class AcceptanceLauncher{
         boolean keepSandbox;
         boolean help;
         int timeoutSeconds = 300;
+        int powerFixtureRepetitions;
 
         static Options parse(String[] args){
             Options result = new Options();
@@ -474,6 +482,12 @@ public final class AcceptanceLauncher{
                         result.timeoutSeconds = Integer.parseInt(value);
                         if(result.timeoutSeconds < 1) throw new IllegalArgumentException("timeout must be positive");
                         break;
+                    case "--power-fixture-repetitions":
+                        result.powerFixtureRepetitions = Integer.parseInt(value);
+                        if(result.powerFixtureRepetitions < 1 || result.powerFixtureRepetitions > 1000){
+                            throw new IllegalArgumentException("power fixture repetitions must be between 1 and 1000");
+                        }
+                        break;
                     default: throw new IllegalArgumentException("Unknown option: " + key);
                 }
             }
@@ -484,11 +498,16 @@ public final class AcceptanceLauncher{
         private static String blank(String value){ return value == null || value.isBlank() ? null : value; }
 
         private static String locale(String value){
-            String normalized = blank(value);
-            if(normalized == null) return null;
-            if(normalized.replace('_', '-').equalsIgnoreCase("en-US")) return "en-US";
-            if(normalized.replace('_', '-').equalsIgnoreCase("pt-BR")) return "pt-BR";
-            throw new IllegalArgumentException("Unsupported acceptance locale '" + value + "'; use en-US or pt-BR.");
+            if(value == null) return null;
+            String normalized = value.trim();
+            if(normalized.isEmpty()){
+                throw new IllegalArgumentException("Unsupported acceptance locale '<empty>'; use en, en-US, pt-BR, ru, zh-CN, ko, or es.");
+            }
+            String key = normalized.replace('_', '-').toLowerCase(Locale.ROOT);
+            String supported = ACCEPTANCE_LOCALES.get(key);
+            if(supported != null) return supported;
+            throw new IllegalArgumentException("Unsupported acceptance locale '" + value
+                + "'; use en, en-US, pt-BR, ru, zh-CN, ko, or es.");
         }
     }
 }
