@@ -216,6 +216,11 @@ final class ModdedBlocks{
             public boolean acceptItem(Building source, Item item){
                 return false;
             }
+
+            @Override
+            public void updateTile(){
+                // Deliberately no output transfer: the probe must not infer one from instanceof alone.
+            }
         }
     }
 

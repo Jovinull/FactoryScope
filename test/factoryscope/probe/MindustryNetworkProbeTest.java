@@ -693,6 +693,9 @@ class MindustryNetworkProbeTest{
 
         assertInstanceOf(ModdedBlocks.RejectingConveyor.RejectingConveyorBuild.class, custom);
         assertFalse(custom.acceptItem(source, Items.copper), "the modded engine build rejects this input");
+        custom.items.add(Items.copper, 1);
+        custom.updateTile();
+        assertEquals(0, destination.items.get(Items.copper), "the custom engine build also suppresses forward transfer");
         assertTrue(inherited.acceptItem(inheritedSource, Items.copper), "the unmodified vanilla build accepts inherited routing");
 
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(7, 8, 14, 16), Team.sharded);
@@ -703,8 +706,15 @@ class MindustryNetworkProbeTest{
             "the custom engine rejection must not become a supported structural route");
         assertTrue(network.unsupportedTransport.contains(customRef), "custom routing is an explicit interruption");
         assertTrue(network.graph.ports.stream().noneMatch(port -> port.building.equals(customRef)));
+        assertTrue(network.unsupportedConnections.stream().anyMatch(interruption ->
+                interruption.transport.equals(customRef) && interruption.direction == NetworkInterruption.Direction.incoming
+                    && interruption.port.building.equals(AreaProbe.refOf(destination))),
+            "the adjacent vanilla route retains an explicit incoming interruption");
         assertFalse(network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(AreaProbe.refOf(source))
             && edge.to.building.equals(customRef)), "the graph must not invent the engine-rejected route");
+        assertFalse(network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(customRef)
+            && edge.to.building.equals(AreaProbe.refOf(destination))),
+            "custom Build routing must not produce a modeled outgoing route");
         assertTrue(network.graph.ports.stream().anyMatch(port -> port.building.equals(inheritedRef)),
             "a modded block using the inherited vanilla build remains compatible");
         assertTrue(network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(AreaProbe.refOf(inheritedSource))

@@ -315,6 +315,9 @@ public final class MindustryNetworkProbe{
     }
 
     private static EnumSet<NetworkSide> outputSides(Building build, Team viewer, Set<Building> itemSources){
+        // A custom runtime transport may inherit a vanilla Build class while overriding its
+        // routing behavior. Its adjacent connection is an interruption, not a modeled output.
+        if(isUnknownTransport(build)) return EnumSet.noneOf(NetworkSide.class);
         if(build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild)
             return EnumSet.of(NetworkSide.rotation(build.rotation));
         if(build instanceof OverflowDuct.OverflowDuctBuild){
