@@ -3,7 +3,7 @@ displayName: "FactoryScope"
 author: "Jovinull"
 description: "Read-only Mindustry factory diagnostics: building state, area reports, supported item/liquid routes, and power-grid evidence."
 subtitle: "Why is this factory not running at full capacity?"
-version: "1.0.1"
+version: "1.1.0"
 main: "factoryscope.FactoryScope"
 minGameVersion: 160
 java: true
