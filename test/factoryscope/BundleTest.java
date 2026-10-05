@@ -175,6 +175,26 @@ class BundleTest{
     }
 
     @Test
+    void causeUnclearHeadlinesStayConsistentAcrossSummaryAndAreaViews() throws IOException{
+        List<Path> files;
+        try(Stream<Path> stream = Files.list(BUNDLES)){
+            files = stream.filter(path -> path.getFileName().toString().equals("bundle.properties")
+                || isTranslation(path)).toList();
+        }
+
+        for(Path file : files){
+            Properties values = read(file);
+            String name = file.getFileName().toString();
+            assertEquals(values.getProperty(FsBundle.PREFIX + "area.status.cause-unclear"),
+                values.getProperty(FsBundle.PREFIX + "status.halted-unknown-cause"),
+                name + " changes the cause-unclear headline between views");
+            assertEquals(values.getProperty(FsBundle.PREFIX + "area.issue.halted-unknown-cause"),
+                values.getProperty(FsBundle.PREFIX + "status.halted-unknown-cause"),
+                name + " changes the cause-unclear issue label between views");
+        }
+    }
+
+    @Test
     void translationsAreReadableAsUtf8() throws IOException{
         //Fi.reader() decodes mod bundles as UTF-8, so malformed bytes or replacement glyphs reach players.
         try(Stream<Path> files = Files.list(BUNDLES)){
@@ -207,13 +227,19 @@ class BundleTest{
         assertFalse(placeholdersMatch("{0} of {1}", "{0}"), "a required placeholder cannot be omitted");
         assertFalse(placeholdersMatch("{0} of {1}", "{0} / {0} / {1}"), "a placeholder cannot be duplicated");
         assertFalse(placeholdersMatch("{0} of {1}", "{0} of {2}"), "an unknown placeholder cannot replace a required one");
+        assertFalse(placeholdersMatch("{0} / {0} / {1}", "{0} / {1}"),
+            "a repeated use of a required placeholder cannot be omitted");
     }
 
     @Test
     void malformedPlaceholderBracesAreRejected(){
         assertThrows(IllegalArgumentException.class, () -> placeholderUsage("missing {0"));
         assertThrows(IllegalArgumentException.class, () -> placeholderUsage("unexpected }"));
+        assertThrows(IllegalArgumentException.class, () -> placeholderUsage("0}"));
+        assertThrows(IllegalArgumentException.class, () -> placeholderUsage("{}"));
         assertThrows(IllegalArgumentException.class, () -> placeholderUsage("named {resource}"));
+        assertThrows(IllegalArgumentException.class, () -> placeholderUsage("{{0}}"));
+        assertThrows(IllegalArgumentException.class, () -> placeholderUsage("{2147483648}"));
     }
 
     private static boolean isTranslation(Path file){
