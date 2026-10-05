@@ -110,6 +110,36 @@ class MindustryLiquidProbeTest{
     }
 
     @Test
+    void moddedConduitWithCustomBuildRoutingIsNotTreatedAsVanillaTopology(){
+        Building source = place(ModdedBlocks.liquidSource, 9, 10, 0);
+        Building custom = place(ModdedBlocks.rejectingConduit, 10, 10, 0);
+        Building destination = place(ModdedBlocks.liquidConsumer, 11, 10, 0);
+        Building inheritedSource = place(ModdedBlocks.liquidSource, 9, 14, 0);
+        Building inherited = place(ModdedBlocks.inheritedConduit, 10, 14, 0);
+        Building inheritedDestination = place(ModdedBlocks.liquidConsumer, 11, 14, 0);
+
+        assertInstanceOf(ModdedBlocks.RejectingConduit.RejectingConduitBuild.class, custom);
+        assertFalse(custom.acceptLiquid(source, Liquids.water), "the custom engine build rejects this input");
+        assertTrue(inherited.acceptLiquid(inheritedSource, Liquids.water),
+            "a modded block reusing the vanilla ConduitBuild keeps inherited routing");
+
+        LiquidNetwork network = scan(AreaSelection.of(7, 8, 14, 16));
+        BuildingRef customRef = AreaProbe.refOf(custom);
+        BuildingRef inheritedRef = AreaProbe.refOf(inherited);
+        assertFalse(network.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
+            input(AreaProbe.refOf(destination), NetworkSide.west), water),
+            "the custom engine rejection must not become a supported structural route");
+        assertTrue(network.unsupportedTransport.contains(customRef), "custom routing is an explicit interruption");
+        assertTrue(network.graph.ports.stream().noneMatch(port -> port.building.equals(customRef)));
+        assertTrue(network.graph.edges.stream().noneMatch(edge -> edge.from.building.equals(AreaProbe.refOf(source))
+            && edge.to.building.equals(customRef)), "the graph must not invent the engine-rejected route");
+        assertTrue(network.graph.isReachable(output(AreaProbe.refOf(inheritedSource), NetworkSide.east),
+            input(AreaProbe.refOf(inheritedDestination), NetworkSide.west), water),
+            "a modded block using the inherited vanilla build remains compatible");
+        assertTrue(network.graph.ports.stream().anyMatch(port -> port.building.equals(inheritedRef)));
+    }
+
+    @Test
     void currentOilInConduitDoesNotEraseWaterTopology(){
         Building producer = place(ModdedBlocks.liquidSource, 9, 10, 0);
         Building conduit = place(Blocks.conduit, 10, 10, 0);

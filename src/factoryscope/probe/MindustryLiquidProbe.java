@@ -267,9 +267,16 @@ public final class MindustryLiquidProbe{
     }
 
     private static boolean isTransport(Building build){
-        return build instanceof Conduit.ConduitBuild && !(build.block instanceof ArmoredConduit)
+        return usesRecognizedLiquidTransportBuild(build) && (build instanceof Conduit.ConduitBuild && !(build.block instanceof ArmoredConduit)
             || build instanceof LiquidJunction.LiquidJunctionBuild
-            || build instanceof LiquidRouter.LiquidRouterBuild;
+            || build instanceof LiquidRouter.LiquidRouterBuild);
+    }
+
+    private static boolean usesRecognizedLiquidTransportBuild(Building build){
+        Class<?> type = build.getClass();
+        return type == Conduit.ConduitBuild.class
+            || type == LiquidJunction.LiquidJunctionBuild.class
+            || type == LiquidRouter.LiquidRouterBuild.class;
     }
 
     private static boolean isUnsupportedTransport(Building build, FactorySnapshot snapshot){

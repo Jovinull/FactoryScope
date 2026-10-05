@@ -682,6 +682,37 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
+    void moddedConveyorWithCustomBuildRoutingIsNotTreatedAsVanillaTopology(){
+        HeadlessGame.newWorld(32);
+        Building source = place(Blocks.router, 9, 10, 0);
+        Building custom = place(ModdedBlocks.rejectingConveyor, 10, 10, 0);
+        Building destination = place(Blocks.conveyor, 11, 10, 0);
+        Building inheritedSource = place(Blocks.router, 9, 14, 0);
+        Building inherited = place(ModdedBlocks.inheritedConveyor, 10, 14, 0);
+        place(Blocks.conveyor, 11, 14, 0);
+
+        assertInstanceOf(ModdedBlocks.RejectingConveyor.RejectingConveyorBuild.class, custom);
+        assertFalse(custom.acceptItem(source, Items.copper), "the modded engine build rejects this input");
+        assertTrue(inherited.acceptItem(inheritedSource, Items.copper), "the unmodified vanilla build accepts inherited routing");
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(7, 8, 14, 16), Team.sharded);
+        BuildingRef customRef = AreaProbe.refOf(custom);
+        BuildingRef inheritedRef = AreaProbe.refOf(inherited);
+        assertFalse(network.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.east),
+            output(AreaProbe.refOf(destination), NetworkSide.east), copper),
+            "the custom engine rejection must not become a supported structural route");
+        assertTrue(network.unsupportedTransport.contains(customRef), "custom routing is an explicit interruption");
+        assertTrue(network.graph.ports.stream().noneMatch(port -> port.building.equals(customRef)));
+        assertFalse(network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(AreaProbe.refOf(source))
+            && edge.to.building.equals(customRef)), "the graph must not invent the engine-rejected route");
+        assertTrue(network.graph.ports.stream().anyMatch(port -> port.building.equals(inheritedRef)),
+            "a modded block using the inherited vanilla build remains compatible");
+        assertTrue(network.graph.edges.stream().anyMatch(edge -> edge.from.building.equals(AreaProbe.refOf(inheritedSource))
+            && edge.to.building.equals(inheritedRef)));
+        assertNotNull(destination);
+    }
+
+    @Test
     void unknownItemConsumingTransportIsTopologyIncompleteNotDiagnosisIncomplete(){
         Building unknown = place(ModdedBlocks.unknownTransport, 10, 10, 0);
         AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);

@@ -281,10 +281,26 @@ public final class MindustryNetworkProbe{
     private static NetworkSide right(NetworkSide side){ return NetworkSide.rotation(side.ordinal() - 1); }
 
     private static boolean isKnownTransport(Building build){
-        return build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof Junction.JunctionBuild
+        return usesRecognizedTransportBuild(build) && (build instanceof Conveyor.ConveyorBuild || build instanceof Duct.DuctBuild || build instanceof Junction.JunctionBuild
             || build instanceof Router.RouterBuild || build instanceof Sorter.SorterBuild || build instanceof DuctRouter.DuctRouterBuild || build instanceof OverflowGate.OverflowGateBuild
             || build instanceof ItemBridge.ItemBridgeBuild
-            || build instanceof OverflowDuct.OverflowDuctBuild;
+            || build instanceof OverflowDuct.OverflowDuctBuild);
+    }
+
+    private static boolean usesRecognizedTransportBuild(Building build){
+        Class<?> type = build.getClass();
+        return type == Conveyor.ConveyorBuild.class
+            || type == ArmoredConveyor.ArmoredConveyorBuild.class
+            || type == Duct.DuctBuild.class
+            || type == Junction.JunctionBuild.class
+            || type == Router.RouterBuild.class
+            || type == StackRouter.StackRouterBuild.class
+            || type == Sorter.SorterBuild.class
+            || type == DuctRouter.DuctRouterBuild.class
+            || type == OverflowGate.OverflowGateBuild.class
+            || type == ItemBridge.ItemBridgeBuild.class
+            || type == BufferedItemBridge.BufferedItemBridgeBuild.class
+            || type == OverflowDuct.OverflowDuctBuild.class;
     }
 
     private static boolean isEndpoint(Building build){
