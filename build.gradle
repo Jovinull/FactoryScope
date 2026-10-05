@@ -3,6 +3,10 @@ apply plugin: "java"
 sourceSets.main.java.srcDirs = ["src"]
 sourceSets.test.java.srcDirs = ["test"]
 
+tasks.withType(JavaCompile).configureEach{
+    options.encoding = "UTF-8"
+}
+
 //The acceptance harness is a second Mindustry mod that drives the inspector inside a real client.
 //Keeping it in its own source set is what guarantees it can never reach the release artifact, which is
 //built from sourceSets.main alone.
@@ -324,7 +328,9 @@ tasks.register("verifyArtifacts"){
     def libs = layout.buildDirectory.dir("libs")
 
     doLast{
-        def required = ["mod.hjson", "icon.png", "bundles/bundle.properties", "bundles/bundle_pt_BR.properties"]
+        def required = ["mod.hjson", "icon.png", "bundles/bundle.properties", "bundles/bundle_pt_BR.properties",
+            "bundles/bundle_ru.properties", "bundles/bundle_zh_CN.properties", "bundles/bundle_ko.properties",
+            "bundles/bundle_es.properties"]
         def forbidden = ~/^(mindustry|arc|org|com|kotlin|javax)\/|acceptance|Test|fixture|harness|scratch|factoryscope\/tools\//
 
         ["${projectName}Desktop.jar", "${projectName}.jar"].each{ name ->
