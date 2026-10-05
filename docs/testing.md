@@ -66,7 +66,8 @@ validated. LiquidScope reports the local client snapshot and applies the normal 
 The LiquidScope acceptance path enters from a missing liquid in the single-building panel, selects an explicit
 area, follows Water to a real pump through a conduit, opens pump diagnostics, returns, refreshes, and uses the
 Area Diagnostics Liquids filter/Trace controls. It also checks the structural-only wording, high-scale layout,
-and every liquid-specific locale key. Real UI acceptance is run in both English and Brazilian Portuguese.
+and every liquid-specific locale key. The complete real UI acceptance suite is run in every supported locale:
+English, Brazilian Portuguese, Russian, Simplified Chinese, Korean, and Spanish.
 
 ## 2. Acceptance suite
 
@@ -81,13 +82,15 @@ shell scripts:
 
 ```
 ./gradlew acceptanceTest -PmindustryJar="/games/Mindustry.jar" -PmodJar="build/libs/FactoryScope.jar" -Plocale=pt-BR
+./gradlew acceptanceTest -PmindustryJar="/games/Mindustry.jar" -PmodJar="build/libs/FactoryScope.jar" -Plocale=zh-CN
 ./gradlew acceptanceTest -PmindustryPath="/games/Mindustry" -Pcapture=true -PkeepSandbox=true
 ```
 
 `mindustryJar` and `mindustryPath` are mutually exclusive. `modJar` may point at a desktop jar, a
 universal CI artifact, or a downloaded release asset; when supplied, the launcher does not build or
 substitute the production mod jar. `harnessJar` optionally selects a prebuilt acceptance harness. Other
-properties are `locale`, `capture`, `keepSandbox`, and `timeoutSeconds`. The launcher requires an official
+properties are `locale`, `capture`, `keepSandbox`, and `timeoutSeconds`. Supported locales are `en`, `pt-BR`,
+`ru`, `zh-CN`, `ko`, and `es`; `en-US` remains an accepted English alias. The launcher requires an official
 Mindustry v160.5 desktop jar containing both the desktop entry point and embedded version metadata. An
 install-directory path is accepted only when it contains such a jar; native executable-only installs are
 rejected because their client identity cannot be independently verified or reliably isolated. For headless
@@ -228,7 +231,7 @@ gradlew verifyArtifacts
 ```
 
 Inspects whichever jars have been built and fails if one carries classes outside `factoryscope/`, any
-acceptance or test code, duplicate entries, or is missing `mod.hjson` or a bundle. The universal jar must
+acceptance or test code, duplicate entries, or is missing `mod.hjson` or one of the six locale bundles. The universal jar must
 also contain `classes.dex`. CI runs this after `deploy`.
 
 ## What is not covered

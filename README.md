@@ -66,7 +66,10 @@ for its current diagnostics, or drag a rectangle for Area Diagnostics. Open Netw
 LiquidScope from the area report, then trace a resource where supported. Use **Locate**, **Inspect**,
 and **Return** to navigate; use **Refresh** to rebuild snapshot evidence after the factory changes.
 
-The interface is available in English and Brazilian Portuguese.
+FactoryScope includes translations in English, Portuguese (Brazil), Russian, Simplified Chinese,
+Korean, and Spanish. Localization terminology follows Mindustry v160.5 where applicable; see the
+[localization glossary](docs/localization.md). Contributions and corrections are welcome through
+the issue tracker.
 
 ## What the evidence means
 

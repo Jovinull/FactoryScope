@@ -17,6 +17,23 @@ import static org.junit.jupiter.api.Assertions.*;
 class AcceptanceLauncherTest{
     @TempDir Path temp;
 
+    @Test void normalizesSupportedLocaleAliasesAndCase(){
+        Map<String, String> expected = Map.of(
+            "en", "en", "EN-us", "en-US", "pt-BR", "pt-BR", "pt_br", "pt-BR",
+            "ru", "ru", "zh-CN", "zh-CN", "zh_cn", "zh-CN", "ko", "ko", "es", "es"
+        );
+        expected.forEach((input, normalized) -> assertEquals(normalized,
+            AcceptanceLauncher.Options.parse(new String[]{"--locale", input}).locale, input));
+    }
+
+    @Test void rejectsUnsupportedOrAmbiguousLocaleTags(){
+        for(String locale : List.of("", "pt", "zh", "zh-TW", "ru-RU", "es-MX", "en-GB")){
+            IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> AcceptanceLauncher.Options.parse(new String[]{"--locale", locale}), locale);
+            assertTrue(error.getMessage().contains("Unsupported acceptance locale"), locale);
+        }
+    }
+
     @Test void identifiesSupportedHostNamesWithoutMistakingDarwinForWindows(){
         assertEquals(AcceptanceLauncher.OperatingSystem.windows,
             AcceptanceLauncher.OperatingSystem.fromName("Windows 11"));
@@ -59,6 +76,7 @@ class AcceptanceLauncherTest{
         AcceptanceLauncher.Options options = new AcceptanceLauncher.Options();
         options.mindustryJar = jar;
         options.powerFixtureRepetitions = 50;
+        options.locale = "zh-CN";
         AcceptanceLauncher.Client client = AcceptanceLauncher.resolveClient(options);
         Path sandbox = temp.resolve("sandbox λ");
         Path data = sandbox.resolve("isolated-data");
@@ -71,6 +89,9 @@ class AcceptanceLauncherTest{
         assertEquals("mindustry.desktop.DesktopLauncher", command.get(command.size() - 1));
         assertTrue(command.contains("-Dmindustry.data.dir=" + data));
         assertTrue(command.contains("-Dfactoryscope.power-fixture-repetitions=50"));
+        assertTrue(command.contains("-Dfactoryscope.acceptance.locale=zh-CN"));
+        assertTrue(command.contains("-Duser.language=zh"));
+        assertTrue(command.contains("-Duser.country=CN"));
     }
 
     @Test void rejectsWrongClientBuildBeforeSandboxVersionOverride() throws Exception{
@@ -196,6 +217,11 @@ class AcceptanceLauncherTest{
         assertThrows(IllegalArgumentException.class,
             () -> AcceptanceLauncher.Options.parse(new String[]{"--power-fixture-repetitions", "1001"}));
         assertEquals("pt-BR", AcceptanceLauncher.Options.parse(new String[]{"--locale", "pt_BR"}).locale);
+        assertEquals("en", AcceptanceLauncher.Options.parse(new String[]{"--locale", "en"}).locale);
+        assertEquals("ru", AcceptanceLauncher.Options.parse(new String[]{"--locale", "RU"}).locale);
+        assertEquals("zh-CN", AcceptanceLauncher.Options.parse(new String[]{"--locale", "zh_CN"}).locale);
+        assertEquals("ko", AcceptanceLauncher.Options.parse(new String[]{"--locale", "ko"}).locale);
+        assertEquals("es", AcceptanceLauncher.Options.parse(new String[]{"--locale", "es"}).locale);
         assertThrows(IllegalArgumentException.class,
             () -> AcceptanceLauncher.Options.parse(new String[]{"--locale", "portuguese"}));
     }
