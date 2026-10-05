@@ -57,6 +57,6 @@ These terms describe FactoryScope's evidence, not additional Mindustry mechanics
 
 ## Validation
 
-`BundleTest` checks that every locale has exactly the English key set, that placeholder indices and multiplicities match, values are nonempty, malformed or raw-key values are absent, and files decode as UTF-8. Each test run writes a machine-readable inventory to `build/reports/localization/bundle-inventory.tsv`.
+`BundleTest` checks that every locale has exactly the English key set, that placeholder indices and multiplicities match, values are nonempty, malformed or raw-key values are absent, and files decode as UTF-8. FactoryScope bundle values use only plain decimal argument tokens such as `{0}` and `{1}`; the validator requires each token and repetition count to match English, while allowing their order to change. Braces are reserved for these tokens rather than literal text. Each test run writes a machine-readable inventory to `build/reports/localization/bundle-inventory.tsv`.
 
 Real-client acceptance is selected with Gradle's `-Plocale` property. It checks the resolved Mindustry locale and a localized FactoryScope sentinel in addition to running the same product scenarios in every locale. Locale strings are project translations aligned with Mindustry terminology; this documentation does not claim official or professional translation certification.
