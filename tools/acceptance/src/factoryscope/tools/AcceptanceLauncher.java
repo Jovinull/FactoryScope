@@ -498,8 +498,11 @@ public final class AcceptanceLauncher{
         private static String blank(String value){ return value == null || value.isBlank() ? null : value; }
 
         private static String locale(String value){
-            String normalized = blank(value);
-            if(normalized == null) return null;
+            if(value == null) return null;
+            String normalized = value.trim();
+            if(normalized.isEmpty()){
+                throw new IllegalArgumentException("Unsupported acceptance locale '<empty>'; use en, en-US, pt-BR, ru, zh-CN, ko, or es.");
+            }
             String key = normalized.replace('_', '-').toLowerCase(Locale.ROOT);
             String supported = ACCEPTANCE_LOCALES.get(key);
             if(supported != null) return supported;

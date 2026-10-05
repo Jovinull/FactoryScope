@@ -17,6 +17,23 @@ import static org.junit.jupiter.api.Assertions.*;
 class AcceptanceLauncherTest{
     @TempDir Path temp;
 
+    @Test void normalizesSupportedLocaleAliasesAndCase(){
+        Map<String, String> expected = Map.of(
+            "en", "en", "EN-us", "en-US", "pt-BR", "pt-BR", "pt_br", "pt-BR",
+            "ru", "ru", "zh-CN", "zh-CN", "zh_cn", "zh-CN", "ko", "ko", "es", "es"
+        );
+        expected.forEach((input, normalized) -> assertEquals(normalized,
+            AcceptanceLauncher.Options.parse(new String[]{"--locale", input}).locale, input));
+    }
+
+    @Test void rejectsUnsupportedOrAmbiguousLocaleTags(){
+        for(String locale : List.of("", "pt", "zh", "zh-TW", "ru-RU", "es-MX", "en-GB")){
+            IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> AcceptanceLauncher.Options.parse(new String[]{"--locale", locale}), locale);
+            assertTrue(error.getMessage().contains("Unsupported acceptance locale"), locale);
+        }
+    }
+
     @Test void identifiesSupportedHostNamesWithoutMistakingDarwinForWindows(){
         assertEquals(AcceptanceLauncher.OperatingSystem.windows,
             AcceptanceLauncher.OperatingSystem.fromName("Windows 11"));
