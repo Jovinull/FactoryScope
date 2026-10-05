@@ -22,12 +22,21 @@ engine oracle in tests, but their current result is not a static topology query.
 | `ConsumeLiquidsDynamic` | Evaluate the current building-specific `LiquidStack[]` on each Refresh | Supported when evaluation succeeds | Dynamic requirements are a snapshot fact, not a permanently cached block property |
 | Plated/Reinforced Conduit (`ArmoredConduit`) | Not approximated as Conduit | Partial / interruption | Acceptance depends on source class/alignment and armored-blending rules |
 | Reinforced Bridge Conduit (`DirectionLiquidBridge`) | Not approximated as LiquidBridge | Partial / interruption | It uses forward link search, per-direction occupancy, and a local forward fallback when unlinked |
-| Unknown/modded liquid transport | No guessed internal route | Partial / interruption | Liquid-output-capable blocks with unknown routing are not traversed; `hasLiquids` alone does not establish transport semantics |
+| Unknown/modded liquid transport | No guessed internal route | Partial / interruption | A custom runtime Build class is not traversed; liquid capabilities alone do not establish transport semantics |
 
 Liquids and gases both use Mindustry's `Liquid` content type. Resource identity is the content identity,
 never a localized name or the module's `current()` selection. Storage is independent of production: a
 router/tank may be both a transport participant and a storage endpoint, but its contents do not make it
 a producer.
+
+## Modded liquid transport boundary
+
+The probe recognizes the v160.5 runtime Build implementations for Conduit, Liquid Junction, and Liquid
+Router. A modded block that reuses one of these Build classes receives the corresponding structural
+model; a custom Build class is reported as an unsupported interruption rather than being assumed to
+inherit the vanilla route. Reusing an engine Build class does not independently validate mod-specific
+block fields, configuration, or other behavior, so unknown modded transports remain a bounded
+compatibility case rather than a general support promise.
 
 ## Transfer methods are runtime operations
 

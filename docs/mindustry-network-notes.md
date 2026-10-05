@@ -44,6 +44,13 @@ loading/unloading state is intentionally not presented as a live route or rate.
 Overflow gates keep their direct route preferred and their side routes conditional; underflow gates invert
 that relationship. Overflow ducts use the same preferred-versus-fallback distinction.
 
+## Modded item transports
+
+FactoryScope recognizes a finite set of v160.5 runtime Build implementations. A modded block that reuses
+one of those unchanged Build classes receives that structural model; a custom Build implementation is
+reported as an unsupported interruption instead of being inferred from `hasItems` or its block name.
+This does not validate mod-specific changes to block fields, configuration, or other engine behavior.
+
 ## Armored item transports
 
 In v160.5, `ArmoredConveyorBuild.acceptItem` first applies ordinary conveyor capacity/lane and front-side
