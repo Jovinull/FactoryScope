@@ -274,8 +274,9 @@ path per endpoint. Like item Supply Trace, it says only that a route is structur
 observe liquid movement, pressure, per-pipe throughput, quantitative sufficiency, or cause. The engine's
 `LiquidModule` flow average has no edge/source attribution and is deliberately not enabled by LiquidScope.
 
-Remote multiplayer replication of liquid buffers, bridge configuration, and dynamic requirements is not
-validated; reports reflect the local client snapshot.
+Reports reflect the local client snapshot. The multiplayer acceptance run checks that a client's conduit route
+and liquid shortage match the dedicated server's; replication of liquid bridge configuration and dynamic
+requirements is not separately validated.
 
 Refresh reconstructs factory snapshots, liquid topology, current buffers, and trace evidence as one area report.
 World changes discard the report and overlay. See [the v160.5 liquid behavior notes](mindustry-liquid-notes.md)

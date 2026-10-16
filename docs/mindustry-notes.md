@@ -322,6 +322,20 @@ status bar rather than to recompute it, and to recompute only what the engine do
   owned by the collection, so a for-each over engine collections touches engine state and can break an iteration
   already in progress. The models read engine `Seq`s by index and look up `ObjectMap` keys per content entry.
 
+## What a multiplayer client holds (v160.7)
+
+- `NetServer.writeBlockSnapshots()` sends the `writeSync` state of every `BlockFlag.synced` building of every
+  present team to every player. There is no fog filter there; only entity (unit) snapshots are written per team
+  when `rules.fog` is on. A client therefore holds enemy buildings it cannot see, with their items and liquids.
+  FactoryScope does not rely on the server to hide them: `MindustryFactoryProbe.canInspect` refuses a building
+  for which `Building.inFogTo(player.team())` is true, and area reports scan the player's team only.
+- A client runs `Groups.powerGraph.update()`, `Groups.build.update()`, and `fogControl.update()` itself, so power
+  graph satisfaction, efficiency, and fog are computed locally from synced state rather than received.
+- A dedicated server writes `state.map.tags` to every joining client, so a server mod that generates its own world
+  must give `state.map` a value. Its data directory is `config/` under its working directory.
+- `netServer.addPacketHandler`, `Call.clientPacketReliable`, `netClient.addPacketHandler`, and
+  `Call.serverPacketReliable` carry string packets between a mod on each side.
+
 ## Other useful engine behaviors
 
 - Any area walk has to skip buildings where `efficiencyTracked` is false, or a wall-heavy base will fill

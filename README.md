@@ -108,7 +108,9 @@ custom routing stays conservative.
 Desktop graphical acceptance has been performed on Windows. Launcher/path tests run on Windows,
 Linux, and macOS; that is not graphical validation on those platforms. The universal JAR contains a
 structurally validated DEX, but Android runtime and touch have not been independently validated.
-Remote multiplayer behavior has not been independently validated. See
+Multiplayer has been validated with an official v160.7 dedicated server and client: on a fog-of-war
+server, the client reaches the same diagnoses, area reports, traces, and power grids as the server,
+and enemy buildings hidden by fog stay out of reach. See
 [open Android validation issue #1](https://github.com/Jovinull/FactoryScope/issues/1).
 
 ## Bug reports and development
