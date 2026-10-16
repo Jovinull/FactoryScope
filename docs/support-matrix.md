@@ -5,7 +5,8 @@ This inventory is checked against the vanilla content declarations in [Mindustry
 It was re-checked for v160.7. Between [v160.5 and v160.7](https://github.com/Anuken/Mindustry/compare/v160.5...v160.7)
 no content declaration, transport, power, liquid, or crafter source changed; the only world-block changes are
 Directional Unloader save deserialization and the core's configuration UI, neither of which affects the modeled
-topology. The headless engine tests and the real-client acceptance suite pass against v160.7.
+topology. The headless engine tests and the real-client acceptance suite pass against v160.7, and so does the
+multiplayer acceptance run against an official v160.7 dedicated server ([testing](testing.md#multiplayer-acceptance)).
 
 “Supported” means FactoryScope has a model for the listed vanilla behavior and regression coverage for
 the evidence it presents. It does not mean every modded block or every state-dependent transfer is
@@ -18,7 +19,7 @@ does not fill in an unknown route. “Deferred” means no current topology clai
 | --- | --- | --- |
 | Single-building diagnostics | SUPPORTED | Reads the building's current Mindustry state and declared consumers. Blocks of a modeled production family also get rates, verified stop conditions, and details (see below); other blocks and unknown consumer semantics remain explicitly limited. |
 | Area Diagnostics | SUPPORTED | Uses the selected team's spatial index, snapshots the selected buildings, and groups their current diagnostic states. |
-| PowerScope | SUPPORTED | Uses Mindustry's `PowerGraph` membership and aggregate metrics; it does not assign per-wire flow or a root cause. Remote multiplayer synchronization is not independently validated. |
+| PowerScope | SUPPORTED | Uses Mindustry's `PowerGraph` membership and aggregate metrics; it does not assign per-wire flow or a root cause. On a dedicated server the client's graph gives the server's membership and satisfaction (validated against v160.7). |
 
 ## Production models
 
