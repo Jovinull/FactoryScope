@@ -1,0 +1,93 @@
+name: Wrong diagnosis
+description: FactoryScope said something about a building, route, grid or liquid that the game does not do.
+labels: ["bug", "diagnosis"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        FactoryScope only states what the game's own rules support, so a conclusion the game contradicts is a bug
+        worth reproducing. Examples: a route that items never take, a producer marked as stopped while it runs,
+        a missing input that is actually there, a rate far from what the game shows.
+
+        Blocks marked partial, deferred or limited in the
+        [support matrix](https://github.com/Jovinull/FactoryScope/blob/main/docs/support-matrix.md) show less
+        detail by design. Values marked ≈ are estimates.
+  - type: input
+    id: factoryscope-version
+    attributes:
+      label: FactoryScope version
+      description: Shown in the Mods menu.
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: input
+    id: mindustry-build
+    attributes:
+      label: Mindustry build
+      description: Shown at the bottom of the main menu.
+      placeholder: "160.7"
+    validations:
+      required: true
+  - type: dropdown
+    id: view
+    attributes:
+      label: Where FactoryScope said it
+      options:
+        - Building diagnostics panel
+        - Area Diagnostics
+        - Network or Supply Trace
+        - PowerScope
+        - LiquidScope
+    validations:
+      required: true
+  - type: input
+    id: block
+    attributes:
+      label: Block or blocks involved
+      placeholder: Silicon Smelter, Plastanium Conveyor
+    validations:
+      required: true
+  - type: textarea
+    id: factoryscope-says
+    attributes:
+      label: What FactoryScope says
+      description: The exact text, or a screenshot of the panel.
+    validations:
+      required: true
+  - type: textarea
+    id: game-does
+    attributes:
+      label: What the game actually does
+      description: And how you can tell, for example "items arrive at the core", "the block's bar shows 100%".
+    validations:
+      required: true
+  - type: dropdown
+    id: modded
+    attributes:
+      label: Is any involved block from a mod?
+      options:
+        - "No"
+        - "Yes"
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: mods
+    attributes:
+      label: Mods enabled
+      description: List them, or write "none".
+  - type: dropdown
+    id: game-mode
+    attributes:
+      label: Where it happened
+      options:
+        - Campaign
+        - Custom game
+        - Multiplayer
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to set it up
+      description: A small layout that shows it, ideally as a schematic or a save file (`.msav`). Drag files here.
+    validations:
+      required: true
