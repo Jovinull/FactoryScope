@@ -1,0 +1,10 @@
+name: "factory-scope-mp-fixture"
+displayName: "FactoryScope Multiplayer Fixture"
+author: "Jovinull"
+description: "Development-only dedicated-server fixture that builds a fog-of-war world for FactoryScope multiplayer acceptance and reports the server's own diagnoses."
+version: "0.1.0"
+main: "factoryscope.mpfixture.MultiplayerFixture"
+minGameVersion: 160
+java: true
+hidden: true
+dependencies: ["factory-scope"]

@@ -73,6 +73,15 @@ public enum DiagnosticReason{
         return ordinal();
     }
 
+    /**
+     * Whether a finding's resources are alternatives the building would accept rather than the subject of
+     * the problem: a turret without ammunition lists every ammunition it takes, but it lacks ammunition,
+     * not each of those items. An area report counts such a finding once, not once per alternative.
+     */
+    public boolean resourcesAreAlternatives(){
+        return this == noAmmo || this == waitingForUnit;
+    }
+
     /** The family wordings this reason can carry; empty when it has a single wording. */
     public List<String> variants(){
         return VARIANTS.getOrDefault(this, List.of());

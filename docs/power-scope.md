@@ -68,8 +68,9 @@ visibility rather than presenting partial member counts as complete grid totals.
   dispose of it.
 - Ordinary power is pooled by Mindustry. There is no per-wire flow, per-generator attribution of the
   deficit, battery depletion prediction, or recommended fix.
-- Remote multiplayer visibility/synchronization is not yet independently validated. PowerScope remains
-  client-side and introduces no server component.
+- PowerScope is client-side and introduces no server component. A multiplayer client runs the power graphs
+  itself from synced buildings; the multiplayer acceptance run checks that its membership and satisfaction
+  match the dedicated server's.
 - Android runtime/touch remains unvalidated; the release pipeline validates the universal DEX artifact.
 
 ## Source reviewed
