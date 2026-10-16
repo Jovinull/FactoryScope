@@ -2,6 +2,12 @@
 
 ## 1.1.0
 
+### Post-release validation
+
+- 2026-10-16: the unchanged public 1.1.0 artifact passed the isolated smoke test and the complete real-client
+  acceptance suite in all six locales against Mindustry v160.7. Build, test, and acceptance tooling now pin
+  v160.7, and the smoke test reports the client's actual build.
+
 ### Added
 
 - Evidence-backed structural routing for vanilla Armored Conveyor and Armored Duct behavior in Mindustry v160.5.

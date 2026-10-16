@@ -30,7 +30,8 @@ These assets serve different purposes:
 - **`docs/media/`:** README and repository screenshots; these are not the in-game icon.
 - **MindustryMods `hasIcon`:** an indexer-generated flag for its own cached 64-pixel icon, subject to
   its star gate and refresh schedule.
-- **Steam Workshop preview:** a separate upload asset; FactoryScope has no Steam Workshop release.
+- **Steam Workshop preview:** a separate upload asset, [`branding/workshop-preview.png`](branding/workshop-preview.png),
+  shipped as `preview.png` only in the Workshop folder; see [steam-workshop.md](steam-workshop.md).
 
 The icon uses a project-owned generated raster mark and no Mindustry game artwork. See
 [`branding.md`](branding.md) for its design/source note.

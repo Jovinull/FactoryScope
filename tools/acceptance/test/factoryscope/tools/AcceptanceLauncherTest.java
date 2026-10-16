@@ -102,19 +102,19 @@ class AcceptanceLauncherTest{
         options.mindustryJar = jar;
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
             () -> AcceptanceLauncher.resolveClient(options));
-        assertTrue(error.getMessage().contains("160.5"));
+        assertTrue(error.getMessage().contains("160.7"));
         assertTrue(error.getMessage().contains("159.2"));
     }
 
-    @Test void requiresAuthoritativeVersionMetadataAndAllowsSteam1605Jar() throws Exception{
+    @Test void requiresAuthoritativeVersionMetadataAndAllowsSteam1607Jar() throws Exception{
         Path missingMetadata = temp.resolve("missing-version.jar");
         desktopJarWithoutVersion(missingMetadata);
         AcceptanceLauncher.Options invalid = new AcceptanceLauncher.Options();
         invalid.mindustryJar = missingMetadata;
         assertThrows(IllegalArgumentException.class, () -> AcceptanceLauncher.resolveClient(invalid));
 
-        Path steamJar = temp.resolve("Steam 160.5.jar");
-        desktopJar(steamJar, "160.5", "steam");
+        Path steamJar = temp.resolve("Steam 160.7.jar");
+        desktopJar(steamJar, "160.7", "steam");
         AcceptanceLauncher.Options steam = new AcceptanceLauncher.Options();
         steam.mindustryJar = steamJar;
         assertEquals(steamJar.toAbsolutePath().normalize(), AcceptanceLauncher.resolveClient(steam).path);
@@ -132,7 +132,7 @@ class AcceptanceLauncherTest{
     @Test void malformedHarnessLogsCannotPassAcceptance() throws Exception{
         Path mod = temp.resolve("FactoryScope.jar");
         modArtifact(mod);
-        String valid = "[I] [Mindustry] Version: 160.5\n"
+        String valid = "[I] [Mindustry] Version: 160.7\n"
             + "[I] Loading mod: factory-scope\n[I] Loading mod: factory-scope-acceptance\n"
             + "[I] [FactoryScope] 1.0.0 inspector ready\n"
             + "[I] [HARNESS]   PASS the sandbox loaded no external mods\n"
@@ -156,7 +156,7 @@ class AcceptanceLauncherTest{
         assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
             valid + "[E] [FactoryScope] test error\n", true));
         assertFalse(AcceptanceLauncher.acceptanceLogPassed(mod,
-            valid.replace("Version: 160.5", "Version: 159.2"), true));
+            valid.replace("Version: 160.7", "Version: 159.2"), true));
     }
 
     @Test void explicitInstallFindsBundledDesktopJarBeforeNativeExecutable() throws Exception{
@@ -234,7 +234,7 @@ class AcceptanceLauncherTest{
         options.mindustryPath = install;
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
             () -> AcceptanceLauncher.resolveClient(options));
-        assertTrue(error.getMessage().contains("official v160.5 desktop jar"));
+        assertTrue(error.getMessage().contains("official v160.7 desktop jar"));
     }
 
     @Test void completionAndClientCrashAreDistinguished(){
@@ -281,7 +281,7 @@ class AcceptanceLauncherTest{
     }
 
     private static void desktopJar(Path path) throws IOException{
-        desktopJar(path, "160.5", "release");
+        desktopJar(path, "160.7", "release");
     }
 
     private static void modArtifact(Path path) throws IOException{

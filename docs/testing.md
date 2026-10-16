@@ -43,7 +43,7 @@ Mindustry's asymmetric footprint. `TraceWordingTest` prevents causal or prescrip
 entering either trace bundle.
 
 PowerScope is tested in `power/PowerGridAnalyzerTest` as a pure domain analyzer and in
-`probe/MindustryPowerProbeTest` against real v160.5 PowerGraph, PowerNode, BeamNode, Power Diode,
+`probe/MindustryPowerProbeTest` against real v160.7 PowerGraph, PowerNode, BeamNode, Power Diode,
 battery, and modded-generator behavior. `PowerGridBatteryIntegrationTest` runs actual engine grid updates
 to prove that battery discharge can keep delivered satisfaction high while generation remains below
 demand, and that an empty battery does not. The client acceptance path opens PowerScope from both a
@@ -51,7 +51,7 @@ single-building inspector and Area Diagnostics, checks separate grids and batter
 exercises a real BeamNode connection and a directional Power Diode between separate grids, then uses
 Refresh and the electrical-connection overlay.
 
-LiquidScope has pure tests in `liquid/LiquidTraceAnalyzerTest` and real v160.5 transport fixtures in
+LiquidScope has pure tests in `liquid/LiquidTraceAnalyzerTest` and real v160.7 transport fixtures in
 `probe/MindustryLiquidProbeTest`. They cover Conduit side acceptance/output direction, content-independent
 topology, Liquid Junction channel isolation (including real straight-through movement), router branches,
 Liquid Bridge interruption behavior and a real remote-transfer/local-routing differential, directed
@@ -75,7 +75,7 @@ English, Brazilian Portuguese, Russian, Simplified Chinese, Korean, and Spanish.
 gradlew acceptanceTest
 ```
 
-Needs a Mindustry v8 Build 160.5 desktop client. `acceptanceTest` is a Java launcher and runs on Windows,
+Needs a Mindustry v8 Build 160.7 desktop client. `acceptanceTest` is a Java launcher and runs on Windows,
 Linux, and macOS; automatic Steam discovery is best-effort, while an explicit jar works without Steam.
 Use Gradle properties (`-PmindustryPath`, `-PmindustryJar`, `-PmodJar`) rather than platform-specific
 shell scripts:
@@ -91,7 +91,7 @@ universal CI artifact, or a downloaded release asset; when supplied, the launche
 substitute the production mod jar. `harnessJar` optionally selects a prebuilt acceptance harness. Other
 properties are `locale`, `capture`, `keepSandbox`, and `timeoutSeconds`. Supported locales are `en`, `pt-BR`,
 `ru`, `zh-CN`, `ko`, and `es`; `en-US` remains an accepted English alias. The launcher requires an official
-Mindustry v160.5 desktop jar containing both the desktop entry point and embedded version metadata. An
+Mindustry v160.7 desktop jar containing both the desktop entry point and embedded version metadata. An
 install-directory path is accepted only when it contains such a jar; native executable-only installs are
 rejected because their client identity cannot be independently verified or reliably isolated. For headless
 Linux environments, use a working X server such as Xvfb; GUI client availability is separate from launcher
@@ -158,7 +158,7 @@ headless integration fixture independently checks the same structural path.
 
 Results are written to the game log as `[HARNESS]` lines; the Java launcher validates the result, requires
 the no-external-mods harness check, and turns failures, client crashes and timeouts into a nonzero exit
-code. Before launch it verifies the selected desktop JAR's embedded v160.5 metadata, then redirects each
+code. Before launch it verifies the selected desktop JAR's embedded v160.7 metadata, then redirects each
 platform's Mindustry data directory into a unique temporary sandbox and copies only FactoryScope and its
 harness there. For a verified Steam JAR, the sandbox version marker suppresses Steam/Workshop behavior;
 it is not the client-version oracle. Successful sandboxes are deleted unless capture/keep was requested.
@@ -186,7 +186,9 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1
 ```
 
 Builds, finds the local Mindustry install, launches it in a sandbox and checks the log for **this
-version** initialising with no errors. `-MindustryJar` selects an official client jar and `-ModJar`
+version** initialising with no errors. The sandbox's Steam-suppressing version marker repeats the
+build embedded in the selected client jar, and the run fails if the client reports a different
+build, so the log always names the client that actually ran. `-MindustryJar` selects an official client jar and `-ModJar`
 selects the exact mod artifact to test. `-Install` copies the built jar into your real mods folder and
 is only available with `-MindustryPath` or automatic install discovery.
 
