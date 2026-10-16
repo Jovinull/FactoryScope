@@ -552,7 +552,7 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
-    void drillsExposeTheirDominantItemAsAProductWithoutAddingAProductionRate(){
+    void drillsExposeTheirDominantItemAsAProductAlongsideTheEngineDrillRate(){
         world.tile(10, 10).setFloor((Floor)Blocks.sand);
         Building drill = place(Blocks.mechanicalDrill, 10, 10, 0);
 
@@ -560,7 +560,8 @@ class MindustryNetworkProbeTest{
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
 
         assertEquals(List.of("sand"), snapshot.producedItems.stream().map(item -> item.id).toList());
-        assertTrue(snapshot.outputs.isEmpty(), "drill capability is not relabeled as a rate measurement");
+        assertEquals(List.of("sand"), snapshot.outputs.stream().map(output -> output.contentId).toList(),
+            "the drill model reports the same product it exposes structurally");
         assertTrue(network.resources.stream().anyMatch(item -> item.id.equals("sand")));
     }
 
