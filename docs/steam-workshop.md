@@ -1,8 +1,10 @@
 # Steam Workshop
 
-FactoryScope is distributed through GitHub Releases and the Mindustry Mod Browser. A Steam Workshop item
-is published separately, by hand, from the owner's Steam client. This page records how Mindustry publishes
-a mod, how the Workshop folder is built from a release, and the listing text.
+FactoryScope is distributed through GitHub Releases, the Mindustry Mod Browser, and the
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151) (item `3820843151`, published
+2026-10-16 with the unchanged 1.1.0 release). The Workshop item is updated separately, by hand, from the owner's
+Steam client. This page records how Mindustry publishes a mod, how the Workshop folder is built from a release,
+and the listing text.
 
 ## How Mindustry publishes a mod
 
