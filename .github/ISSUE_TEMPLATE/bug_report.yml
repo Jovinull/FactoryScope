@@ -1,0 +1,117 @@
+name: Bug report
+description: FactoryScope crashed, logged an error, or a button, panel or overlay does not work.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. English is preferred, but Portuguese, Spanish, Russian,
+        Chinese and Korean are fine too.
+
+        If FactoryScope worked but reached a conclusion the game contradicts, use **Wrong diagnosis** instead.
+  - type: input
+    id: factoryscope-version
+    attributes:
+      label: FactoryScope version
+      description: Shown in the Mods menu.
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: input
+    id: mindustry-build
+    attributes:
+      label: Mindustry build
+      description: Shown at the bottom of the main menu.
+      placeholder: "160.7"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - Android
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: installed-from
+    attributes:
+      label: Installed from
+      options:
+        - Steam Workshop
+        - GitHub release
+        - In-game mod browser
+        - Built from source
+    validations:
+      required: true
+  - type: dropdown
+    id: game-mode
+    attributes:
+      label: Where it happened
+      options:
+        - Campaign
+        - Custom game
+        - Multiplayer, as the host
+        - Multiplayer, on someone else's server
+        - Dedicated server
+    validations:
+      required: true
+  - type: dropdown
+    id: feature
+    attributes:
+      label: Which part of FactoryScope
+      multiple: true
+      options:
+        - Building diagnostics panel
+        - Area Diagnostics
+        - Network or Supply Trace
+        - PowerScope
+        - LiquidScope
+        - Locate or Inspect
+        - HUD button or settings
+        - Other
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods enabled
+      description: List them, or write "none". A conflict between mods is a common cause.
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Place ...
+        2. Open FactoryScope and ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        The relevant part of `last_log.txt`, especially lines with `[E]` or `FactoryScope`. It is in the Mindustry
+        data folder: `steamapps/common/Mindustry/saves/` for Steam, `%AppData%\Mindustry\` for the standalone
+        Windows game, `~/.local/share/Mindustry/` on Linux, `~/Library/Application Support/Mindustry/` on macOS.
+      render: text
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots or save file
+      description: Drag images here. A save file (`.msav`) or schematic that shows the problem helps the most.
