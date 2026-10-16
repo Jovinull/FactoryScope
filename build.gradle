@@ -12,7 +12,12 @@ tasks.withType(JavaCompile).configureEach{
 //built from sourceSets.main alone.
 sourceSets{
     acceptance{
-        java.srcDirs = ["acceptance/src"]
+        java.srcDirs = ["acceptance/src", "multiplayer/shared/src"]
+        compileClasspath += sourceSets.main.output
+    }
+    //The dedicated-server fixture of the multiplayer acceptance run, another development-only mod.
+    mpFixture{
+        java.srcDirs = ["multiplayer/fixture/src", "multiplayer/shared/src"]
         compileClasspath += sourceSets.main.output
     }
     // The real-client launcher is build tooling, not mod code; keeping it in a separate source set
@@ -178,6 +183,7 @@ dependencies{
     compileOnly "Anuken:Mindustry:$mindustryVersion"
 
     acceptanceCompileOnly "Anuken:Mindustry:$mindustryVersion"
+    mpFixtureCompileOnly "Anuken:Mindustry:$mindustryVersion"
 
     testImplementation "Anuken:Mindustry:$mindustryVersion"
     mindustryAssets "Anuken:MindustryAssets:$mindustryVersion"
@@ -314,6 +320,35 @@ tasks.register("acceptanceJar", Jar){
     from sourceSets.acceptance.output
     from("acceptance"){
         include "mod.hjson"
+    }
+}
+
+//loaded by the dedicated server of the multiplayer acceptance run; never released
+tasks.register("multiplayerFixtureJar", Jar){
+    archiveFileName = "FactoryScopeMultiplayerFixture.jar"
+    from sourceSets.mpFixture.output
+    from("multiplayer/fixture"){
+        include "mod.hjson"
+    }
+}
+
+tasks.register("multiplayerAcceptanceTest", JavaExec){
+    group = "verification"
+    description = "Runs the multiplayer acceptance suite against an isolated official dedicated server and client."
+    dependsOn "acceptanceJar", "multiplayerFixtureJar"
+    if(!project.hasProperty("modJar")) dependsOn "jar"
+    classpath = sourceSets.acceptanceLauncher.runtimeClasspath
+    mainClass = "factoryscope.tools.MultiplayerAcceptanceLauncher"
+
+    doFirst{
+        if(!project.hasProperty("serverJar")) throw new GradleException("Pass -PserverJar=<official Mindustry server-release.jar>")
+        def arguments = ["--project", projectDir.absolutePath, "--server-jar", project.property("serverJar").toString()]
+        ["mindustryPath": "--mindustry-path", "mindustryJar": "--mindustry-jar", "modJar": "--mod-jar",
+         "harnessJar": "--harness-jar", "fixtureJar": "--fixture-jar", "locale": "--locale", "capture": "--capture",
+         "keepSandbox": "--keep-sandbox", "timeoutSeconds": "--timeout-seconds"].each{ property, flag ->
+            if(project.hasProperty(property)) arguments += [flag, project.property(property).toString()]
+        }
+        setArgs(arguments)
     }
 }
 
