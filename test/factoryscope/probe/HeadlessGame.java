@@ -77,6 +77,10 @@ final class HeadlessGame{
 
     /** Replaces the world with an empty square of tiles and resets the rules to a plain survival game. */
     static void newWorld(int size){
+        //Logic.reset() starts every map with fresh team data. The indexer creates each team's building
+        //quadtree once, with the bounds of the world it first sees, and only clears it on later loads, so
+        //team data carried over from a smaller test world would silently drop buildings outside it.
+        state.teams = new Teams();
         Tiles tiles = world.resize(size, size);
         world.beginMapLoad();
         tiles.fill();
