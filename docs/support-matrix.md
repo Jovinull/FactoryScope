@@ -16,9 +16,39 @@ does not fill in an unknown route. “Deferred” means no current topology clai
 
 | View | Status | Scope and evidence |
 | --- | --- | --- |
-| Single-building diagnostics | SUPPORTED | Reads the building's current Mindustry state and declared consumers; unknown consumer semantics remain explicitly limited. |
+| Single-building diagnostics | SUPPORTED | Reads the building's current Mindustry state and declared consumers. Blocks of a modeled production family also get rates, verified stop conditions, and details (see below); other blocks and unknown consumer semantics remain explicitly limited. |
 | Area Diagnostics | SUPPORTED | Uses the selected team's spatial index, snapshots the selected buildings, and groups their current diagnostic states. |
 | PowerScope | SUPPORTED | Uses Mindustry's `PowerGraph` membership and aggregate metrics; it does not assign per-wire flow or a root cause. Remote multiplayer synchronization is not independently validated. |
+
+## Production models
+
+A production model is the set of engine rules FactoryScope applies to a block family to report rates, stop
+conditions, and details. Each current rate is the value the engine itself computes for the block's status bar or
+power graph; the nominal rate is derived from the block's declared timing at 100% efficiency. A stop condition is
+reported only when it is a check the engine makes before the block produces. Figures that depend on conditions
+FactoryScope cannot observe are marked as estimates (≈) in the panel.
+
+| Family | Vanilla blocks | Rates | Verified stop conditions | Details |
+| --- | --- | --- | --- | --- |
+| Crafters (`GenericCrafter`, `AttributeCrafter`, `HeatCrafter`, `HeatProducer`) | 31 | Exact, from `getProgressIncrease` and `scaleOutput` | Full output buffer | Cycle time, block speed and condition multipliers |
+| Drills (`Drill`, `BurstDrill`) | 6 | The engine's drill speed (`lastDrillSpeed`) | No mineable ore; ore too hard for the tier or excluded (named); full buffer (a burst drill needs room for a whole burst) | Ore, ore tiles, drill tier, speed with full boost, warm-up |
+| Plasma bores (`BeamDrill`) | 2 | The engine's drill speed, split by the walls each laser reaches | No mineable ore wall; walls too hard or excluded (named); full buffer | Lasers on ore walls, drill tier, speed with full boost |
+| Cliff crushers (`WallCrafter`) | 2 | The engine's efficiency (`lastEfficiency`) | No suitable wall in front; full buffer | Wall yield, speed with full boost |
+| Pumps (`Pump`) | 4 | `amount × pumpAmount × edelta()`, capped by free capacity as the engine caps it | No liquid under the pump; full tank | Liquid tile yield |
+| Extractors (`SolidPump`, `Fracker`) | 2 | The engine's pump speed (`lastPump`) | Full tank | Ground yield |
+| Separators (`Separator`) | 2 | The cycle rate is exact; per-item rates are **estimates** (each cycle draws one result at random, weighted by its stack amount) | Full shared output buffer | — |
+| Generators and reactors (`ConsumeGenerator`, `SolarGenerator`, `ThermalGenerator`, `NuclearReactor`, `ImpactReactor`, `VariableReactor`, `HeaterGenerator`) | 14 | The engine's power production (`getPowerProduction`), plus declared liquid by-products | Fuel and other inputs through the consumers; light, heat under the block and fuel quality as a block condition | Generation efficiency, fuel use while running, light, heat, fuel stored, reactor heat and instability coloured by the engine's own thresholds, warm-up, explode-when-full tanks |
+| Unit factories (`UnitFactory`) | 6 | `efficiency × unitBuildSpeed ÷ plan time` | No unit selected; unit cap reached; finished unit unable to leave | Unit, progress, units of that type against the cap |
+| Reconstructors (`Reconstructor`) | 8 | `efficiency × unitBuildSpeed ÷ constructTime` | No upgradable unit inside (accepted units are named); unit cap reached; finished unit unable to leave | Unit inside and its upgrade, progress |
+| Unit assemblers (`UnitAssembler`) | 3 | The same, scaled by the share of drones in position | Unit cap reached; spawn area occupied; payload requirements as inputs | Drones in position, progress |
+| Turrets (`ItemTurret`, `LiquidTurret`, `PowerTurret`, `ContinuousTurret`, `ContinuousLiquidTurret`, `LaserTurret`, `PointDefenseTurret`, `TractorBeamTurret`) | 28 | Turrets produce nothing; shots and ammunition use while firing are **estimates** that assume continuous fire at full efficiency without coolant | No usable ammunition (accepted ammunition is named); loaded and reloaded with no target, reported as normal | Ammunition held and loaded, reload, heat requirement, whether it is engaging |
+
+Other blocks - projectors, menders, cores and storage, incinerators, constructors, payload and unit logistics -
+keep limited diagnostics: their state and declared requirements, without rates or block-specific verdicts.
+
+A model applies only to a building whose runtime build class is the engine's own. A mod block that reuses a
+vanilla build class gets the vanilla model; a mod that replaces the build class may have changed exactly the rules
+the model relies on, so its buildings keep the general diagnostics.
 
 ## Item topology and Supply Trace
 
@@ -32,6 +62,7 @@ does not fill in an unknown route. “Deferred” means no current topology clai
 | Duct, duct router, overflow duct, underflow duct, Surge Router | SUPPORTED | Models standard duct ports and configured item constraints. Surge Router shares Duct Router port/configuration semantics; its transient loading/unloading state is not reported. |
 | Item Bridge and Phase Conveyor | SUPPORTED | Uses the configured, engine-valid link; a remote edge means structural connectivity, not current transfer. |
 | Drill, conventional crafter, known consumer, core/storage | SUPPORTED | Uses captured producer/consumer resource identities and keeps storage distinct from production. |
+| Separator, Plasma Bore, Cliff Crusher | SUPPORTED | Structural producers of the items they can output: every possible separator result, the ore of each wall a bore reaches, and the crusher's declared item. A separator's product is random per cycle; the route claims only that it can carry each result. |
 | Armored Conveyor | SUPPORTED | Models the forward route and Mindustry's source-sensitive insertion: Conveyor sources may enter through non-front sides, while other sources require the engine-aligned side. Transient belt capacity/position is not modeled. |
 | Armored Duct | SUPPORTED | Models the forward route; v160.5 accepts a rotating Duct source facing into it, or any source at the engine-aligned edge. Transient one-item occupancy is not modeled. |
 | Plastanium Conveyor and Surge Conveyor | PARTIAL | Their load/move/unload state machines are not flattened into an ordinary conveyor route. |
