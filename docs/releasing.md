@@ -83,3 +83,8 @@ targeting the running game line. Use a title such as `FactoryScope X.Y.Z [v160]`
 The indexer only downloads repository icons when the repository has at least two stars. It looks for
 `icon.png` at the root or under `assets/` and scales it to 64 by 64. FactoryScope currently has fewer
 than two stars, so an icon file would not appear in the browser yet.
+
+## Steam Workshop
+
+The Workshop item is updated by hand from the owner's Steam client after the GitHub release is published,
+from the same release jar, unpacked. See [steam-workshop.md](steam-workshop.md).

@@ -119,3 +119,22 @@ function Get-MindustryJarLauncher{
         Arguments = @('-jar', ('"' + [IO.Path]::GetFullPath($JarPath) + '"'))
     }
 }
+
+function Get-MindustryJarBuild{
+    param([Parameter(Mandatory = $true)][string]$JarPath)
+
+    # The client's own embedded version.properties; $null when the jar carries none.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [IO.Compression.ZipFile]::OpenRead([IO.Path]::GetFullPath($JarPath))
+    try{
+        $entry = $zip.GetEntry('version.properties')
+        if(-not $entry){ return $null }
+        $reader = New-Object IO.StreamReader($entry.Open())
+        try{ $text = $reader.ReadToEnd() }finally{ $reader.Dispose() }
+        $match = [regex]::Match($text, '(?m)^build=(\S+)')
+        if($match.Success){ return $match.Groups[1].Value }
+        return $null
+    }finally{
+        $zip.Dispose()
+    }
+}
