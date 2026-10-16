@@ -92,4 +92,14 @@ final class HeadlessGame{
         Time.setDeltaProvider(() -> 1f);
         Time.update();
     }
+
+    /** Advances the world by whole frames, updating what Logic.update does for transport: graphs, buildings, bullets. */
+    static void run(int frames){
+        for(int i = 0; i < frames; i++){
+            Time.update();
+            mindustry.gen.Groups.powerGraph.update();
+            mindustry.gen.Groups.build.update();
+            mindustry.gen.Groups.bullet.update();
+        }
+    }
 }
