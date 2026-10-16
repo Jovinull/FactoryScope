@@ -77,13 +77,13 @@ if($running.Count -gt 0){
 }
 
 Write-Step 'Locating Mindustry'
-$gameBuild = '160.5'
 if($MindustryJar){
     $gamePath = [IO.Path]::GetFullPath($MindustryJar)
     if(-not (Test-Path -LiteralPath $gamePath)){ throw "Mindustry jar not found: $gamePath" }
     $launcher = Get-MindustryJarLauncher -JarPath $gamePath
     if(-not $launcher){ throw 'java.exe was not found on PATH.' }
     $dataDir = $null
+    $gameBuild = Get-MindustryJarBuild -JarPath $gamePath
     Write-Host "    jar:      $gamePath"
 }else{
     $gamePath = Find-MindustryInstall -Hint $MindustryPath
@@ -93,11 +93,19 @@ if($MindustryJar){
     $launcher = Get-MindustryLauncher -InstallPath $gamePath
     if(-not $launcher){ throw "No launcher found under $gamePath" }
     $dataDir = Get-MindustryDataDir -InstallPath $gamePath
+    # The sandbox marker written below replaces the client's own version, so it must repeat the
+    # installed client's real build; a fixed number would make the log name a build that is not running.
+    $installJar = Join-Path $gamePath 'jre\desktop.jar'
+    $gameBuild = if(Test-Path -LiteralPath $installJar){ Get-MindustryJarBuild -JarPath $installJar }
+    if(-not $gameBuild){
+        throw "Cannot read the client build from $installJar. Pass -MindustryJar with an official client jar."
+    }
     Write-Host "    install:  $gamePath"
     Write-Host "    data dir: $dataDir"
 }
 
 Write-Host "    launcher: $($launcher.Path)"
+if($gameBuild){ Write-Host "    build:    $gameBuild" }
 
 # --------------------------------------------------------------------------- install
 
@@ -196,10 +204,18 @@ $modErrors = @($logLines | Where-Object { $_ -match 'factoryscope\.' -and $_ -ma
 $externalMods = @($logLines | Where-Object {
     $_ -match 'Loading mod:' -and $_ -notmatch 'Loading mod: factory-scope$'
 })
+$reportedBuild = $logLines | ForEach-Object {
+    if($_ -match '\[Mindustry\] Version: (\S+)'){ $Matches[1] }
+} | Select-Object -First 1
+$buildMatches = -not $gameBuild -or $reportedBuild -eq $gameBuild
 
 Write-Host ''
+Write-Host "    client reported build: $reportedBuild"
 if(-not $ready){
     Write-Fail 'FactoryScope did not report that it initialised within the timeout.'
+}
+if(-not $buildMatches){
+    Write-Fail "The client reported build $reportedBuild, but the selected client is $gameBuild."
 }
 if($problems.Count -gt 0){
     Write-Fail 'Suspicious log lines:'
@@ -214,7 +230,7 @@ if($externalMods.Count -gt 0){
     $externalMods | ForEach-Object { Write-Host "    $_" }
 }
 
-$success = $ready -and $problems.Count -eq 0 -and $modErrors.Count -eq 0 -and $externalMods.Count -eq 0
+$success = $ready -and $buildMatches -and $problems.Count -eq 0 -and $modErrors.Count -eq 0 -and $externalMods.Count -eq 0
 if($success){
     Write-Host 'SMOKE TEST PASSED: FactoryScope loaded cleanly.' -ForegroundColor Green
 }else{

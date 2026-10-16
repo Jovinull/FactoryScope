@@ -26,3 +26,12 @@ Item and liquid routes are structural connectivity, not measured flow, throughpu
 ## Validation and limitations
 
 Targets Mindustry v8 Build 160 and was validated against v160.5. Desktop graphical acceptance was performed on Windows; launcher/path portability was checked on Windows, Linux, and macOS. The universal JAR's DEX was structurally validated, but Android runtime/touch was not validated. Remote multiplayer behavior was not independently validated.
+
+## Post-release validation on v160.7
+
+On 2026-10-16 the unchanged public `FactoryScope.jar` (SHA-256
+`b188c24f6a693ba692eebb3dad16c33e9623c61c11ae9e50ebdb64b821c80d8b`) was re-validated against Mindustry v160.7: the
+isolated smoke test on the official client and on the Steam client, and the complete real-client acceptance suite in
+all six supported locales (673 checks each, no failures). Every Mindustry and Arc class, method, and field the
+artifact references resolves in v160.7, and the headless engine tests pass against v160.7 content. No FactoryScope
+change was needed.
