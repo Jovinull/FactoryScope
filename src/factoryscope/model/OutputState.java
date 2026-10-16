@@ -20,10 +20,21 @@ public final class OutputState{
     public final float capacity;
     /** True when this specific product is what stops the building from starting a new cycle. */
     public final boolean bufferFull;
+    /**
+     * True when the rates are an expected average rather than what the engine will deliver: a
+     * separator draws each output at random, so only its long-run share per item is known.
+     */
+    public final boolean estimate;
 
     public OutputState(ResourceKind kind, String name, String contentId,
                        float theoreticalPerSecond, float expectedPerSecond,
                        float stored, float capacity, boolean bufferFull){
+        this(kind, name, contentId, theoreticalPerSecond, expectedPerSecond, stored, capacity, bufferFull, false);
+    }
+
+    public OutputState(ResourceKind kind, String name, String contentId,
+                       float theoreticalPerSecond, float expectedPerSecond,
+                       float stored, float capacity, boolean bufferFull, boolean estimate){
         this.kind = kind;
         this.name = name;
         this.contentId = contentId;
@@ -32,6 +43,7 @@ public final class OutputState{
         this.stored = stored;
         this.capacity = capacity;
         this.bufferFull = bufferFull;
+        this.estimate = estimate;
     }
 
     /** Stable identity plus display name, for findings that need to name this product. */
@@ -45,6 +57,6 @@ public final class OutputState{
 
     @Override
     public String toString(){
-        return name + " " + expectedPerSecond + "/" + theoreticalPerSecond + "/s";
+        return name + " " + (estimate ? "~" : "") + expectedPerSecond + "/" + theoreticalPerSecond + "/s";
     }
 }

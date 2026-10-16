@@ -8,7 +8,10 @@ import mindustry.*;
 import mindustry.game.Team;
 import mindustry.gen.*;
 import mindustry.type.*;
+import arc.struct.*;
+import mindustry.ctype.*;
 import mindustry.world.*;
+import mindustry.world.blocks.defense.turrets.*;
 import mindustry.world.blocks.power.*;
 import mindustry.world.blocks.production.*;
 import mindustry.world.consumers.*;
@@ -24,8 +27,9 @@ import java.util.*;
  * inspection is driven by {@code block.consumers} rather than by a list of known blocks, so modded
  * crafters built on the standard consumers are analysed the same way vanilla ones are.
  *
- * <p>All formulas here were taken from the Mindustry v160.5 sources; the reasoning behind the
- * non-obvious ones is in {@code docs/mindustry-notes.md}.
+ * <p>All formulas here were taken from the Mindustry v160.5 sources and rechecked against v160.7; the
+ * reasoning behind the non-obvious ones is in {@code docs/mindustry-notes.md}. Production models for
+ * families other than conventional crafters live in {@link ProductionModels}.
  */
 public final class MindustryFactoryProbe{
     /** Guards against a zero-length frame, which happens on the first frame and while the game is paused. */
@@ -87,7 +91,14 @@ public final class MindustryFactoryProbe{
                 && PowerGraphMetrics.completelyVisible(graph, viewer);
             snapshot.power(readPower(build, block.consPower, visibleGraph));
         }
-        if(crafter) addCrafterProduction(build, (GenericCrafter)block, snapshot, frameTicks, timeScale);
+        if(crafter){
+            addCrafterProduction(build, (GenericCrafter)block, snapshot, frameTicks, timeScale);
+            snapshot.family(ProductionFamily.crafter);
+            //GenericCrafterBuild.shouldConsume() is false exactly when an output cannot take another cycle
+            if(!shouldConsume && build.enabled && snapshot.outputBufferFull()) snapshot.gate(ProductionGate.outputFull);
+        }else{
+            ProductionModels.apply(new ProductionModels.Context(build, snapshot, frameTicks, timeScale, shouldConsume));
+        }
         addConventionalLiquidProduction(build, snapshot);
         if(build instanceof Drill.DrillBuild drill && drill.dominantItem != null){
             snapshot.producedItem(new ResourceRef(ResourceKind.item, drill.dominantItem.name, drill.dominantItem.localizedName));
@@ -111,6 +122,9 @@ public final class MindustryFactoryProbe{
     private static void addInputs(Building build, Block block, FactorySnapshot.Builder snapshot,
                                   float frameTicks, float timeScale){
         for(Consume consume : block.consumers){
+            //ConsumeItemExplode only watches for explosive items: it consumes nothing and its efficiency is
+            //always 1, so it is never a requirement and must not be listed as one
+            if(consume instanceof ConsumeItemExplode) continue;
             //ignore() consumers are excluded from the game's own efficiency calculation, so they can
             //never be the cause of a shortage; buffered power is the vanilla case.
             boolean optional = consume.optional || consume.ignore();
@@ -131,6 +145,8 @@ public final class MindustryFactoryProbe{
     private static void readConsumer(Building build, Consume consume, boolean optional,
                                      FactorySnapshot.Builder snapshot, float frameTicks, float timeScale){
         float multiplier = consume.multiplier.get(build);
+
+        if(ammoInput(build, consume, optional, snapshot)) return;
 
         if(consume instanceof ConsumeItems items){
             for(ItemStack stack : items.items){
@@ -180,6 +196,15 @@ public final class MindustryFactoryProbe{
             }
         }else if(consume instanceof ConsumePower power){
             snapshot.input(powerInput(build, power, optional));
+        }else if(consume instanceof ConsumePayloads payloads){
+            for(int i = 0; i < payloads.payloads.size; i++){
+                snapshot.input(payloadInput(build, payloads.payloads.get(i), multiplier, optional));
+            }
+        }else if(consume instanceof ConsumePayloadDynamic dynamic){
+            Seq<PayloadStack> stacks = dynamic.payloads.get(build);
+            for(int i = 0; stacks != null && i < stacks.size; i++){
+                snapshot.input(payloadInput(build, stacks.get(i), multiplier, optional));
+            }
         }else{
             snapshot.input(unknownInput(build, consume, optional));
         }
@@ -200,6 +225,58 @@ public final class MindustryFactoryProbe{
             .satisfaction(satisfied ? 1f : 0f)
             .amounts(stored, required, RateUnit.perCraft)
             .build();
+    }
+
+    /**
+     * A payload requirement: units or blocks that must be carried into the building, as a unit
+     * assembler needs. Mirrors {@code ConsumePayloads.efficiency()}, which checks each stack against
+     * {@code getPayloads()} with the amount rounded after the multiplier.
+     */
+    private static ResourceState payloadInput(Building build, PayloadStack stack, float multiplier, boolean optional){
+        UnlockableContent content = stack.item;
+        int required = Math.round(stack.amount * multiplier);
+        int held = build.getPayloads() == null ? 0 : build.getPayloads().get(content);
+        ResourceKind kind = content instanceof mindustry.type.UnitType ? ResourceKind.unit : ResourceKind.block;
+        return ResourceState.of(kind, content.localizedName)
+            .contentId(content.name)
+            .optional(optional)
+            .satisfaction(required <= 0 || held >= required ? 1f : 0f)
+            .amounts(held, required, RateUnit.perCraft)
+            .build();
+    }
+
+    /**
+     * Turret ammunition is declared as a filter consumer but held in the turret's ammunition list, not
+     * in its item or liquid module, so the generic filter reading would report a loaded turret as empty.
+     * The vanilla item turret overrides the consumer's efficiency with a pure check of that list, which is
+     * used here as is; a liquid turret's filter does not drain anything, so it is shown without a rate.
+     */
+    private static boolean ammoInput(Building build, Consume consume, boolean optional, FactorySnapshot.Builder snapshot){
+        if(!ProductionModels.engineBuild(build)) return false;
+        if(build instanceof ItemTurret.ItemTurretBuild turret && consume instanceof ConsumeItemFilter filter){
+            Item top = !turret.ammo.isEmpty() && turret.ammo.peek() instanceof ItemTurret.ItemEntry entry ? entry.item : null;
+            snapshot.input(ResourceState.of(ResourceKind.item, top != null ? top.localizedName : FsBundle.get("input.any-accepted-item"))
+                .contentId(top == null ? null : top.name)
+                .optional(optional)
+                .satisfaction(filter.efficiency(build))
+                .build());
+            return true;
+        }
+        //ConsumeCoolant is a liquid filter too; only the turret's own ammunition filter is reinterpreted
+        if(build instanceof LiquidTurret.LiquidTurretBuild turret && consume instanceof ConsumeLiquidFilter filter
+            && consume != ((BaseTurret)build.block).coolant){
+            Liquid current = build.liquids == null || build.liquids.currentAmount() <= 0f ? null : build.liquids.current();
+            Boolean loaded = TurretModels.hasAmmo(turret);
+            var state = current != null
+                ? ResourceState.of(ResourceKind.liquid, current.localizedName).contentId(current.name)
+                : ResourceState.of(ResourceKind.liquid, FsBundle.get("input.any-accepted-liquid"));
+            snapshot.input(state.optional(optional)
+                .accepts(acceptedLiquids(filter))
+                .satisfaction(loaded == null || loaded ? 1f : 0f)
+                .build());
+            return true;
+        }
+        return false;
     }
 
     private static ResourceState itemFilterInput(Building build, ConsumeItemFilter filter, boolean optional){

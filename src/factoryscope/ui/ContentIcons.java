@@ -28,6 +28,8 @@ public final class ContentIcons{
         UnlockableContent content = switch(kind){
             case item -> Vars.content.item(contentId);
             case liquid -> Vars.content.liquid(contentId);
+            case unit -> Vars.content.unit(contentId);
+            case block -> Vars.content.block(contentId);
             default -> null;
         };
         return content == null ? null : content.uiIcon;

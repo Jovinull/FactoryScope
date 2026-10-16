@@ -15,11 +15,16 @@ public enum AreaStatus{
     liquidShortage(Kind.problem),
     powerLimited(Kind.problem),
     outputBlocked(Kind.problem),
+    noResource(Kind.problem),
+    noAmmo(Kind.problem),
+    unitCapReached(Kind.problem),
+    payloadShortage(Kind.problem),
     otherLimitation(Kind.problem),
     causeUnclear(Kind.problem),
     disabled(Kind.informational),
     inoperable(Kind.informational),
     notConsuming(Kind.informational),
+    notConfigured(Kind.informational),
     limitedDiagnostics(Kind.informational);
 
     /**
@@ -44,11 +49,16 @@ public enum AreaStatus{
 
     public static AreaStatus of(DiagnosticReason reason){
         return switch(reason){
-            case active -> operating;
+            case active, turretIdle -> operating;
             case missingItemInput -> itemShortage;
             case missingLiquidInput -> liquidShortage;
             case insufficientPower -> powerLimited;
             case outputBlocked -> outputBlocked;
+            case noResource, resourceTooHard -> noResource;
+            case noAmmo -> noAmmo;
+            case unitCapReached -> unitCapReached;
+            case missingPayloadInput, waitingForUnit -> payloadShortage;
+            case noPlanSelected -> notConfigured;
             case otherConsumerLimited, blockConditionLimited -> otherLimitation;
             case haltedUnknownCause -> causeUnclear;
             case disabled -> disabled;
