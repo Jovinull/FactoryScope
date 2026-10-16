@@ -407,4 +407,20 @@ class FactoryAnalyzerTest{
         assertThrows(IllegalArgumentException.class,
             () -> new Finding(DiagnosticReason.noAmmo, Severity.stopped, List.of(), true, "drill"));
     }
+
+    @Test
+    void aTurretWithoutAmmunitionDoesNotRepeatItsAmmunitionAsAnItemShortage(){
+        ResourceRef copper = new ResourceRef(ResourceKind.item, "copper", "Copper");
+        FactorySnapshot snapshot = FactorySnapshot.builder("Duo")
+            .family(ProductionFamily.turret)
+            .efficiency(0f, 0f)
+            .input(ResourceState.of(ResourceKind.item, "Any accepted item").satisfaction(0f).build())
+            .gate(ProductionGate.noAmmo, List.of(copper))
+            .build();
+
+        DiagnosticResult result = FactoryAnalyzer.analyze(snapshot);
+
+        assertEquals(DiagnosticReason.noAmmo, result.reason());
+        assertEquals(1, result.findings.size(), "the ammunition shortage is already the gate");
+    }
 }
