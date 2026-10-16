@@ -1196,6 +1196,7 @@ public class AcceptanceHarness extends Mod{
         itemNetworkView();
         powerScopeScenarios();
         liquidScopeScenarios();
+        transportFamilyScenarios();
         healthyArea();
         emptyArea();
         configurableBlocks();
@@ -1699,11 +1700,13 @@ public class AcceptanceHarness extends Mod{
         queue(this::closeAnyDialog);
         queue(() -> {
             clearRegion();
-            placeAt(Blocks.plastaniumConveyor, unsupportedX - 1, y, 1);
+            //every vanilla item transport is modeled; the sandbox Item Source is in the transportation group
+            //without a transport model, so it stands in for an unknown modded transport
+            placeAt(Blocks.itemSource, unsupportedX - 1, y, 1);
             target = placeAt(Blocks.siliconSmelter, unsupportedX, y);
             check("unsupported-route fixture keeps both buildings", target != null
                 && world.tile(unsupportedX - 1, y).build != null
-                && world.tile(unsupportedX - 1, y).build.block == Blocks.plastaniumConveyor,
+                && world.tile(unsupportedX - 1, y).build.block == Blocks.itemSource,
                 "transport=" + world.tile(unsupportedX - 1, y).build + ", target=" + target);
         });
         queue(this::armPicker);
@@ -1728,13 +1731,92 @@ public class AcceptanceHarness extends Mod{
         queue(this::closeAnyDialog);
     }
 
+    /** Supply Trace and LiquidScope across the linked, unloading and armored transports. */
+    void transportFamilyScenarios(){
+        scenario("Supply Trace follows a duct bridge and a sorting unloader back to storage");
+        queue(this::closeAnyDialog);
+        queue(() -> {
+            clearRegion();
+            int x = rx(), y = ry();
+            //the container is empty, so the smelter keeps its sand shortage and offers the trace
+            producer = placeAt(Blocks.container, x + 2, y + 3);
+            Building unloader = placeAt(Blocks.unloader, x + 4, y + 3);
+            if(unloader != null) unloader.configure(Items.sand);
+            placeAt(Blocks.ductBridge, x + 5, y + 3, 0);
+            placeAt(Blocks.ductBridge, x + 8, y + 3, 0);
+            target = placeAt(Blocks.siliconSmelter, x + 9, y + 3);
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> check("missing sand offers Supply Trace", Core.scene.find("factoryscope-trace-input-sand") != null));
+        queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> dragTiles(rx() + 1, ry() + 1, rx() + 11, ry() + 7));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            SupplyTrace trace = report == null ? null
+                : TraceAnalyzer.input(report, AreaProbe.refOf(target), new ResourceRef(ResourceKind.item, "sand", "Sand"));
+            check("the trace crosses the bridge and the unloader to the container", trace != null && trace.complete
+                && trace.endpoints.stream().anyMatch(endpoint -> endpoint.kind == TraceEndpointKind.storage
+                    && endpoint.building.equals(AreaProbe.refOf(producer))),
+                trace == null ? "no trace" : "complete=" + trace.complete + ", endpoints=" + trace.endpoints.size()
+                    + ", unsupported=" + trace.unsupportedInterruptions.size());
+            check("none of these transports is reported as unsupported", trace != null && trace.unsupportedInArea.isEmpty()
+                && !dialogShows(FsBundle.get("trace.unsupported-area-one")));
+            capture("supply-trace-unloader-bridge");
+        });
+        //closing the trace shows the area report again
+        closeDialogStack();
+
+        scenario("LiquidScope follows a bridge conduit and a plated conduit back to a pump");
+        closeDialogStack();
+        queue(() -> {
+            clearRegion();
+            int x = rx(), y = ry();
+            for(int dx = 2; dx <= 3; dx++) for(int dy = 2; dy <= 3; dy++){
+                Tile floor = world.tile(x + dx, y + dy);
+                floor.setFloor((Floor)Blocks.water);
+                floor.clearOverlay();
+            }
+            producer = placeAt(Blocks.mechanicalPump, x + 3, y + 3);
+            Building first = placeAt(Blocks.bridgeConduit, x + 4, y + 3);
+            Building last = placeAt(Blocks.bridgeConduit, x + 7, y + 3);
+            if(first != null && last != null) first.configure(last.tile.pos());
+            placeAt(Blocks.platedConduit, x + 8, y + 3, 0);
+            target = placeAt(Blocks.cryofluidMixer, x + 9, y + 3);
+        });
+        queue(() -> {
+            //keep the mixer's water shortage, as the conduit scenario does
+            producer.enabled = false;
+            for(int dx = 3; dx <= 8; dx++){
+                Building build = world.tile(rx() + dx, ry() + 3).build;
+                if(build != null && build.liquids != null) build.liquids.clear();
+            }
+            target.liquids.clear();
+        });
+        queue(this::armPicker);
+        queue(() -> clickBuilding(target));
+        queue(() -> check("missing water offers LiquidScope", Core.scene.find("factoryscope-trace-liquid-water") != null));
+        queue(() -> clickNamed("factoryscope-trace-liquid-water"));
+        queue(() -> dragTiles(rx() + 1, ry() + 1, rx() + 11, ry() + 7));
+        queue(() -> {
+            LiquidTrace trace = FactoryScopeUI.liquidTrace();
+            check("the water trace crosses the bridge and the plated conduit to the pump", trace != null && trace.complete
+                && trace.producers().stream().anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer))),
+                trace == null ? "no trace" : "complete=" + trace.complete + ", endpoints=" + trace.endpoints.size()
+                    + ", unsupported=" + trace.unsupportedTransports.size());
+            check("neither liquid transport is reported as unsupported", trace != null && trace.unsupportedTransports.isEmpty());
+            capture("liquid-trace-bridge-plated");
+        });
+        closeDialogStack();
+    }
+
     void unsupportedTraceLocate(){
         int x = rx() + 5, y = ry() + 4;
         scenario("an unsupported transport interruption can be located and returned to");
         queue(this::closeAnyDialog);
         queue(() -> {
             clearRegion();
-            placeAt(Blocks.plastaniumConveyor, x - 1, y, 1);
+            placeAt(Blocks.itemSource, x - 1, y, 1);
             target = placeAt(Blocks.siliconSmelter, x, y);
         });
         queue(this::armPicker);
@@ -2635,7 +2717,8 @@ public class AcceptanceHarness extends Mod{
         queue(() -> {
             clearRegion();
             target = placeAt(Blocks.cryofluidMixer, rx() + 6, ry() + 4);
-            placeAt(Blocks.platedConduit, rx() + 5, ry() + 4);
+            //the sandbox Liquid Source is the vanilla liquid block without a transport model
+            placeAt(Blocks.liquidSource, rx() + 5, ry() + 4);
         });
         queue(this::armPicker);
         queue(() -> dragTiles(rx() + 2, ry() + 2, rx() + 9, ry() + 7));
