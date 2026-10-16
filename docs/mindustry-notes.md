@@ -114,8 +114,10 @@ return enabled;
 ```
 
 So for a `GenericCrafter`, `enabled && !shouldConsume()` means the output buffer cannot take another
-cycle, and nothing else. For any other block type the same expression only means "the block declined to
-consume", with a block-specific reason FactoryScope has not verified — it says so instead of guessing.
+cycle, and nothing else. For a block outside the modeled families the same expression only means "the block
+declined to consume", with a block-specific reason FactoryScope has not verified — it says so instead of
+guessing. The families FactoryScope does model, and the `shouldConsume()` override each one has, are in
+[production models beyond crafters](#production-models-beyond-crafters-v1607).
 
 ## Units
 
@@ -260,6 +262,65 @@ transfers energy conditionally according to the battery percentages/capacities o
 PowerScope keeps it as a separate conditional cross-grid relation and does not invent a transfer amount.
 
 See [PowerScope semantics](power-scope.md) and its real-engine battery tests before changing this adapter.
+
+## Production models beyond crafters (v160.7)
+
+Each family below was read in the v160.7 sources and is exercised against the running engine in
+`ProductionModelsTest`. The rule throughout is to read the value the engine already keeps for the block's own
+status bar rather than to recompute it, and to recompute only what the engine does not store.
+
+- **`Drill`** advances `progress += delta() * dominantItems * speed * warmup` with
+  `speed = lerp(1, liquidBoostIntensity, optionalEfficiency) * efficiency`, and `warmup` approaches `speed`. At
+  steady state the rate therefore scales with `speed²`: the declared boost is applied twice (the engine's own stat
+  shows `liquidBoostIntensity²`), and half power gives a quarter of the output. `lastDrillSpeed` holds the
+  per-tick rate before the time scale; the bar shows `lastDrillSpeed * 60 * timeScale`. `shouldConsume()` is
+  `items.total() < itemCapacity && enabled && dominantItem != null`. `dominantItem` is only recomputed in
+  `onProximityUpdate()`; ores excluded by `canMine()` (hardness above `tier`, or `blockedItems`) are what the
+  placement hint calls "requires a better drill".
+- **`BurstDrill`** has no warm-up in its rate: `lastDrillSpeed = speed * dominantItems / drillTime`, the boost
+  applies once, and `getDrillTime()` ignores hardness. It needs room for a whole burst:
+  `shouldConsume()` is `items.total() <= itemCapacity - dominantItems && enabled`, and it does **not** check
+  `dominantItem`, so "no ore" has to be read from `dominantItem` directly.
+- **`BeamDrill`** resolves its lasers and the walls they reach in `updateTile()`, so `lasers`, `facing` and
+  `facingAmount` are empty until the building's first update. Each laser yields one of its wall's `wallDrop()`
+  per cycle, all timed with `getDrillTime(lastItem)`, where `lastItem` is null when the walls differ.
+  `lastDrillSpeed` already includes the time scale, the booster and efficiency.
+- **`WallCrafter.getEfficiency()`** is package-private. Its geometry - the solid tiles along the front edge,
+  summing `attributes.get(attribute)` - is repeated read-only to obtain the nominal rate; `lastEfficiency`
+  (already scaled by boosters, time scale and efficiency) gives the current one as `lastEfficiency * 60 / drillTime`.
+  Its booster is linear, not squared.
+- **`Pump`** adds `min(liquidCapacity - stored, amount * pumpAmount * edelta())` per frame, where `amount` is the
+  sum of the pumpable tiles' `liquidMultiplier`. `shouldConsume()` is false once the tank is within 0.01 of full
+  or when `liquidDrop` is null. `SolidPump` and `Fracker` keep `lastPump` per tick; the bar shows `lastPump * 60`.
+- **`Separator`** advances by `getProgressIncrease(craftTime)` like a crafter, but each completed cycle offloads
+  one result chosen by `Mathf.randomSeed(seed++)` weighted by the result stack amounts. Only the expected share of
+  each result is knowable. `shouldConsume()` counts the shared buffer excluding the consumed input items.
+- **Generators** report `getPowerProduction() = powerProduction * productionEfficiency` per tick, which the
+  power graph integrates with `delta()`; the bar shows it times `60 * timeScale`. What drives
+  `productionEfficiency` differs: fuel quality (`efficiencyMultiplier`) for `ConsumeGenerator`, the rules' light
+  level for `SolarGenerator`, the heat attribute under a `ThermalGenerator`, stored fuel for `NuclearReactor`, the
+  fifth power of warm-up for `ImpactReactor`. A `ConsumeGenerator` consumes one item each time `generateTime`,
+  falling by `delta() / (itemDuration * itemDurationMultiplier)`, runs out. A `NuclearReactor` explodes at
+  `heat >= 0.999` and flashes its warning from `flashThreshold`; a `VariableReactor` explodes at
+  `instability >= 1`; a `ConsumeGenerator` with `explodeOnFull` explodes when its output tank fills.
+- **Unit blocks** advance `progress += edelta() * rules.unitBuildSpeed(team)` (an assembler also multiplies by
+  the share of drones whose `AssemblerAI.inPosition()` holds). A finished unit travels to the block edge, where
+  `moveOutPayload()` releases it once `payVector` is within 0.001 world units of that point.
+  `UnitPayload.dump()` refuses while `Units.canCreate(team, type)` is false, which is how the unit cap holds a
+  finished unit inside the factory. `UnitFactoryBuild.shouldConsume()` is false without a selected plan or while
+  a payload is held.
+- **Turrets.** `Turret.TurretBuild.hasAmmo()` has a side effect: when the top ammunition entry cannot fire a shot,
+  it swaps a usable entry to the top. FactoryScope never calls it and computes the same answer from the list;
+  pure overrides (`LiquidTurret`, `PowerTurret`, `ContinuousTurret`, `ContinuousLiquidTurret`) are called, and an
+  unknown override is not. `ItemTurret` holds ammunition in its `ammo` list, not in its item module, and declares
+  it with an anonymous `ConsumeItemFilter` whose `efficiency()` is a pure check of that list; the generic filter
+  reading (which looks at the item module) would report a loaded turret as empty, so the turret's own efficiency
+  is used. `LiquidTurret`'s ammunition filter overrides `update()` to drain nothing, so it is shown without a rate.
+  `TurretBuild.shouldConsume()` is `isShooting || reloadCounter < reload`: a loaded, reloaded turret with no target
+  declines to consume and has zero efficiency, which is a normal state rather than a fault.
+- **Arc collections hand out shared iterators.** `Seq.iterator()` and `ObjectMap.keys()` reuse iterator instances
+  owned by the collection, so a for-each over engine collections touches engine state and can break an iteration
+  already in progress. The models read engine `Seq`s by index and look up `ObjectMap` keys per content entry.
 
 ## Other useful engine behaviors
 

@@ -52,6 +52,11 @@ These terms describe FactoryScope's evidence, not additional Mindustry mechanics
 | Current demand | Текущая потребность | 当前需求 | 현재 전력 수요 | Demanda actual |
 | Generation | Генерация | 发电量 | 발전량 | Generación |
 | Satisfaction (power demand) | Покрытие потребности | 需求满足率 | 전력 수요 충족률 | Cobertura de la demanda |
+| Estimate (≈) | Оценка | 估计值 | 추정치 | Estimación |
+| Ammunition | Боеприпасы | 弹药 | 탄약 | Munición |
+| Unit cap | Лимит единиц | 单位上限 | 유닛 한도 | Límite de unidades |
+| Payload | Груз | 载荷 | 화물 | Carga |
+| Drill tier | Уровень бура | 钻头等级 | 드릴 등급 | Nivel del taladro |
 
 `FactoryScope`, `PowerScope`, and `LiquidScope` are product names and remain unchanged. `PowerGraph` is an engine identifier; explanatory text may describe it as the complete Mindustry power graph, but must not turn graph membership into a claim about per-wire power flow.
 
