@@ -24,21 +24,23 @@ public final class Diagnostics{
 
     /** Full sentence explaining the verdict, with the affected resources filled in. */
     public static String explanation(Finding finding){
-        String key = "diagnosis." + finding.reason.slug() + "." + finding.severity.name();
-        String text = finding.resources.isEmpty()
-            ? FsBundle.get(key)
-            : FsBundle.format(key, join(finding.resourceNames()));
+        String key = "diagnosis." + finding.reason.slug()
+            + (finding.variant == null ? "" : "." + finding.variant) + "." + finding.severity.name();
+        //sentences that name a subject always get one, so a gate with no resolvable subject never shows "{0}"
+        String text = FsBundle.format(key, finding.resources.isEmpty()
+            ? FsBundle.get("value.unknown") : join(finding.resourceNames()));
         return finding.certain ? text : FsBundle.format("diagnosis.uncertain", text);
     }
 
     public static Color color(DiagnosticReason reason){
         return switch(reason){
-            case active -> BlockStatus.active.color;
+            case active, turretIdle -> BlockStatus.active.color;
             case disabled, inoperableHere -> BlockStatus.logicDisable.color;
-            case outputBlocked -> BlockStatus.noOutput.color;
-            case missingItemInput, missingLiquidInput, insufficientPower,
-                 otherConsumerLimited, blockConditionLimited -> BlockStatus.noInput.color;
-            case notConsuming, haltedUnknownCause, limitedSupport -> BlockStatus.inactive.color;
+            case outputBlocked, unitCapReached -> BlockStatus.noOutput.color;
+            case missingItemInput, missingLiquidInput, missingPayloadInput, insufficientPower,
+                 otherConsumerLimited, blockConditionLimited, noResource, resourceTooHard,
+                 waitingForUnit, noAmmo -> BlockStatus.noInput.color;
+            case notConsuming, noPlanSelected, haltedUnknownCause, limitedSupport -> BlockStatus.inactive.color;
         };
     }
 

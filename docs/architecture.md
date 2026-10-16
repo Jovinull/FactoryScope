@@ -68,6 +68,26 @@ FactoryScopePanel            words, colours, icons
 values with names, and checked against fixtures, instead of against a live building whose fields change
 under the test.
 
+### Production models
+
+`MindustryFactoryProbe` reads consumers and power for every building, models conventional crafters itself, and
+hands every other building to `ProductionModels`, which dispatches by build class to the family models
+(`ExtractionModels`, `GeneratorModels`, `UnitModels`, `TurretModels`, and the separator). A model records, in the
+snapshot and still without Mindustry types:
+
+- the `ProductionFamily` it applied, which also makes the building's support full;
+- `OutputState`s for what the block produces - items, liquids, power or units - with current and nominal rates,
+  marked as estimates where the engine leaves the outcome to chance or to conditions the probe cannot observe;
+- at most one `ProductionGate`, a stopping condition verified against the family's own `shouldConsume()` or update
+  rules, with the resources it concerns;
+- `Fact`s, family-specific details carried as a bundle key plus a value and a format, never as text;
+- note keys explaining how to read the family's figures.
+
+`FactoryAnalyzer` turns a gate into its finding right after the enabled check, because each gate is a condition
+the engine tests before producing; a family can select its own sentence for a shared reason through a finding
+variant (no ore under a drill and no liquid under a pump are both "nothing to extract"). The panel renders facts
+and estimates from the snapshot alone, so it never reads a family rule twice.
+
 ## The area pipeline
 
 Area diagnostics adds a collection step at the front and an aggregation step at the back. The middle is

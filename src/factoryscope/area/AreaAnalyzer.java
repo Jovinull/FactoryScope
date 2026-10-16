@@ -46,7 +46,7 @@ public final class AreaAnalyzer{
 
         for(AreaEntry entry : entries){
             counts.merge(entry.status, 1, Integer::sum);
-            if(entry.support == SupportLevel.full) production++;
+            if(entry.withRates) production++;
             switch(entry.status.kind){
                 case problem -> problems++;
                 case informational -> informational++;

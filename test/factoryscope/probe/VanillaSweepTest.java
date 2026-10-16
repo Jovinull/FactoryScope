@@ -9,8 +9,11 @@ import mindustry.type.*;
 import mindustry.game.*;
 import mindustry.gen.*;
 import mindustry.world.*;
+import mindustry.world.blocks.defense.turrets.*;
 import mindustry.world.blocks.environment.*;
+import mindustry.world.blocks.power.*;
 import mindustry.world.blocks.production.*;
+import mindustry.world.blocks.units.*;
 import org.junit.jupiter.api.*;
 
 import java.util.*;
@@ -105,6 +108,12 @@ class VanillaSweepTest{
         if(build.power != null){
             text.append(" power=").append(build.power.status).append(" links=").append(build.power.links.size);
         }
+        //Turret.hasAmmo() reorders this list; inspection must never do that
+        if(build instanceof Turret.TurretBuild turret){
+            text.append(" ammo=");
+            for(int i = 0; i < turret.ammo.size; i++) text.append(turret.ammo.get(i).amount).append(',');
+            text.append(" reload=").append(turret.reloadCounter);
+        }
         return text.toString();
     }
 
@@ -141,6 +150,59 @@ class VanillaSweepTest{
         assertEquals(List.of(), problems, "crafters with an unusable production model");
     }
 
+    /**
+     * Every vanilla block of a modeled family gets its model, and every model's details can be printed.
+     * A family left unmodeled here would silently fall back to the limited diagnostics.
+     */
+    @Test
+    void everyProductionFamilyBlockIsModeled(){
+        List<String> problems = new ArrayList<>();
+        int modeled = 0;
+
+        for(Block block : placeable){
+            ProductionFamily expected = expectedFamily(block);
+            if(expected == ProductionFamily.none) continue;
+            Building build = tryPlace(block, problems);
+            if(build == null) continue;
+            modeled++;
+
+            FactorySnapshot snapshot = MindustryFactoryProbe.probe(build);
+            if(snapshot.family != expected){
+                problems.add(block.name + ": expected the " + expected + " model, got " + snapshot.family);
+            }
+            if(snapshot.support != SupportLevel.full){
+                problems.add(block.name + ": a modeled block should be fully supported");
+            }
+            for(Fact fact : snapshot.facts){
+                if(!fact.printable()) problems.add(block.name + ": detail " + fact + " cannot be printed");
+            }
+            for(OutputState output : snapshot.outputs){
+                if(output.estimate && expected != ProductionFamily.separator){
+                    problems.add(block.name + ": only a separator's outputs are estimates");
+                }
+            }
+        }
+
+        assertTrue(modeled >= 75, "expected the vanilla production families, found " + modeled);
+        assertEquals(List.of(), problems, "blocks of a modeled family without a usable model");
+    }
+
+    private static ProductionFamily expectedFamily(Block block){
+        if(block instanceof GenericCrafter) return ProductionFamily.crafter;
+        if(block instanceof Separator) return ProductionFamily.separator;
+        if(block instanceof Drill) return ProductionFamily.drill;
+        if(block instanceof BeamDrill) return ProductionFamily.beamDrill;
+        if(block instanceof WallCrafter) return ProductionFamily.wallCrafter;
+        if(block instanceof SolidPump) return ProductionFamily.solidPump;
+        if(block instanceof Pump) return ProductionFamily.pump;
+        if(block instanceof PowerGenerator) return ProductionFamily.generator;
+        if(block instanceof UnitFactory) return ProductionFamily.unitFactory;
+        if(block instanceof Reconstructor) return ProductionFamily.reconstructor;
+        if(block instanceof UnitAssembler) return ProductionFamily.unitAssembler;
+        if(block instanceof BaseTurret) return ProductionFamily.turret;
+        return ProductionFamily.none;
+    }
+
     private static void checkInvariants(Block block, FactorySnapshot snapshot,
                                         DiagnosticResult result, List<String> problems){
         for(OutputState output : snapshot.outputs){
@@ -158,9 +220,10 @@ class VanillaSweepTest{
                 problems.add(block.name + ": expected " + output.expectedPerSecond
                     + " exceeds theoretical " + output.theoreticalPerSecond + " without a boost");
             }
-            if(output.contentId == null){
+            //power is the one output with no content behind it
+            if(output.contentId == null && output.kind != ResourceKind.power){
                 problems.add(block.name + ": output " + output.name + " has no content id");
-            }else if(resolve(output.kind, output.contentId) == null){
+            }else if(output.contentId != null && resolve(output.kind, output.contentId) == null){
                 problems.add(block.name + ": output content id " + output.contentId + " does not resolve");
             }
         }
@@ -177,8 +240,11 @@ class VanillaSweepTest{
             }
         }
 
-        if(!(block instanceof GenericCrafter) && !snapshot.outputs.isEmpty()){
-            problems.add(block.name + ": invented a production model for a non-crafter");
+        if(!snapshot.family.modeled() && !snapshot.outputs.isEmpty()){
+            problems.add(block.name + ": reported rates without a production model");
+        }
+        if(snapshot.gate != ProductionGate.none && !snapshot.family.modeled()){
+            problems.add(block.name + ": claimed a verified gate without a production model");
         }
         if(result.reason() == DiagnosticReason.haltedUnknownCause && result.primary.certain){
             problems.add(block.name + ": stated an unestablished cause as fact");
@@ -221,9 +287,12 @@ class VanillaSweepTest{
     }
 
     private static UnlockableContent resolve(ResourceKind kind, String contentId){
+        if(contentId == null) return null;
         return switch(kind){
             case item -> content.item(contentId);
             case liquid -> content.liquid(contentId);
+            case unit -> content.unit(contentId);
+            case block -> content.block(contentId);
             default -> null;
         };
     }

@@ -18,8 +18,10 @@ does not change blocks, inventories, power, or the world.
 
 ## What it includes
 
-- **Building diagnostics** for operating state, recognized input shortages, output limits, and
-  supported production estimates.
+- **Building diagnostics** for operating state, recognized input shortages, output limits, and production
+  rates for crafters, drills, pumps and extractors, separators, generators and reactors, unit factories, and
+  turrets, each derived from the engine's own values and rules. What only an estimate can describe, such as a separator's
+  random output or a turret's fire while it has targets, is marked as an estimate.
 - **Area Diagnostics** to summarize selected friendly buildings and group their current findings.
 - **Network** to inspect supported, resource-aware item routes in a selected area.
 - **Supply Trace** to follow structural item routes to reachable producers, storage, boundaries, and

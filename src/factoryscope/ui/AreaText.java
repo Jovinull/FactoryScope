@@ -23,10 +23,11 @@ public final class AreaText{
     public static Color color(AreaStatus status){
         return switch(status){
             case operating -> BlockStatus.active.color;
-            case itemShortage, liquidShortage, powerLimited, otherLimitation -> BlockStatus.noInput.color;
-            case outputBlocked -> BlockStatus.noOutput.color;
+            case itemShortage, liquidShortage, powerLimited, otherLimitation,
+                 noResource, noAmmo, payloadShortage -> BlockStatus.noInput.color;
+            case outputBlocked, unitCapReached -> BlockStatus.noOutput.color;
             case disabled, inoperable -> BlockStatus.logicDisable.color;
-            case notConsuming, causeUnclear, limitedDiagnostics -> BlockStatus.inactive.color;
+            case notConsuming, notConfigured, causeUnclear, limitedDiagnostics -> BlockStatus.inactive.color;
         };
     }
 
@@ -55,7 +56,8 @@ public final class AreaText{
 
     private static boolean namesResource(DiagnosticReason reason){
         return switch(reason){
-            case missingItemInput, missingLiquidInput, outputBlocked, otherConsumerLimited -> true;
+            case missingItemInput, missingLiquidInput, missingPayloadInput, outputBlocked, otherConsumerLimited,
+                 resourceTooHard, unitCapReached -> true;
             default -> false;
         };
     }

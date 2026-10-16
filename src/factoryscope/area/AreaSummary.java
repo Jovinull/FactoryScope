@@ -14,7 +14,7 @@ public final class AreaSummary{
     public final int selected;
     /** Of those, the ones FactoryScope successfully probed and analysed. */
     public final int analyzed;
-    /** Of the analysed ones, the ones with a full production model - conventional crafting blocks. */
+    /** Of the analysed ones, the ones FactoryScope derived a production rate for. */
     public final int production;
     /** Analysed buildings with a problem, i.e. whose primary status is a {@link AreaStatus.Kind#problem}. */
     public final int problems;

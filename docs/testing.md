@@ -14,6 +14,23 @@ check the diagnosis and derived rates against the values the game itself compute
 placeable vanilla block and stand-ins for common modded block shapes, asserting nothing throws, no rate
 is unprintable, no cause is asserted without evidence, and that inspection never alters game state.
 
+`probe/ProductionModelsTest` covers the production models of non-crafter families against the real engine. Each
+current rate is checked against the value the engine computed for the block's own bar or power graph and against
+what the block actually produced while the simulation ran tick by tick: drills (including burst drills and plasma
+bores), cliff crushers, pumps and extractors, generators, unit factories. Separator estimates are checked as
+long-run shares over hundreds of real cycles. Verified stop conditions are exercised directly: no ore, ore and
+walls too hard for the tier, full buffers, no unit selected, the unit cap holding a finished unit, an empty
+reconstructor, a turret without ammunition, and a loaded turret with no target. A dedicated test proves that
+inspecting a turret never reorders its ammunition, which the engine's own `hasAmmo()` would do.
+`VanillaSweepTest` asserts that every placeable vanilla block of a modeled family receives its model with
+printable details, that only modeled families report rates or verified gates, and that turret ammunition order is
+part of the state inspection must leave untouched.
+
+`HeadlessGame.newWorld` starts each fixture with fresh team data, as `Logic.reset()` does for every map. The
+indexer creates a team's building quadtree once, with the bounds of the first world it sees, and only clears it on
+later loads; carrying team data over from a smaller fixture world silently drops buildings outside its bounds from
+area queries, which made the result depend on test order.
+
 For area diagnostics specifically:
 
 - `area/AreaSelectionTest` — tile arithmetic: the four drag directions normalising to one rectangle,
@@ -147,6 +164,12 @@ Area diagnostics adds, through the same dispatch:
 The suite drives the real overlay end to end. It does not call an internal "select this rectangle"
 method, for the same reason the single-building test does not call `inspect(building)`: that would skip
 the code most likely to be wrong.
+
+The production-model acceptance path opens the real single-building panel, through the same click dispatch,
+for a drill on sand, a separator, an unfuelled generator, a unit factory with and without a selected unit, and an
+empty and a loaded turret. It checks the model applied and that the status headline, sections, details and notes
+render in the active locale, and captures each panel. Every production-model string is also resolved and
+formatted in the active locale.
 
 The Supply Trace acceptance path uses the real building inspector, starts area selection from a missing
 item, follows Sand from a real Drill through three real conveyors to a Silicon Smelter, opens the

@@ -12,6 +12,19 @@ public final class FactorySnapshot{
     /** Localized block name. */
     public final String blockName;
     public final SupportLevel support;
+    /** Production model applied to this building; {@link ProductionFamily#none} when there is none. */
+    public final ProductionFamily family;
+    /**
+     * A stopping condition verified against the family's own rules, or {@link ProductionGate#none}.
+     * Only a modeled family sets one.
+     */
+    public final ProductionGate gate;
+    /** Resources the gate is about: the ore that is too hard, the ammunition a turret accepts, ... */
+    public final List<ResourceRef> gateResources;
+    /** Family-specific details, in display order. */
+    public final List<Fact> facts;
+    /** Bundle key suffixes of notes explaining how to read this family's figures. */
+    public final List<String> notes;
 
     /** {@code Building.enabled} - false when switched off, whether by a player, by logic, or by the game. */
     public final boolean enabled;
@@ -81,6 +94,11 @@ public final class FactorySnapshot{
     private FactorySnapshot(Builder b){
         this.blockName = b.blockName;
         this.support = b.support;
+        this.family = b.family;
+        this.gate = b.gate;
+        this.gateResources = List.copyOf(b.gateResources);
+        this.facts = List.copyOf(b.facts);
+        this.notes = List.copyOf(new LinkedHashSet<>(b.notes));
         this.enabled = b.enabled;
         this.updateAllowed = b.updateAllowed;
         this.efficiencyTracked = b.efficiencyTracked;
@@ -129,6 +147,13 @@ public final class FactorySnapshot{
         return support == SupportLevel.full && !outputs.isEmpty();
     }
 
+    /** Whether any rate or detail shown for this building is an estimate rather than an engine value. */
+    public boolean hasEstimates(){
+        for(OutputState output : outputs) if(output.estimate) return true;
+        for(Fact fact : facts) if(fact.estimate) return true;
+        return false;
+    }
+
     public static Builder builder(String blockName){
         return new Builder(blockName);
     }
@@ -136,6 +161,11 @@ public final class FactorySnapshot{
     public static final class Builder{
         private final String blockName;
         private SupportLevel support = SupportLevel.minimal;
+        private ProductionFamily family = ProductionFamily.none;
+        private ProductionGate gate = ProductionGate.none;
+        private final List<ResourceRef> gateResources = new ArrayList<>();
+        private final List<Fact> facts = new ArrayList<>();
+        private final List<String> notes = new ArrayList<>();
         private boolean enabled = true;
         private boolean updateAllowed = true;
         private boolean efficiencyTracked = true;
@@ -164,6 +194,38 @@ public final class FactorySnapshot{
 
         public Builder support(SupportLevel support){
             this.support = support;
+            return this;
+        }
+
+        /** Marks the building as covered by a production model, which also makes its support full. */
+        public Builder family(ProductionFamily family){
+            this.family = family;
+            if(family.modeled()) this.support = SupportLevel.full;
+            return this;
+        }
+
+        public ProductionFamily family(){
+            return family;
+        }
+
+        public Builder gate(ProductionGate gate, Collection<ResourceRef> resources){
+            this.gate = gate;
+            this.gateResources.clear();
+            this.gateResources.addAll(resources);
+            return this;
+        }
+
+        public Builder gate(ProductionGate gate){
+            return gate(gate, List.of());
+        }
+
+        public Builder fact(Fact fact){
+            if(fact != null) this.facts.add(fact);
+            return this;
+        }
+
+        public Builder note(String key){
+            this.notes.add(key);
             return this;
         }
 
@@ -221,6 +283,10 @@ public final class FactorySnapshot{
         public Builder outputBufferFull(boolean full){
             this.outputBufferFull = full;
             return this;
+        }
+
+        public boolean outputBufferFull(){
+            return outputBufferFull;
         }
 
         public Builder craftTimeSeconds(float seconds){
