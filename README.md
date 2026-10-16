@@ -55,9 +55,16 @@ These are unedited captures of FactoryScope's production UI in Mindustry v160.5.
 **Mod Browser:** search for FactoryScope and install it. The listing is generated from GitHub and may
 take a scheduled index refresh to reflect a new release.
 
+**Steam Workshop:** subscribe to
+[FactoryScope on the Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151)
+and start Mindustry from Steam. The Workshop item carries the unchanged 1.1.0 release.
+
 **GitHub Releases:** download [`FactoryScope.jar`](https://github.com/Jovinull/FactoryScope/releases/latest)
 and import it from Mindustry's Mods menu. This is the manual fallback if the browser listing has not
-updated yet. There is no Steam Workshop release at this time.
+updated yet.
+
+Install FactoryScope from only one of these sources. Every copy uses the mod name `factory-scope`, and
+Mindustry will not load a second mod with the same name.
 
 ## Use
 
