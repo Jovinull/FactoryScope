@@ -12,9 +12,14 @@
   and a loaded turret that is ready with no target.
 - Estimates are marked as such: a separator's per-item output and a turret's fire and ammunition use while firing.
 - Separators, plasma bores and cliff crushers are structural item producers in Network and Supply Trace.
+- Every remaining vanilla transport is modeled in Network, Supply Trace and LiquidScope: Duct Bridges, Unloaders and
+  Duct Unloaders, Plastanium and Surge Conveyors, Mass Drivers, Plated and Reinforced Conduits, Bridge and Phase
+  Conduits, and Reinforced Bridge Conduits. Each follows the engine's own link, acceptance and state rules and is
+  checked against the running engine. They are no longer reported as unsupported transport.
 
 ### Fixed
 
+- An unlinked item bridge was treated as able to dump toward a bridge linked into it, which the engine refuses.
 - A loaded item turret was reported as short of items, and an idle one as not consuming; its ammunition is now read
   from the turret itself, and inspection never reorders it.
 - A turret with no ammunition is counted once in Area Diagnostics, not once per accepted ammunition, and its

@@ -362,15 +362,15 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
-    void unloadersArePartialUntilTheirNeighborTransferRulesAreModeled(){
+    void anUnloaderWithNothingToUnloadIsModeledWithoutInventedRoutes(){
         Building unloader = place(Blocks.unloader, 10, 10, 0);
 
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
 
-        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
-        assertEquals(List.of(AreaProbe.refOf(unloader)), network.unsupportedTransport);
-        assertTrue(network.graph.ports.isEmpty());
-        assertTrue(network.graph.edges.isEmpty());
+        assertEquals(NetworkCompleteness.complete, network.completeness);
+        assertTrue(network.unsupportedTransport.isEmpty());
+        assertTrue(network.graph.ports.stream().allMatch(port -> port.building.equals(AreaProbe.refOf(unloader))));
+        assertTrue(network.graph.edges.isEmpty(), "with no neighbor to take from, the unloader has no route");
     }
 
     @Test
@@ -523,7 +523,7 @@ class MindustryNetworkProbeTest{
 
     @Test
     void anUnsupportedNeighborIsAnInterruptionRatherThanADeadEndOrGuessedEdge(){
-        Building unknown = place(Blocks.plastaniumConveyor, 10, 10, 0);
+        Building unknown = place(ModdedBlocks.unknownTransport, 10, 10, 0);
         Building inside = place(Blocks.conveyor, 11, 10, 0);
 
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(11, 10, 11, 10), Team.sharded);
@@ -623,15 +623,16 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
-    void ductBridgesArePartialUntilTheirRemoteIngressIsModeled(){
+    void ductBridgesAreModeledThroughTheirForwardLink(){
         Building source = place(Blocks.ductBridge, 8, 10, 0);
         Building target = place(Blocks.ductBridge, 12, 10, 0);
 
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 14, 12), Team.sharded);
 
-        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
-        assertEquals(Set.of(AreaProbe.refOf(source), AreaProbe.refOf(target)), new HashSet<>(network.unsupportedTransport));
-        assertTrue(network.graph.edges.isEmpty());
+        assertEquals(NetworkCompleteness.complete, network.completeness);
+        assertTrue(network.unsupportedTransport.isEmpty());
+        assertTrue(network.graph.edges.stream().anyMatch(edge -> edge.from.equals(output(AreaProbe.refOf(source), NetworkSide.east))
+            && edge.to.equals(input(AreaProbe.refOf(target), NetworkSide.west))));
     }
 
     @Test
@@ -736,12 +737,13 @@ class MindustryNetworkProbeTest{
     }
 
     @Test
-    void plastaniumConveyorsAreExplicitlyPartialUntilTheirBatchModesAreModeled(){
+    void plastaniumConveyorsAreModeledFromTheirEngineState(){
         Building conveyor = place(Blocks.plastaniumConveyor, 10, 10, 0);
         ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
 
-        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
-        assertEquals(List.of(AreaProbe.refOf(conveyor)), network.unsupportedTransport);
+        assertEquals(NetworkCompleteness.complete, network.completeness);
+        assertTrue(network.unsupportedTransport.isEmpty());
+        assertTrue(network.graph.ports.stream().anyMatch(port -> port.building.equals(AreaProbe.refOf(conveyor))));
     }
 
     @Test

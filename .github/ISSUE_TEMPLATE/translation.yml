@@ -1,0 +1,35 @@
+name: Translation problem
+description: Wrong, missing or awkward text in one of FactoryScope's languages.
+labels: ["translation"]
+body:
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - English
+        - Português (Brasil)
+        - Español
+        - Русский
+        - 简体中文
+        - 한국어
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where the text appears
+      description: The panel, button or message, ideally with a screenshot.
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current text
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested text
+      description: Optional. Keep game terms as the game itself translates them.
