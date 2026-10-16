@@ -17,7 +17,7 @@ public final class AcceptanceLauncher{
     private static final Pattern RESULT = Pattern.compile("(?m)^.*\\[HARNESS] RESULT (PASS|FAIL)\\s*$");
     private static final Pattern STEAM_LIBRARY = Pattern.compile("\\\"path\\\"\\s+\\\"([^\\\"]+)\\\"");
     private static final Pattern MOD_VERSION = Pattern.compile("(?m)^\\s*version\\s*:\\s*\"([^\"]+)\"");
-    private static final String GAME_VERSION = "160.5";
+    private static final String GAME_VERSION = "160.7";
     private static final String MOD_NAME = "factory-scope";
     private static final String HARNESS_NAME = "factory-scope-acceptance";
     private static final Map<String, String> ACCEPTANCE_LOCALES = Map.of(
@@ -65,7 +65,7 @@ public final class AcceptanceLauncher{
         // Mindustry reads this resource to detect Steam. Put the sandbox first on the classpath so a
         // Steam installation does not initialize Steamworks or import Workshop/user mods.
         Path version = sandbox.resolve("version.properties");
-        Files.writeString(version, "number=8\nbuild=160.5\nmodifier=release\ntype=official\ncommitHash=acceptance\n",
+        Files.writeString(version, "number=8\nbuild=" + GAME_VERSION + "\nmodifier=release\ntype=official\ncommitHash=acceptance\n",
             StandardCharsets.US_ASCII);
 
         List<String> command = client.command(sandbox, dataDirectory, options);
@@ -191,11 +191,11 @@ public final class AcceptanceLauncher{
             }
         }
         if(options.mindustryPath != null){
-            throw new IllegalArgumentException("No verifiable Mindustry v160.5 desktop jar was found in "
+            throw new IllegalArgumentException("No verifiable Mindustry v" + GAME_VERSION + " desktop jar was found in "
                 + options.mindustryPath.toAbsolutePath().normalize()
-                + ". Supply an official v160.5 desktop jar with -PmindustryJar or an install directory containing one.");
+                + ". Supply an official v" + GAME_VERSION + " desktop jar with -PmindustryJar or an install directory containing one.");
         }
-        throw new IllegalArgumentException("Mindustry v160.5 was not found. Pass -PmindustryJar=<verified desktop jar> or -PmindustryPath=<install directory with desktop jar>."
+        throw new IllegalArgumentException("Mindustry v" + GAME_VERSION + " was not found. Pass -PmindustryJar=<verified desktop jar> or -PmindustryPath=<install directory with desktop jar>."
             + (invalidClient == null ? "" : " Last candidate rejected: " + invalidClient));
     }
 

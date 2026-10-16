@@ -88,10 +88,11 @@ valid route or a proven dead end.
 
 ## Support and validation
 
-FactoryScope targets Mindustry v8 Build 160 (`minGameVersion: 160`); the real-client validation build
-is v160.5. The [support matrix](docs/support-matrix.md) lists modeled, partial, and deferred transport
-families. Common conveyor/conduit routes, junctions, routers, sorters, configured item bridges, and
-the v160.5 Armored Conveyor/Armored Duct insertion rules are modeled. Stateful stack transports,
+FactoryScope targets Mindustry v8 Build 160 (`minGameVersion: 160`). The published 1.1.0 artifact
+was validated in the real client against v160.5 and, unchanged, against v160.7, the current
+validation build. The [support matrix](docs/support-matrix.md) lists modeled, partial, and deferred
+transport families. Common conveyor/conduit routes, junctions, routers, sorters, configured item
+bridges, and the Armored Conveyor/Armored Duct insertion rules are modeled. Stateful stack transports,
 unloaders, Duct Bridges, Mass Drivers, armored conduits, and liquid bridges remain partial; unknown
 custom routing stays conservative.
 
@@ -116,7 +117,7 @@ gradlew.bat acceptanceTest                                                      
 ./gradlew acceptanceTest                                                        # Linux/macOS
 ```
 
-`acceptanceTest` launches a real Mindustry v160.5 desktop client in an isolated sandbox. For an
+`acceptanceTest` launches a real Mindustry v160.7 desktop client in an isolated sandbox. For an
 explicit client and artifact:
 
 ```text
