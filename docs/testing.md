@@ -53,6 +53,13 @@ unsupported transport, Junction channels and cycle termination. `probe/Mindustry
 places a real Mindustry drill, conveyor and crafter to verify that a mined item can be traced as a
 structural product without inventing a production rate. It also covers a non-crafter item consumer, a
 multi-output AttributeCrafter's exact product constraints, and a producer outside the selected area.
+
+`probe/TransportFamiliesTest` checks every transport family modeled from engine link and state rules (Duct
+Bridges, Unloaders and Duct Unloaders, Plastanium and Surge Conveyors, Mass Drivers, Bridge and Phase
+Conduits, Reinforced Bridge Conduits, and armored conduits) twice: the topology says where a resource can go,
+then the engine runs (`HeadlessGame.run` updates power graphs, buildings and bullets) and must deliver there
+and nowhere the topology rules out. Acceptance rules are also compared with the engine's own `acceptItem` and
+`acceptLiquid` for every side and rotation.
 Trace regressions cover local completeness when unrelated transport/diagnostic probes are skipped,
 separate no-endpoint versus no-route findings, multiple producer/dead-end branches, and output boundary
 and dead-end wording. An even-sized skipped multiblock fixture checks terminal adjacency against
@@ -71,7 +78,7 @@ Refresh and the electrical-connection overlay.
 LiquidScope has pure tests in `liquid/LiquidTraceAnalyzerTest` and real v160.7 transport fixtures in
 `probe/MindustryLiquidProbeTest`. They cover Conduit side acceptance/output direction, content-independent
 topology, Liquid Junction channel isolation (including real straight-through movement), router branches,
-Liquid Bridge interruption behavior and a real remote-transfer/local-routing differential, directed
+Liquid Bridge link and dump sides with a real remote-transfer/local-routing differential, directed
 multi-liquid crafter outputs, filter accepted sets, dynamic requirement refresh, placed pump products,
 SolidPump products before first update, multi-liquid module snapshots, gas resource identity, and unsupported
 transport adjacent to a consumer. Production topology is separately audited to ensure it never calls runtime
@@ -84,7 +91,11 @@ bridge configuration and dynamic requirements is not separately validated.
 The LiquidScope acceptance path enters from a missing liquid in the single-building panel, selects an explicit
 area, follows Water to a real pump through a conduit, opens pump diagnostics, returns, refreshes, and uses the
 Area Diagnostics Liquids filter/Trace controls. It also checks the structural-only wording, high-scale layout,
-and every liquid-specific locale key. The complete real UI acceptance suite is run in every supported locale:
+and every liquid-specific locale key. Two scenarios trace through the linked and unloading transports: sand
+from a container through an Unloader and a pair of Duct Bridges, and water from a pump through a pair of
+Bridge Conduits and a Plated Conduit. Every vanilla transport is modeled, so the unsupported-transport
+scenarios use the sandbox Item and Liquid Sources, the vanilla blocks still outside the transport models.
+The complete real UI acceptance suite is run in every supported locale:
 English, Brazilian Portuguese, Russian, Simplified Chinese, Korean, and Spanish.
 
 ## 2. Acceptance suite
