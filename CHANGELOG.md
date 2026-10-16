@@ -17,6 +17,15 @@
 
 - A loaded item turret was reported as short of items, and an idle one as not consuming; its ammunition is now read
   from the turret itself, and inspection never reorders it.
+- A turret with no ammunition is counted once in Area Diagnostics, not once per accepted ammunition, and its
+  ammunition is no longer repeated as an item shortage.
+
+### Validation
+
+- Multiplayer: a new acceptance run joins an isolated official v160.7 dedicated server from an isolated official
+  client and checks that building diagnostics, Area Diagnostics, Network, Supply Trace, PowerScope, LiquidScope,
+  Inspect, and Locate give on the client what FactoryScope computes on the server, and that enemy buildings hidden
+  by fog stay out of reach although the client holds their synced state.
 
 ### Changed
 

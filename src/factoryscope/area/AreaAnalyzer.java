@@ -70,7 +70,7 @@ public final class AreaAnalyzer{
                 //a normal finding is not a problem; reporting it as one is how a report starts crying wolf
                 if(finding.severity == Severity.normal) continue;
 
-                if(finding.resources.isEmpty()){
+                if(finding.resources.isEmpty() || finding.reason.resourcesAreAlternatives()){
                     add(builders, new AreaIssue(finding.reason, null), finding, entry.ref);
                 }else{
                     for(ResourceRef resource : finding.resources){

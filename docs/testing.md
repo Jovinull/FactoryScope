@@ -77,8 +77,9 @@ SolidPump products before first update, multi-liquid module snapshots, gas resou
 transport adjacent to a consumer. Production topology is separately audited to ensure it never calls runtime
 `acceptLiquid()` to decide structural reachability.
 
-Remote multiplayer replication of liquid buffers, bridge configuration, and dynamic requirements has not been
-validated. LiquidScope reports the local client snapshot and applies the normal team/fog visibility checks.
+LiquidScope reports the local client snapshot and applies the normal team/fog visibility checks. The multiplayer
+acceptance run compares a client's water trace and shortage with the dedicated server's; replication of liquid
+bridge configuration and dynamic requirements is not separately validated.
 
 The LiquidScope acceptance path enters from a missing liquid in the single-building panel, selects an explicit
 area, follows Water to a real pump through a conduit, opens pump diagnostics, returns, refreshes, and uses the
@@ -201,6 +202,43 @@ after its preceding UI scenarios.
 The small `scripts/acceptance-test.ps1` remains only as a Windows compatibility wrapper around the same
 Gradle task. The launcher/path test runs in Windows, Linux, and macOS CI; the real graphical client has
 been exercised end to end on Windows, not claimed for platforms where it has not been run.
+
+### Multiplayer acceptance
+
+```
+./gradlew multiplayerAcceptanceTest -PserverJar="/games/server-release.jar" -PmindustryJar="/games/Mindustry.jar"
+```
+
+Needs the official v160.7 dedicated server (`server-release.jar` from the Mindustry release) besides the
+desktop client; the launcher refuses any other server build. It starts the server in its own sandbox with
+FactoryScope and `FactoryScopeMultiplayerFixture.jar`, a development-only server mod from
+`multiplayer/fixture`. The fixture builds a 160×160 world with fog of war and static fog: the player team's
+core, a running and a starved silicon smelter, an unpowered laser drill feeding the starved one, a kiln on a
+grid with only an unfuelled generator, a cryofluid mixer fed by an unpowered rotary pump, a loaded duo, a
+ground factory with no plan, one enemy kiln inside the team's vision, and one enemy smelter far outside it.
+The client then starts in its own sandbox with FactoryScope and the harness, joins over the loopback
+interface, and drives the real UI as in the single-player suite.
+
+The comparison is against the server, not against expected strings. On request, the server computes a
+digest of FactoryScope's result for every fixture building and for the area report (entries, power grids,
+the sand trace and the water trace) from its own authoritative state, and sends it in a custom packet; the
+client computes the same digest from what it was sent and fails on any difference. The run checks:
+
+- every fixture building's panel through a real click, with the server's family, verdict, severity, stop
+  condition, efficiency, power satisfaction, and rates;
+- Area Diagnostics, Network, Supply Trace from the starved smelter to the laser drill, PowerScope for the
+  kiln's grid, and LiquidScope from the mixer to the pump;
+- Inspect and Locate/Return from an area report;
+- team and fog visibility: the visible enemy building is left out of the area report and its power grids,
+  and the hidden one cannot be inspected.
+
+A vanilla server sends the synced state of every team's buildings to every client, fog or not (only units
+are filtered by fog), so the client does hold the hidden enemy smelter and its items. The run asserts that,
+and that FactoryScope refuses to show it: Mindustry reports the building in fog for the player's team, and
+neither the panel nor any report includes it. The same `-PmodJar`, `-PharnessJar`, `-Plocale`,
+`-Pcapture`, `-PkeepSandbox`, and `-PtimeoutSeconds` properties apply; `-PfixtureJar` selects a prebuilt
+fixture. One client on one machine is covered; latency, packet loss, several clients, and a client on the
+enemy team are not.
 
 ## 3. Load smoke test
 

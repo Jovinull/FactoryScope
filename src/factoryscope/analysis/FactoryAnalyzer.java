@@ -86,7 +86,10 @@ public final class FactoryAnalyzer{
     private static void addInputFindings(FactorySnapshot s, List<Finding> findings){
         if(s.consumersBypassed) return;
 
-        List<ResourceState> mandatory = s.mandatoryInputs();
+        List<ResourceState> mandatory = new ArrayList<>(s.mandatoryInputs());
+        //a turret's ammunition is declared as an input; when the ammunition gate already explains the
+        //state, the same shortage is not repeated as an input finding
+        if(s.gate == ProductionGate.noAmmo) mandatory.removeIf(input -> isAmmunition(s, input));
         if(mandatory.isEmpty()) return;
 
         float min = 1f;
@@ -158,6 +161,11 @@ public final class FactoryAnalyzer{
             case power -> DiagnosticReason.insufficientPower;
             case other -> DiagnosticReason.otherConsumerLimited;
         };
+    }
+
+    private static boolean isAmmunition(FactorySnapshot s, ResourceState input){
+        if(input.kind != ResourceKind.item && input.kind != ResourceKind.liquid) return false;
+        return input.contentId == null || s.gateResources.contains(input.ref());
     }
 
     private static Finding gateFinding(FactorySnapshot s){
