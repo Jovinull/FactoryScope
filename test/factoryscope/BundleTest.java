@@ -74,6 +74,24 @@ class BundleTest{
         assertEquals(List.of(), missing, "reachable diagnoses with no sentence to show");
     }
 
+    /** A finding carrying a family variant selects its own sentence, so each variant needs one too. */
+    @Test
+    void everyFamilyVariantHasItsOwnExplanation(){
+        List<String> missing = new ArrayList<>();
+
+        for(DiagnosticReason reason : DiagnosticReason.values()){
+            for(String variant : reason.variants()){
+                for(Severity severity : Severity.values()){
+                    if(!reachable(reason, severity)) continue;
+                    String key = FsBundle.PREFIX + "diagnosis." + reason.slug() + "." + variant + "." + severity.name();
+                    if(!bundle.containsKey(key)) missing.add(key);
+                }
+            }
+        }
+
+        assertEquals(List.of(), missing, "family wordings with no sentence to show");
+    }
+
     @Test
     void everyAreaStatusHasALabel(){
         for(AreaStatus status : AreaStatus.values()){
@@ -304,13 +322,15 @@ class BundleTest{
 
     /** An issue group only ever comes from a finding that is not {@link Severity#normal}. */
     private static boolean canBecomeAnIssue(DiagnosticReason reason){
-        return reason != DiagnosticReason.active && reason != DiagnosticReason.limitedSupport;
+        return reason != DiagnosticReason.active && reason != DiagnosticReason.limitedSupport
+            && reason != DiagnosticReason.turretIdle;
     }
 
     /** Mirrors {@code AreaText.namesResource}. */
     private static boolean namesResource(DiagnosticReason reason){
         return switch(reason){
-            case missingItemInput, missingLiquidInput, outputBlocked, otherConsumerLimited -> true;
+            case missingItemInput, missingLiquidInput, missingPayloadInput, outputBlocked, otherConsumerLimited,
+                 resourceTooHard, unitCapReached -> true;
             default -> false;
         };
     }
@@ -318,8 +338,9 @@ class BundleTest{
     /** Mirrors what {@link FactoryAnalyzer} can actually emit; see the severity it assigns per reason. */
     private static boolean reachable(DiagnosticReason reason, Severity severity){
         return switch(reason){
-            case active, limitedSupport -> severity == Severity.normal;
-            case disabled, inoperableHere, outputBlocked, notConsuming -> severity == Severity.stopped;
+            case active, limitedSupport, turretIdle -> severity == Severity.normal;
+            case disabled, inoperableHere, outputBlocked, notConsuming, noResource, resourceTooHard,
+                 noPlanSelected, unitCapReached, waitingForUnit, noAmmo -> severity == Severity.stopped;
             default -> severity != Severity.normal;
         };
     }
