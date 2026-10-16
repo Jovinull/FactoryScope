@@ -267,8 +267,8 @@ resource sets where those sets can be enumerated. Current positive liquid-module
 as immutable `StoredLiquidState` values; `LiquidModule.current()` is not treated as a full inventory. Gases are
 Mindustry `Liquid` content and use the same identity and route model.
 
-Armored Conduits, Liquid Bridges, Direction Liquid Bridges, unknown modded liquid transports, and unreadable
-dynamic requirements remain partial evidence. An unsupported neighbor or area boundary is not turned into a dead end or a no-route
+Armored Conduits, Liquid Bridges and Direction Liquid Bridges are modeled from their engine acceptance and link
+rules. Unknown modded liquid transports and unreadable dynamic requirements remain partial evidence. An unsupported neighbor or area boundary is not turned into a dead end or a no-route
 conclusion. Liquid Trace uses iterative, resource-aware port traversal and one deterministic representative
 path per endpoint. Like item Supply Trace, it says only that a route is structurally possible; it does not
 observe liquid movement, pressure, per-pipe throughput, quantitative sufficiency, or cause. The engine's

@@ -12,7 +12,7 @@ engine oracle in tests, but their current result is not a static topology query.
 | Conduit | Any of the three non-front sides may enter; output is front-only | Supported | `acceptLiquid` also checks the current buffer, so only its directional side rule is used for topology |
 | Liquid Junction and Reinforced Liquid Junction | Independent straight-through N–S and E–W channels | Supported | Both vanilla blocks use Mindustry's `LiquidJunction`; `getLiquidDestination` preserves the incoming direction, and disabled runtime state is not structural topology |
 | Liquid Router/Container/Tank and reinforced variants | All-side storage/router; structurally connect each distinct input/output side | Supported | These vanilla blocks use `LiquidRouter`; current contents affect acceptance and dumping, not the persistent set of possible routes |
-| Liquid Bridge | Not approximated as a router or simple remote edge | Partial / interruption | `ItemBridgeBuild.updateTile()` chooses remote `updateTransport()` for a valid configured link and local `doDump()` only when the link is invalid; input/output sides also depend on that link and registered incoming bridges |
+| Liquid Bridge | Linked: every side but the link's accepts, everything goes to the link. Unlinked: only bridges linked into it deliver, and it dumps to every side they do not arrive from | Supported | `ItemBridgeBuild.updateTile()` chooses remote `updateTransport()` for a valid configured link and local `doDump()` only when the link is invalid; `checkAccept` and `checkDump` give the sides |
 | GenericCrafter liquid output | One resource-specific output route for each declared `LiquidStack`, using that stack's `liquidOutputDirections` after rotation; `-1` means unrestricted dump sides | Supported | `dumpOutputs` passes each product's own direction to `dumpLiquid` |
 | Mechanical/Rotary/Impulse/Reinforced Pump | Product from the live placement's `liquidDrop`; external output may dump on neighboring sides | Supported | These vanilla blocks use `Pump`; floor/footprint state is placement-specific and is read at Refresh |
 | SolidPump / Fracker | Product from configured `result`; inherits Pump's liquid routing | Supported | `SolidPumpBuild.updateTile()` assigns `liquidDrop = result` and uses Pump's dump behavior; the configured product is available before its first update, and Fracker remains a SolidPump output family |
@@ -20,8 +20,8 @@ engine oracle in tests, but their current result is not a static topology query.
 | Exact `ConsumeLiquid` / `ConsumeLiquids` | Declared resource identities, one requirement per declared liquid | Supported | Consumer stacks are static block metadata |
 | `ConsumeLiquidFilter` / coolant filter | Enumerate the filter's accepted content set, preserving each `Liquid` identity | Supported when enumerable | Current `getConsumed` is only a buffer choice and cannot define all structural choices; conventional consumers without liquid-output behavior are terminal input endpoints |
 | `ConsumeLiquidsDynamic` | Evaluate the current building-specific `LiquidStack[]` on each Refresh | Supported when evaluation succeeds | Dynamic requirements are a snapshot fact, not a permanently cached block property |
-| Plated/Reinforced Conduit (`ArmoredConduit`) | Not approximated as Conduit | Partial / interruption | Acceptance depends on source class/alignment and armored-blending rules |
-| Reinforced Bridge Conduit (`DirectionLiquidBridge`) | Not approximated as LiquidBridge | Partial / interruption | It uses forward link search, per-direction occupancy, and a local forward fallback when unlinked |
+| Plated/Reinforced Conduit (`ArmoredConduit`) | Conduit route; a neighbor beside its back may be anything, elsewhere only a Conduit, Liquid Junction or Direction Liquid Bridge | Supported | `ArmoredConduitBuild.acceptLiquid` adds that source rule to the conduit's; its proximity exception only admits sources that are not adjacent, such as a bridge link |
+| Reinforced Bridge Conduit (`DirectionLiquidBridge`) | Forward link; no input from the front or from a side a linked bridge arrives from; unlinked, only linked bridges deliver and it moves liquid forward | Supported | `findLink()` searches forward; `acceptLiquid` refuses an unlinked bridge's neighbors and the `occupied` sides |
 | Unknown/modded liquid transport | No guessed internal route | Partial / interruption | A custom runtime Build class is not traversed; liquid capabilities alone do not establish transport semantics |
 
 Liquids and gases both use Mindustry's `Liquid` content type. Resource identity is the content identity,
@@ -55,12 +55,11 @@ distribution guarantee.
 
 LiquidBridge is ItemBridge-backed and does not have stable all-side router semantics. With a valid link,
 `updateTile()` uses the remote transport path; when that link is invalid, it uses local dumping instead.
-Its local input and output eligibility also depend on the configured direction and `incoming` links.
-LiquidScope therefore marks the family partial and emits a navigable interruption instead of inventing
-local router branches or treating a remote link as a complete port model. DirectionLiquidBridge is different: it searches forward for a
-matching directional bridge, records occupied entry directions, and falls back to front movement when
-there is no remote link. Until those rules are represented and tested as distinct states, it remains an
-explicit partial interruption.
+Its local input and output eligibility also depend on the configured direction and `incoming` links, and
+LiquidScope models both states that way rather than as a router. DirectionLiquidBridge is different: it
+searches forward for a matching directional bridge, refuses the entry directions occupied by bridges linked
+into it, and falls back to front movement when there is no remote link. Both are checked against the running
+engine in `TransportFamiliesTest`.
 
 ## Stored liquid and flow tracking
 

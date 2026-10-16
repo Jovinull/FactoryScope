@@ -101,9 +101,9 @@ FactoryScope targets Mindustry v8 Build 160 (`minGameVersion: 160`). The publish
 was validated in the real client against v160.5 and, unchanged, against v160.7, the current
 validation build. The [support matrix](docs/support-matrix.md) lists modeled, partial, and deferred
 transport families. Common conveyor/conduit routes, junctions, routers, sorters, configured item
-bridges, and the Armored Conveyor/Armored Duct insertion rules are modeled. Stateful stack transports,
-unloaders, Duct Bridges, Mass Drivers, armored conduits, and liquid bridges remain partial; unknown
-custom routing stays conservative.
+bridges, and the Armored Conveyor/Armored Duct insertion rules are modeled, and so are every other vanilla
+item and liquid transport: Plastanium and Surge Conveyors, Duct Bridges, Unloaders and Duct Unloaders, Mass
+Drivers, armored conduits, and liquid bridges. Unknown custom routing stays conservative.
 
 Desktop graphical acceptance has been performed on Windows. Launcher/path tests run on Windows,
 Linux, and macOS; that is not graphical validation on those platforms. The universal JAR contains a
