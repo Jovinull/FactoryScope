@@ -165,6 +165,8 @@ public class AcceptanceHarness extends Mod{
             check("a wall is given no production model", snapshot.outputs.isEmpty());
         });
 
+        productionModelScenarios();
+
         scenario("a destroyed target is released while the panel is open");
         queue(this::closeAnyDialog);
         queue(() -> target = place(Blocks.kiln, tileX() + 8, tileY() + 4));
@@ -192,6 +194,7 @@ public class AcceptanceHarness extends Mod{
         layout(720, 1280, 2f);
         queue(this::restoreLayout);
         queue(this::checkLocalization);
+        queue(this::checkProductionLocalization);
 
         scenario("a world change clears the panel");
         queue(this::closeAnyDialog);
@@ -741,6 +744,118 @@ public class AcceptanceHarness extends Mod{
         //format() resolves through I18NBundle.get(), which renders an absent key as ???key???
         String absent = FsBundle.format("definitely.not.a.key", 1);
         check("an absent key never leaks ??? into the panel", !absent.contains("???"), absent);
+    }
+
+    /**
+     * Opens the single-building panel of one block per production family through the real click path and
+     * checks what the panel renders: the model applied, the status headline, and the sections, details and
+     * notes that family adds. Every expected string is looked up in the active locale, so the same checks
+     * prove the translated panel in each acceptance run.
+     */
+    void productionModelScenarios(){
+        productionPanel("a drill on sand shows its mining model", () -> {
+            int x = tileX() - 8, y = tileY() + 6;
+            for(int dx = -1; dx <= 2; dx++){
+                for(int dy = -1; dy <= 2; dy++){
+                    Tile tile = world.tile(x + dx, y + dy);
+                    if(tile == null) continue;
+                    if(tile.block() != Blocks.air) tile.remove();
+                    tile.setFloor((Floor)Blocks.sand);
+                }
+            }
+            return place(Blocks.mechanicalDrill, x, y);
+        }, ProductionFamily.drill, null, "production-drill",
+            "section.production", "section.details", "fact.ore", "fact.ore-tiles", "fact.drill-tier");
+
+        productionPanel("random separator outputs are shown as estimates", () -> place(Blocks.separator, tileX() - 4, tileY() + 6),
+            ProductionFamily.separator, "status.missing-liquid-input", "production-separator",
+            "section.production", "panel.estimate-note", "note.separator-random");
+
+        productionPanel("an unfuelled generator shows its power model and fuel shortage",
+            () -> place(Blocks.combustionGenerator, tileX(), tileY() + 6),
+            ProductionFamily.generator, "status.missing-item-input", "production-generator",
+            "section.production", "section.details", "fact.production-efficiency", "fact.fuel-use");
+
+        productionPanel("a unit factory with nothing selected says so", () -> {
+            Building factory = place(Blocks.groundFactory, tileX() + 5, tileY() + 7);
+            ((mindustry.world.blocks.units.UnitFactory.UnitFactoryBuild)factory).currentPlan = -1;
+            return factory;
+        }, ProductionFamily.unitFactory, "status.no-plan-selected", "production-unit-factory-empty");
+
+        productionPanel("a unit factory shows the unit it builds", () -> {
+            Building factory = place(Blocks.groundFactory, tileX() + 5, tileY() + 7);
+            ((mindustry.world.blocks.units.UnitFactory.UnitFactoryBuild)factory).currentPlan = 0;
+            return factory;
+        }, ProductionFamily.unitFactory, "status.missing-item-input", "production-unit-factory",
+            "section.production", "section.details", "fact.unit", "fact.progress");
+
+        productionPanel("an empty turret has no ammunition", () -> place(Blocks.duo, tileX() + 9, tileY() + 6),
+            ProductionFamily.turret, "status.no-ammo", "production-turret-empty",
+            "section.details", "fact.ammo", "note.turret-estimates");
+
+        productionPanel("a loaded turret without a target is ready", () -> {
+            Building duo = place(Blocks.duo, tileX() + 9, tileY() + 6);
+            duo.handleItem(null, Items.copper);
+            return duo;
+        }, ProductionFamily.turret, "status.turret-idle", "production-turret-idle",
+            "fact.ammo-type", "fact.fire-rate", "fact.ammo-use", "panel.estimate-note");
+    }
+
+    void productionPanel(String name, arc.func.Prov<Building> placer, ProductionFamily family, String statusKey,
+                         String shot, String... shownKeys){
+        scenario(name);
+        queue(this::closeAnyDialog);
+        queue(() -> target = placer.get());
+        queue(this::clickToggleButton);
+        queue(() -> clickBuilding(target));
+        queue(() -> {
+            check("the panel opened for it", FactoryScopeUI.inspected() == target);
+            FactorySnapshot snapshot = MindustryFactoryProbe.probe(target);
+            check("FactoryScope applies the " + family + " model", snapshot.family == family, String.valueOf(snapshot.family));
+            if(statusKey != null){
+                check("the panel headline reads " + statusKey, dialogShows(FsBundle.get(statusKey)), FsBundle.get(statusKey));
+            }
+            for(String key : shownKeys){
+                check("the panel shows " + key, dialogShows(FsBundle.get(key)), FsBundle.get(key));
+            }
+            check("the panel does not call a modeled block limited", !dialogShows(FsBundle.get("panel.limited-support")));
+        });
+        queue(() -> capture(shot));
+        queue(this::closeAnyDialog);
+    }
+
+    void checkProductionLocalization(){
+        scenarioNow("every production-model string resolves in the active locale");
+        String[] keys = {
+            "status.no-resource", "status.resource-too-hard", "status.no-plan-selected", "status.unit-cap-reached",
+            "status.waiting-for-unit", "status.no-ammo", "status.missing-payload-input", "status.turret-idle",
+            "diagnosis.no-resource.stopped", "diagnosis.no-resource.drill.stopped", "diagnosis.no-resource.beam-drill.stopped",
+            "diagnosis.no-resource.wall-crafter.stopped", "diagnosis.no-resource.pump.stopped", "diagnosis.no-plan-selected.stopped",
+            "diagnosis.turret-idle.normal", "section.details", "value.yes", "value.unknown", "panel.estimate-note",
+            "note.separator-random", "note.turret-estimates", "note.reactor-heat", "note.impact-warmup", "note.flux-reactor",
+            "note.explodes-when-full", "fact.drill-tier", "fact.ore", "fact.ore-tiles", "fact.ore-walls", "fact.max-boost",
+            "fact.warmup", "fact.wall-yield", "fact.tile-yield", "fact.ground-yield", "fact.production-efficiency",
+            "fact.heat-output", "fact.light", "fact.heat-yield", "fact.fuel-fullness", "fact.reactor-heat", "fact.heat-input",
+            "fact.instability", "fact.fuel-use", "fact.output-tank", "fact.unit", "fact.unit-input", "fact.progress",
+            "fact.unit-count", "fact.drones-ready", "fact.reload", "fact.ammo", "fact.ammo-type", "fact.fire-rate",
+            "fact.ammo-use", "fact.engaging", "area.status.no-resource", "area.status.no-ammo", "area.status.unit-cap-reached",
+            "area.status.payload-shortage", "area.status.not-configured", "area.issue.no-resource", "area.issue.no-ammo"
+        };
+        for(String key : keys){
+            String text = FsBundle.get(key);
+            check(key + " resolves", !text.startsWith(FsBundle.PREFIX) && !text.contains("???"), text);
+        }
+        String[] formatted = {
+            "diagnosis.resource-too-hard.drill.stopped", "diagnosis.resource-too-hard.beam-drill.stopped",
+            "diagnosis.unit-cap-reached.stopped", "diagnosis.waiting-for-unit.stopped", "diagnosis.no-ammo.stopped",
+            "diagnosis.missing-payload-input.stopped", "value.power-rate-pair", "value.rate-per-minute", "value.estimate",
+            "value.items-per-second", "value.liquid-per-second", "value.times-per-second", "value.heat",
+            "area.issue.resource-too-hard.resource", "area.issue.unit-cap-reached.resource"
+        };
+        for(String key : formatted){
+            String text = FsBundle.format(key, "SENTINEL", "SENTINEL2");
+            check(key + " formats its subject", text.contains("SENTINEL") && !text.contains("{"), text);
+        }
     }
 
     void checkRequestedLocaleResolution(){
@@ -2812,7 +2927,9 @@ public class AcceptanceHarness extends Mod{
             "area.only-limited");
         for(AreaStatus status : AreaStatus.values()) keys.add("area.status." + status.slug());
         for(DiagnosticReason reason : DiagnosticReason.values()){
-            if(reason == DiagnosticReason.active || reason == DiagnosticReason.limitedSupport) continue;
+            //normal findings never form an issue group, so these reasons have no issue headline
+            if(reason == DiagnosticReason.active || reason == DiagnosticReason.limitedSupport
+                || reason == DiagnosticReason.turretIdle) continue;
             keys.add("area.issue." + reason.slug());
         }
 
