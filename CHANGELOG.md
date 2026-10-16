@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Production models for drills, burst drills, plasma bores, cliff crushers, pumps, water and oil extractors,
+  separators, generators and reactors, unit factories, reconstructors, unit assemblers, and turrets: current and
+  nominal rates derived from the engine's own values and rules, verified stop conditions, and family-specific details.
+- New verdicts: nothing to extract, ore or walls too hard for the drill (named), no unit selected, unit cap reached,
+  waiting for a unit to upgrade (accepted units named), no ammunition (accepted ammunition named), payload shortage,
+  and a loaded turret that is ready with no target.
+- Estimates are marked as such: a separator's per-item output and a turret's fire and ammunition use while firing.
+- Separators, plasma bores and cliff crushers are structural item producers in Network and Supply Trace.
+
+### Fixed
+
+- A loaded item turret was reported as short of items, and an idle one as not consuming; its ammunition is now read
+  from the turret itself, and inspection never reorders it.
+
+### Changed
+
+- The "with production rates" count in Area Diagnostics now counts every building with a derived rate.
+
 ## 1.1.0
 
 ### Post-release validation
