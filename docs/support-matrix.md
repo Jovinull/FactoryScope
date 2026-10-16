@@ -1,6 +1,11 @@
-# FactoryScope support matrix — Mindustry v160.5
+# FactoryScope support matrix — Mindustry v160.5 to v160.7
 
 This inventory is checked against the vanilla content declarations in [Mindustry v160.5 `Blocks.java`](https://github.com/Anuken/Mindustry/blob/v160.5/core/src/mindustry/content/Blocks.java). The status describes the behavior FactoryScope models, not every behavior exposed by a similarly named modded block.
+
+It was re-checked for v160.7. Between [v160.5 and v160.7](https://github.com/Anuken/Mindustry/compare/v160.5...v160.7)
+no content declaration, transport, power, liquid, or crafter source changed; the only world-block changes are
+Directional Unloader save deserialization and the core's configuration UI, neither of which affects the modeled
+topology. The headless engine tests and the real-client acceptance suite pass against v160.7.
 
 “Supported” means FactoryScope has a model for the listed vanilla behavior and regression coverage for
 the evidence it presents. It does not mean every modded block or every state-dependent transfer is
