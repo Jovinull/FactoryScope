@@ -189,7 +189,7 @@ public final class FactorySnapshot{
         private PowerState power;
 
         private Builder(String blockName){
-            this.blockName = blockName;
+            this.blockName = Objects.requireNonNull(blockName, "blockName");
         }
 
         public Builder support(SupportLevel support){
