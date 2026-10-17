@@ -711,6 +711,25 @@ class MindustryLiquidProbeTest{
             input(AreaProbe.refOf(consumer), NetworkSide.north), water));
     }
 
+    @Test
+    void snapshotFailureIsRecordedWithoutInventingASupportedLiquidRoute() throws Exception{
+        Building conduit = place(Blocks.conduit, 10, 10, 0);
+
+        try(AutoCloseable ignored = ProbeSnapshotReader.replaceForTests(build -> {
+            throw new IllegalStateException("controlled snapshot failure");
+        })){
+            LiquidNetwork network = scan(AreaSelection.of(8, 8, 12, 12));
+
+            assertEquals(1, network.probeFailures.size());
+            assertEquals(AreaProbe.refOf(conduit), network.probeFailures.get(0).building);
+            assertEquals("snapshot", network.probeFailures.get(0).operation);
+            assertTrue(network.unsupportedTransport.isEmpty());
+            assertTrue(network.graph.edges.stream().allMatch(edge -> edge.from.building.equals(edge.to.building)),
+                "a failed endpoint probe must not invent an external liquid route");
+            assertTrue(network.partial());
+        }
+    }
+
     private static LiquidNetwork scan(AreaSelection selection){
         return MindustryLiquidProbe.scan(selection, Team.sharded, Map.of());
     }

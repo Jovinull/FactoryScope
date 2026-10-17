@@ -68,18 +68,19 @@ public final class LiquidTraceAnalyzer{
         List<LiquidInterruption> interruptions = relevantInterruptions(network, search.visited, liquid, direction);
         List<LiquidUncertainty> incompleteConnections = relevantIncompleteConnections(network, search.visited,
             liquid, direction);
+        List<TopologyProbeFailure> probeFailures = relevantProbeFailures(network, search.visited, target);
         List<BuildingRef> unsupported = relevantUnsupported(network, target, interruptions);
         List<BuildingRef> deadEnds = deadEnds(network.graph, search.visited, target, liquid, direction,
-            endpoints, boundaries, interruptions, incompleteConnections);
+            endpoints, boundaries, interruptions, incompleteConnections, probeFailures);
 
         boolean topologyIncomplete = requirementsIncomplete || !unsupported.isEmpty() || !interruptions.isEmpty()
-            || !incompleteConnections.isEmpty() || !boundaries.isEmpty();
+            || !incompleteConnections.isEmpty() || !boundaries.isEmpty() || !probeFailures.isEmpty();
         boolean diagnosticsIncomplete = !area.skippedBuildings.isEmpty();
         boolean complete = !topologyIncomplete && !diagnosticsIncomplete;
         // A zero-edge conclusion is intentionally conservative. A route ending in storage/dead-end is not "no route".
         boolean noRouteProven = endpoints.isEmpty() && boundaries.isEmpty() && interruptions.isEmpty()
             && incompleteConnections.isEmpty() && unsupported.isEmpty() && !requirementsIncomplete && !diagnosticsIncomplete
-            && search.traversedEdges.isEmpty() && deadEnds.isEmpty();
+            && probeFailures.isEmpty() && search.traversedEdges.isEmpty() && deadEnds.isEmpty();
 
         return new LiquidTrace(target, liquid, direction, targetFound, true, complete, noRouteProven,
             requirementsIncomplete, topologyIncomplete, search.traversedEdges, endpoints, boundaries,
@@ -233,18 +234,31 @@ public final class LiquidTraceAnalyzer{
         return List.copyOf(result);
     }
 
+    private static List<TopologyProbeFailure> relevantProbeFailures(LiquidNetwork network, Set<NetworkPort> visited,
+                                                                     BuildingRef target){
+        TreeSet<TopologyProbeFailure> result = new TreeSet<>();
+        for(TopologyProbeFailure failure : network.probeFailures){
+            if(failure.building.equals(target)) result.add(failure);
+            for(NetworkPort port : visited) if(port.building.equals(failure.building)) result.add(failure);
+        }
+        return List.copyOf(result);
+    }
+
     private static List<BuildingRef> deadEnds(LiquidNetworkGraph graph, Set<NetworkPort> visited, BuildingRef target,
             ResourceRef liquid, TraceDirection direction, List<LiquidTraceEndpoint> endpoints,
             List<NetworkPort> boundaries, List<LiquidInterruption> interruptions,
-            List<LiquidUncertainty> incompleteConnections){
+            List<LiquidUncertainty> incompleteConnections, List<TopologyProbeFailure> probeFailures){
         Set<BuildingRef> endpointRefs = new HashSet<>();
         for(LiquidTraceEndpoint endpoint : endpoints) endpointRefs.add(endpoint.building);
         Set<NetworkPort> continuations = new HashSet<>(boundaries);
         for(LiquidInterruption interruption : interruptions) continuations.add(interruption.port);
         for(LiquidUncertainty uncertainty : incompleteConnections) continuations.add(uncertainty.port);
+        Set<BuildingRef> failed = new HashSet<>();
+        for(TopologyProbeFailure failure : probeFailures) failed.add(failure.building);
         TreeSet<BuildingRef> result = new TreeSet<>(BUILDING_ORDER);
         for(NetworkPort port : visited){
-            if(port.building.equals(target) || endpointRefs.contains(port.building) || continuations.contains(port)) continue;
+            if(port.building.equals(target) || endpointRefs.contains(port.building) || continuations.contains(port)
+                || failed.contains(port.building)) continue;
             boolean more = direction == TraceDirection.input
                 ? graph.incoming(port).stream().anyMatch(edge -> edge.liquids.allows(liquid))
                 : graph.outgoing(port).stream().anyMatch(edge -> edge.liquids.allows(liquid));
