@@ -884,6 +884,25 @@ class MindustryNetworkProbeTest{
             .findFirst().orElseThrow();
     }
 
+    @Test
+    void snapshotFailureIsRecordedWithoutInventingASupportedSource() throws Exception{
+        Building conveyor = place(Blocks.conveyor, 10, 10, 0);
+
+        try(AutoCloseable ignored = ProbeSnapshotReader.replaceForTests(build -> {
+            throw new IllegalStateException("controlled snapshot failure");
+        })){
+            ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+
+            assertEquals(1, network.probeFailures.size());
+            assertEquals(AreaProbe.refOf(conveyor), network.probeFailures.get(0).building);
+            assertEquals("snapshot", network.probeFailures.get(0).operation);
+            assertTrue(network.unsupportedTransport.isEmpty());
+            assertTrue(network.graph.edges.stream().allMatch(edge -> edge.from.building.equals(edge.to.building)),
+                "a failed endpoint probe must not invent a supported source edge");
+            assertEquals(NetworkCompleteness.partialProbeFailure, network.completeness);
+        }
+    }
+
     private static Building place(Block block, int x, int y, int rotation){ return place(block, x, y, Team.sharded, rotation); }
 
     private static Building place(Block block, int x, int y, Team team, int rotation){
