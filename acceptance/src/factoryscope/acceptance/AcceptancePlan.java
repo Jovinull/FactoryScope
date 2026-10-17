@@ -20,15 +20,13 @@ final class AcceptancePlan{
     void queue(){
         harness.context.captureAreaOrigin(harness.tileX() + 5, harness.tileY() - 7);
         new HudInspectionScenarios(harness).queue();
-        harness.productionModelScenarios();
+        new ProductionScenarios(harness).queue();
         queueDestroyedTarget();
-        harness.liveFogInspectionScenario();
-        harness.reportLocateFogTransitionScenario();
-        harness.reportLiquidFogTransitionScenario();
+        new VisibilityScenarios(harness).queue();
         queueLayoutAndLocalization();
         queueWorldChange();
-        harness.areaScenarios();
-        harness.unsupportedTraceLocate();
+        harness.area.queue();
+        harness.itemNetwork.queueUnsupportedLocate();
         harness.context.actions.add(harness::finish);
         harness.pump();
     }
@@ -58,7 +56,6 @@ final class AcceptancePlan{
         harness.layout(720, 1280, 2f);
         harness.queue(harness::restoreLayout);
         harness.queue(harness::checkLocalization);
-        harness.queue(harness::checkProductionLocalization);
     }
 
     private void queueWorldChange(){
