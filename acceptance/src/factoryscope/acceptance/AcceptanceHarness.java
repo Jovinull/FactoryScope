@@ -62,11 +62,7 @@ public class AcceptanceHarness extends Mod{
     /** Intermediate pointer positions per drag; a real pointer never jumps from one corner to the other. */
     static final int DRAG_STEPS = 6;
 
-    final Seq<String> failures = new Seq<>();
-    final Seq<Runnable> actions = new Seq<>();
-    int checks;
-    int areaOriginX, areaOriginY;
-    boolean areaOriginCaptured;
+    final AcceptanceContext context = new AcceptanceContext();
 
     Building upper, lower, target, producer, disabledProducer, disabledRouteBreak;
     Building fogTarget, fogSource;
@@ -75,7 +71,6 @@ public class AcceptanceHarness extends Mod{
     AreaDiagnosticResult traceSnapshotBeforeRefresh;
     PowerGridReport refreshedPowerSnapshot;
     int baselineFactoryScopeElements;
-    float nextActionDelay = TICKS_BETWEEN_ACTIONS;
     final Seq<Building> patch = new Seq<>();
     final Seq<AreaSelection> bounds = new Seq<>();
     final Seq<String> members = new Seq<>();
@@ -117,109 +112,12 @@ public class AcceptanceHarness extends Mod{
     }
 
     void plan(){
-        //Area fixtures and their queued drag coordinates must share one origin. Some production
-        //scenarios intentionally pan the camera (Locate and off-world selection); following the
-        //camera in rx()/ry() after those actions made later fixtures get built at a new location
-        //while their already-queued screen gestures still pointed at the old one.
-        areaOriginX = tileX() + 5;
-        areaOriginY = tileY() - 7;
-        areaOriginCaptured = true;
         int powerFixtureRepetitions = Integer.getInteger("factoryscope.power-fixture-repetitions", 0);
         if(powerFixtureRepetitions > 0){
             new PowerFixtureStress(this, powerFixtureRepetitions).start();
             return;
         }
-        chatVisibilityScenarios();
-        hudVisibilityScenarios();
-        hudAnchorRebuildScenario();
-        scenario("the HUD toggle activates the picker");
-        queue(this::closeAnyDialog);
-        queue(this::ensurePickerOff);
-        queue(this::clickToggleButton);
-        queue(() -> {
-            check("picker is active after clicking the HUD button", FactoryScopeUI.picking());
-            check("exactly one HUD toggle exists", countNamed("factoryscope-toggle") == 1);
-            check("exactly one picker overlay exists", countNamed("factoryscope-picker") == 1);
-            checkToggleFollowsHudLayout("default window");
-        });
-        queue(this::clickToggleButton);
-        queue(() -> check("picker is inactive after clicking again", !FactoryScopeUI.picking()));
-
-        verticalSelection("above", true);
-        verticalSelection("below", false);
-
-        scenario("clicking empty terrain cancels without opening a panel");
-        queue(this::closeAnyDialog);
-        queue(this::clickToggleButton);
-        queue(() -> clickTile(emptyTileNearCamera()));
-        queue(() -> {
-            check("no panel opened for empty terrain", FactoryScopeUI.inspected() == null);
-            check("picker exited after clicking empty terrain", !FactoryScopeUI.picking());
-        });
-
-        scenario("an unsupported block gives limited diagnostics, not an invented fault");
-        queue(this::closeAnyDialog);
-        queue(() -> target = place(Blocks.titaniumWall, tileX() + 5, tileY() + 2));
-        queue(this::clickToggleButton);
-        queue(() -> clickBuilding(target));
-        queue(() -> {
-            check("panel opened for a wall", FactoryScopeUI.inspected() == target);
-            FactorySnapshot snapshot = MindustryFactoryProbe.probe(target);
-            check("a wall is not claimed to be efficiency-tracked", !snapshot.efficiencyTracked);
-            check("a wall reports limited diagnostics",
-                FactoryAnalyzer.analyze(snapshot).reason() == DiagnosticReason.limitedSupport);
-            check("a wall is given no production model", snapshot.outputs.isEmpty());
-        });
-
-        productionModelScenarios();
-
-        scenario("a destroyed target is released while the panel is open");
-        queue(this::closeAnyDialog);
-        queue(() -> target = place(Blocks.kiln, tileX() + 8, tileY() + 4));
-        queue(this::clickToggleButton);
-        queue(() -> clickBuilding(target));
-        queue(() -> check("panel opened for the victim", FactoryScopeUI.inspected() == target));
-        queue(() -> target.tile.remove());
-        queue(() -> check("panel released the destroyed building", FactoryScopeUI.inspected() == null));
-
-        liveFogInspectionScenario();
-        reportLocateFogTransitionScenario();
-        reportLiquidFogTransitionScenario();
-
-        repeatedUse(8);
-        layout(1280, 720, 1f);
-        layout(1920, 1080, 1f);
-        layout(2560, 1440, 1f);
-        layout(1280, 720, 2f);
-        layout(1280, 720, 1.5f);
-        layout(1920, 1080, 1.5f);
-        layout(1920, 1080, 2f);
-        layout(2560, 1440, 1.5f);
-        layout(2560, 1440, 2f);
-        layout(720, 1280, 1.5f);
-        layout(720, 1280, 2f);
-        queue(this::restoreLayout);
-        queue(this::checkLocalization);
-        queue(this::checkProductionLocalization);
-
-        scenario("a world change clears the panel");
-        queue(this::closeAnyDialog);
-        queue(() -> target = place(Blocks.siliconSmelter, tileX() + 10, tileY()));
-        queue(this::clickToggleButton);
-        queue(() -> clickBuilding(target));
-        queue(() -> check("panel opened before the world change", FactoryScopeUI.inspected() == target));
-        queue(() -> Events.fire(new WorldLoadEvent()));
-        queue(() -> {
-            check("panel cleared on world load", FactoryScopeUI.inspected() == null);
-            check("picker cleared on world load", !FactoryScopeUI.picking());
-            checkToggleFollowsHudLayout("after world load");
-        });
-
-        areaScenarios();
-        unsupportedTraceLocate();
-
-        actions.add(this::finish);
-        pump();
+        new AcceptancePlan(this).queue();
     }
 
     void liveFogInspectionScenario(){
@@ -925,7 +823,7 @@ public class AcceptanceHarness extends Mod{
         multiplayerInspectFromReport();
         multiplayerLocate();
 
-        actions.add(this::finish);
+        context.actions.add(this::finish);
         pump();
     }
 
@@ -1137,7 +1035,7 @@ public class AcceptanceHarness extends Mod{
      * the camera that both corners of any drag are on screen at the zoom the scenarios set.
      */
     int rx(){
-        return areaOriginCaptured ? areaOriginX : tileX() + 5;
+        return context.areaOriginX(tileX() + 5);
     }
 
     void checkToggleFollowsHudLayout(String label){
@@ -1161,7 +1059,7 @@ public class AcceptanceHarness extends Mod{
     }
 
     int ry(){
-        return areaOriginCaptured ? areaOriginY : tileY() - 7;
+        return context.areaOriginY(tileY() - 7);
     }
 
     static final int REGION_WIDTH = 16;
@@ -2058,8 +1956,8 @@ public class AcceptanceHarness extends Mod{
             && consumer != null && consumer.shouldConsumePower;
         long engineUpdates = Math.max(0L, Math.round(state.tick - setupTick));
         if(!engineReady && generator != null && consumer != null && engineUpdates < 120){
-            nextActionDelay = 1f;
-            actions.insert(0, () -> checkBatterySupportedFixtureReady(grid, node, graph, setupTick));
+            context.nextActionDelay = 1f;
+            context.actions.insert(0, () -> checkBatterySupportedFixtureReady(grid, node, graph, setupTick));
             return;
         }
 
@@ -2169,7 +2067,7 @@ public class AcceptanceHarness extends Mod{
             if(supportedGrid[1] != null) supportedGrid[1].power.status = 1f;
             supportedGraph[0] = supportedGrid[0] == null ? null : supportedGrid[0].power.graph;
             powerSetupTick[0] = state.tick;
-            nextActionDelay = 1f;
+            context.nextActionDelay = 1f;
         });
         queue(() -> checkBatterySupportedFixtureReady(supportedGrid, supportedNode[0], supportedGraph[0], powerSetupTick[0]));
         queue(this::armPicker);
@@ -3920,7 +3818,7 @@ public class AcceptanceHarness extends Mod{
     // ------------------------------------------------------------------ driver
 
     void scenario(String name){
-        actions.add(() -> Log.info(TAG + " --- @", name));
+        context.actions.add(() -> Log.info(TAG + " --- @", name));
     }
 
     void scenarioNow(String name){
@@ -3928,25 +3826,25 @@ public class AcceptanceHarness extends Mod{
     }
 
     void queue(Runnable action){
-        actions.add(action);
+        context.actions.add(action);
     }
 
     void delayNextAction(float ticks){
-        nextActionDelay = Math.max(nextActionDelay, ticks);
+        context.nextActionDelay = Math.max(context.nextActionDelay, ticks);
     }
 
     void pump(){
-        if(actions.isEmpty()) return;
-        Runnable next = actions.remove(0);
+        if(context.actions.isEmpty()) return;
+        Runnable next = context.actions.remove(0);
         try{
             next.run();
         }catch(Throwable t){
-            failures.add("action threw " + t);
+            context.failures.add("action threw " + t);
             Log.err(TAG + " action threw", t);
         }
-        if(!actions.isEmpty()){
-            float delay = nextActionDelay;
-            nextActionDelay = TICKS_BETWEEN_ACTIONS;
+        if(!context.actions.isEmpty()){
+            float delay = context.nextActionDelay;
+            context.nextActionDelay = TICKS_BETWEEN_ACTIONS;
             Time.runTask(delay, this::pump);
         }
     }
@@ -3956,19 +3854,19 @@ public class AcceptanceHarness extends Mod{
     }
 
     void check(String what, boolean ok, String detail){
-        checks++;
+        context.checks++;
         if(ok){
             Log.info(TAG + "   PASS @", what);
         }else{
-            failures.add(what + (detail.isEmpty() ? "" : " [" + detail + "]"));
+            context.failures.add(what + (detail.isEmpty() ? "" : " [" + detail + "]"));
             Log.err(TAG + "   FAIL " + what + (detail.isEmpty() ? "" : " [" + detail + "]"));
         }
     }
 
     void finish(){
-        Log.info(TAG + " ===== @ checks, @ failures =====", checks, failures.size);
-        for(String failure : failures) Log.err(TAG + " FAILURE: " + failure);
-        Log.info(failures.isEmpty() ? TAG + " RESULT PASS" : TAG + " RESULT FAIL");
+        Log.info(TAG + " ===== @ checks, @ failures =====", context.checks, context.failures.size);
+        for(String failure : context.failures) Log.err(TAG + " FAILURE: " + failure);
+        Log.info(context.failures.isEmpty() ? TAG + " RESULT PASS" : TAG + " RESULT FAIL");
         Core.app.post(() -> Core.app.exit());
     }
 }
