@@ -43,13 +43,15 @@ final class ItemNetworkScenarios{
         traceCompletenessScenarios();
         outputTraceBoundary();
         outputTraceDeadEnd();
-        mixedProblems();
-        itemNetworkView();
     }
 
     void queueTransportFamilies(){ transportFamilyScenarios(); }
     void queueUnsupportedLocate(){ unsupportedTraceLocate(); }
     void queueTinyDrag(){ tinyDragIsAClick(); }
+    void queueAfterTinyDrag(){
+        mixedProblems();
+        itemNetworkView();
+    }
 
     void singlePanelSupplyTrace(){
         scenario("a missing item can be traced from single-building diagnostics");
