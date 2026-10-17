@@ -22,7 +22,7 @@ import java.util.*;
 /**
  * Reads a live {@link Building} and produces a {@link FactorySnapshot}.
  *
- * <p>This is the only class that knows about Mindustry types, and it only ever reads: no field is
+ * <p>This is a live-engine adapter in FactoryScope's probe layer. It only ever reads: no field is
  * written, no method with side effects is called, nothing is sent over the network. The consumer
  * inspection is driven by {@code block.consumers} rather than by a list of known blocks, so modded
  * crafters built on the standard consumers are analysed the same way vanilla ones are.
