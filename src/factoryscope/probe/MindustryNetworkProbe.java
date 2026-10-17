@@ -16,8 +16,6 @@ import mindustry.world.meta.*;
 
 import java.util.*;
 
-import static factoryscope.probe.TransportAdjacency.of;
-
 /** Extracts verified item topology from a Mindustry world without calling transfer methods. */
 public final class MindustryNetworkProbe{
     //StackConveyor's own state constants are protected; these mirror stateLoad and stateUnload
@@ -90,7 +88,7 @@ public final class MindustryNetworkProbe{
         for(var entry : buildings.entrySet()){
             Building source = entry.getValue();
             BuildingRef sourceRef = entry.getKey();
-            for(TransportAdjacency.Neighbor adjacent : of(source)){
+            for(Adjacent adjacent : adjacent(source)){
                 NetworkSide side = adjacent.side;
                 if(!outputSides(source, viewer, itemSources).contains(side)) continue;
                 Building neighbor = adjacent.building;
@@ -116,7 +114,7 @@ public final class MindustryNetworkProbe{
             Building target = entry.getValue();
             BuildingRef targetRef = entry.getKey();
             if(!isKnownTransport(target) && !isEndpoint(target)) continue;
-            for(TransportAdjacency.Neighbor adjacent : of(target)){
+            for(Adjacent adjacent : adjacent(target)){
                 Building neighbor = adjacent.building;
                 if(neighbor == null || neighbor.team != viewer) continue;
                 NetworkSide side = adjacent.side;
@@ -148,6 +146,35 @@ public final class MindustryNetworkProbe{
         addUnloaderSupply(links, interruptions, buildings, viewer, resolved);
         return new ItemNetwork(new NetworkGraph(ports, edges), boundary, boundaryInputs, unsupported,
             interruptions, storage, resources, boundaryOutputConstraints, boundaryInputConstraints);
+    }
+
+    private static List<Adjacent> adjacent(Building build){
+        List<Adjacent> result = new ArrayList<>();
+        if(build.tile == null) return result;
+        int offset = -(build.block.size - 1) / 2;
+        int minX = build.tile.x + offset;
+        int minY = build.tile.y + offset;
+        int maxX = minX + build.block.size - 1;
+        int maxY = minY + build.block.size - 1;
+        build.eachEdge(tile -> {
+            Building neighbor = tile.build;
+            if(neighbor == null || neighbor == build) return;
+            if(tile.x < minX) result.add(new Adjacent(neighbor, NetworkSide.west));
+            else if(tile.x > maxX) result.add(new Adjacent(neighbor, NetworkSide.east));
+            else if(tile.y < minY) result.add(new Adjacent(neighbor, NetworkSide.south));
+            else if(tile.y > maxY) result.add(new Adjacent(neighbor, NetworkSide.north));
+        });
+        return result;
+    }
+
+    private static final class Adjacent{
+        final Building building;
+        final NetworkSide side;
+
+        Adjacent(Building building, NetworkSide side){
+            this.building = building;
+            this.side = side;
+        }
     }
 
     /** Where the edges between non-adjacent or non-accepting buildings are collected. */
@@ -221,7 +248,7 @@ public final class MindustryNetworkProbe{
             NetworkSide forward = NetworkSide.rotation(stack.rotation);
             StackConveyor.StackConveyorBuild next = stackTransferTarget(stack, viewer);
             if(next != null) links.send(entry.getKey(), forward, next, forward.opposite());
-            for(TransportAdjacency.Neighbor adjacent : of(stack)){
+            for(Adjacent adjacent : adjacent(stack)){
                 if(adjacent.building instanceof StackConveyor.StackConveyorBuild previous && !links.refs.containsKey(previous)
                     && stackTransferTarget(previous, viewer) == stack){
                     links.enter(entry.getKey(), adjacent.side, ItemConstraint.any());
@@ -255,7 +282,7 @@ public final class MindustryNetworkProbe{
             Building unloader = entry.getValue();
             if(!isUnloader(unloader) || !isKnownTransport(unloader)) continue;
             BuildingRef unloaderRef = entry.getKey();
-            for(TransportAdjacency.Neighbor adjacent : unloadSources(unloader, viewer)){
+            for(Adjacent adjacent : unloadSources(unloader, viewer)){
                 Building provider = adjacent.building;
                 NetworkSide side = adjacent.side;
                 NetworkPort port = input(unloaderRef, side);
@@ -332,16 +359,16 @@ public final class MindustryNetworkProbe{
     }
 
     /** The neighbors an unloader takes items from: every side for an Unloader, the back for a Duct Unloader. */
-    private static List<TransportAdjacency.Neighbor> unloadSources(Building unloader, Team viewer){
-        List<TransportAdjacency.Neighbor> result = new ArrayList<>();
+    private static List<Adjacent> unloadSources(Building unloader, Team viewer){
+        List<Adjacent> result = new ArrayList<>();
         if(unloader instanceof DirectionalUnloader.DirectionalUnloaderBuild directional){
             Building back = directional.back();
             if(unloadsFrom(directional, back, viewer)){
-                result.add(new TransportAdjacency.Neighbor(back, NetworkSide.rotation(directional.rotation).opposite()));
+                result.add(new Adjacent(back, NetworkSide.rotation(directional.rotation).opposite()));
             }
             return result;
         }
-        for(TransportAdjacency.Neighbor adjacent : of(unloader)) if(unloadsFrom(unloader, adjacent.building, viewer)) result.add(adjacent);
+        for(Adjacent adjacent : adjacent(unloader)) if(unloadsFrom(unloader, adjacent.building, viewer)) result.add(adjacent);
         return result;
     }
 
@@ -449,7 +476,7 @@ public final class MindustryNetworkProbe{
             for(NetworkSide entry : entries) add(edges, ref, entry, forward, ItemConstraint.any(), false);
         }else if(build instanceof Unloader.UnloaderBuild unloader){
             ItemConstraint items = unloader.sortItem == null ? ItemConstraint.any() : ItemConstraint.only(itemRef(unloader.sortItem));
-            for(TransportAdjacency.Neighbor source : unloadSources(unloader, viewer)) for(NetworkSide out : NetworkSide.values()){
+            for(Adjacent source : unloadSources(unloader, viewer)) for(NetworkSide out : NetworkSide.values()){
                 if(out != source.side) add(edges, ref, source.side, out, items, true);
             }
         }else if(build instanceof DirectionalUnloader.DirectionalUnloaderBuild unloader){
@@ -459,7 +486,7 @@ public final class MindustryNetworkProbe{
         }else if(build instanceof StackConveyor.StackConveyorBuild stack){
             NetworkSide forward = NetworkSide.rotation(stack.rotation);
             EnumSet<NetworkSide> entries = inputSides(stack, viewer, Set.of());
-            for(TransportAdjacency.Neighbor adjacent : of(stack)){
+            for(Adjacent adjacent : adjacent(stack)){
                 if(adjacent.building instanceof StackConveyor.StackConveyorBuild previous
                     && stackTransferTarget(previous, viewer) == stack) entries.add(adjacent.side);
             }
