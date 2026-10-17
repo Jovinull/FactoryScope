@@ -19,8 +19,6 @@ import mindustry.type.Liquid;
 
 import java.util.*;
 
-import static factoryscope.probe.TransportAdjacency.of;
-
 /** Converts known Mindustry liquid routing rules into an area-scoped structural graph. */
 public final class MindustryLiquidProbe{
     private static final Comparator<BuildingRef> REF_ORDER = Comparator
@@ -110,7 +108,7 @@ public final class MindustryLiquidProbe{
             Building source = entry.getValue();
             BuildingRef sourceRef = entry.getKey();
             FactorySnapshot sourceSnapshot = resolvedSnapshots.get(sourceRef);
-            for(TransportAdjacency.Neighbor adjacent : of(source)){
+            for(Adjacent adjacent : adjacent(source)){
                 Building neighbor = adjacent.building;
                 if(neighbor == null || neighbor.team != viewer || !MindustryFactoryProbe.canInspect(neighbor, viewer)) continue;
                 NetworkSide sourceSide = adjacent.side;
@@ -161,7 +159,7 @@ public final class MindustryLiquidProbe{
         for(var entry : buildings.entrySet()){
             if(!incompleteOutputs.contains(entry.getKey())) continue;
             Building source = entry.getValue();
-            for(TransportAdjacency.Neighbor adjacent : of(source)){
+            for(Adjacent adjacent : adjacent(source)){
                 Building target = adjacent.building;
                 BuildingRef targetRef = refs.get(target);
                 if(targetRef == null || unsupported.contains(targetRef) || !acceptsLiquidFrom(target, source)) continue;
@@ -182,7 +180,7 @@ public final class MindustryLiquidProbe{
             BuildingRef targetRef = entry.getKey();
             FactorySnapshot targetSnapshot = resolvedSnapshots.get(targetRef);
             if(isUnsupportedTransport(target, targetSnapshot)) continue;
-            for(TransportAdjacency.Neighbor adjacent : of(target)){
+            for(Adjacent adjacent : adjacent(target)){
                 Building source = adjacent.building;
                 if(source == null || source.team != viewer || !MindustryFactoryProbe.canInspect(source, viewer)) continue;
                 BuildingRef sourceRef = refs.get(source);
@@ -201,7 +199,7 @@ public final class MindustryLiquidProbe{
             BuildingRef targetRef = entry.getKey();
             FactorySnapshot targetSnapshot = resolvedSnapshots.get(targetRef);
             if(isUnsupportedTransport(target, targetSnapshot)) continue;
-            for(TransportAdjacency.Neighbor adjacent : of(target)){
+            for(Adjacent adjacent : adjacent(target)){
                 Building source = adjacent.building;
                 if(source == null || source.team != viewer || refs.containsKey(source)
                     || !MindustryFactoryProbe.canInspect(source, viewer) || !acceptsLiquidFrom(target, source)) continue;
@@ -497,6 +495,23 @@ public final class MindustryLiquidProbe{
         constraints.put(port, existing == null ? value : existing.union(value));
     }
 
+    private static List<Adjacent> adjacent(Building build){
+        List<Adjacent> result = new ArrayList<>();
+        if(build.tile == null) return result;
+        int offset = -(build.block.size - 1) / 2;
+        int minX = build.tile.x + offset, minY = build.tile.y + offset;
+        int maxX = minX + build.block.size - 1, maxY = minY + build.block.size - 1;
+        build.eachEdge(tile -> {
+            Building neighbor = tile.build;
+            if(neighbor == null || neighbor == build) return;
+            if(tile.x < minX) result.add(new Adjacent(neighbor, NetworkSide.west));
+            else if(tile.x > maxX) result.add(new Adjacent(neighbor, NetworkSide.east));
+            else if(tile.y < minY) result.add(new Adjacent(neighbor, NetworkSide.south));
+            else if(tile.y > maxY) result.add(new Adjacent(neighbor, NetworkSide.north));
+        });
+        return result;
+    }
+
     private static ResourceRef ref(Liquid liquid){
         return new ResourceRef(ResourceKind.liquid, liquid.name, liquid.localizedName);
     }
@@ -504,4 +519,13 @@ public final class MindustryLiquidProbe{
     private static NetworkPort in(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort out(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
 
+    private static final class Adjacent{
+        final Building building;
+        final NetworkSide side;
+
+        Adjacent(Building building, NetworkSide side){
+            this.building = building;
+            this.side = side;
+        }
+    }
 }
