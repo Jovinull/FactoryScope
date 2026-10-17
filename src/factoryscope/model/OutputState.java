@@ -1,5 +1,7 @@
 package factoryscope.model;
 
+import java.util.Objects;
+
 /**
  * One product of the inspected factory, with the rates FactoryScope was able to derive.
  *
@@ -35,8 +37,8 @@ public final class OutputState{
     public OutputState(ResourceKind kind, String name, String contentId,
                        float theoreticalPerSecond, float expectedPerSecond,
                        float stored, float capacity, boolean bufferFull, boolean estimate){
-        this.kind = kind;
-        this.name = name;
+        this.kind = Objects.requireNonNull(kind, "kind");
+        this.name = Objects.requireNonNull(name, "name");
         this.contentId = contentId;
         this.theoreticalPerSecond = theoreticalPerSecond;
         this.expectedPerSecond = expectedPerSecond;

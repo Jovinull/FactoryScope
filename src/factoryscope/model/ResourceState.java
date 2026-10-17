@@ -37,8 +37,8 @@ public final class ResourceState{
     public final List<ResourceRef> acceptedResources;
 
     private ResourceState(Builder builder){
-        this.kind = builder.kind;
-        this.name = builder.name;
+        this.kind = Objects.requireNonNull(builder.kind, "kind");
+        this.name = Objects.requireNonNull(builder.name, "name");
         this.contentId = builder.contentId;
         this.satisfaction = clamp(builder.satisfaction);
         this.optional = builder.optional;
@@ -107,8 +107,8 @@ public final class ResourceState{
         private final List<ResourceRef> acceptedResources = new ArrayList<>();
 
         private Builder(ResourceKind kind, String name){
-            this.kind = kind;
-            this.name = name;
+            this.kind = Objects.requireNonNull(kind, "kind");
+            this.name = Objects.requireNonNull(name, "name");
         }
 
         public Builder contentId(String contentId){
