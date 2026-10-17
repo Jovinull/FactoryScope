@@ -60,6 +60,7 @@ final class AreaScenarios{
         singleClickStillInspects();
         harness.itemNetwork.queueBeforeScopes();
         harness.itemNetwork.queueTinyDrag();
+        harness.itemNetwork.queueAfterTinyDrag();
         new PowerScopeScenarios(harness).queue();
         new LiquidScopeScenarios(harness).queue();
         harness.itemNetwork.queueTransportFamilies();
