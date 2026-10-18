@@ -35,7 +35,8 @@ between evidence without losing the current report context.
 
 ## Screenshots
 
-These are unedited captures of FactoryScope's production UI in Mindustry v160.5.
+These are unedited captures of FactoryScope 1.2.1 running in the official Mindustry v160.7 client.
+Acceptance fixtures create the displayed factory states; each PNG is captured directly from the game UI.
 
 <table>
   <tr>
@@ -43,11 +44,23 @@ These are unedited captures of FactoryScope's production UI in Mindustry v160.5.
     <td width="50%"><img src="docs/media/network-overlay.png" alt="Mindustry world view with the structural item network overlay"><br><sub>Network shows supported structural item routes.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/media/supply-trace.png" alt="Supply Trace showing reachable producers and known structural dead ends"><br><sub>Supply Trace preserves multiple reachable endpoints and dead ends.</sub></td>
-    <td width="50%"><img src="docs/media/power-scope.png" alt="PowerScope report showing separate connected power grids"><br><sub>PowerScope reports grid-level state, not per-wire flow.</sub></td>
+    <td width="50%"><img src="docs/media/production-drill.png" alt="Mechanical Drill production and operating details"><br><sub>Drill status, production estimate, ore and optional inputs.</sub></td>
+    <td width="50%"><img src="docs/media/production-turret-idle.png" alt="Loaded Duo turret ready with no target"><br><sub>Turret ammunition and readiness with no target in range.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/media/liquid-scope-gas.png" alt="LiquidScope world view showing a structural route for Hydrogen gas"><br><sub>LiquidScope also handles Mindustry gas resources by exact content identity.</sub></td>
+    <td width="50%"><img src="docs/media/production-generator.png" alt="Combustion Generator stopped for missing fuel"><br><sub>Generator diagnostics include fuel requirements and its power grid.</sub></td>
+    <td width="50%"><img src="docs/media/production-unit-factory.png" alt="Ground Factory unit plan with missing resources and power"><br><sub>Unit Factory diagnostics show the selected unit and its inputs.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/supply-trace.png" alt="Supply Trace showing reachable producers and known structural dead ends"><br><sub>Supply Trace preserves reachable endpoints and known dead ends.</sub></td>
+    <td width="50%"><img src="docs/media/transport-armored-item-trace.png" alt="Supply Trace route through an Armored Conveyor"><br><sub>Item traces include the supported Armored Conveyor route.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/transport-unloader-bridge-trace.png" alt="Supply Trace route through an Unloader and Duct Bridges"><br><sub>Item traces show routes through an Unloader and Duct Bridges.</sub></td>
+    <td width="50%"><img src="docs/media/power-scope.png" alt="PowerScope report showing multiple connected power grids"><br><sub>PowerScope compares grid-level metrics, not per-wire flow.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/liquid-scope-gas.png" alt="LiquidScope world view showing a structural route for Hydrogen gas"><br><sub>LiquidScope handles Mindustry gas resources by exact content identity.</sub></td>
     <td width="50%"><img src="docs/media/liquid-filter.png" alt="LiquidScope accepted-liquid chooser for a filter consumer"><br><sub>Filter consumers expose the accepted liquid choices.</sub></td>
   </tr>
 </table>
