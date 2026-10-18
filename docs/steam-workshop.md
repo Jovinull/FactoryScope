@@ -2,9 +2,17 @@
 
 FactoryScope is distributed through GitHub Releases, the Mindustry Mod Browser, and the
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151) (item `3820843151`, first published
-2026-10-16 with the unchanged 1.1.0 release). The Workshop item is updated separately, by hand, from the owner's
-Steam client. This page records how Mindustry publishes a mod, how the Workshop folder is built from a release,
+2026-10-16 with the unchanged 1.1.0 release, updated on 2026-10-18 to 1.2.0, and updated again to 1.2.1
+from the exact public release JAR; this entry records its size and digest below). The Workshop item is updated separately,
+by hand, from the owner's Steam client. This page records how Mindustry publishes a mod, how the Workshop folder is built from a release,
 and the listing text.
+
+## 1.2.1 release artifact
+
+The Workshop payload was extracted from the public [FactoryScope 1.2.1 GitHub release](https://github.com/Jovinull/FactoryScope/releases/tag/v1.2.1).
+Its `FactoryScope.jar` is 615,109 bytes, SHA-256
+`6967ce5040d438316273f129ea49057f124c958e2ed13a4881dac701e0128a7c`. The uploaded Workshop folder contains
+1,878,423 bytes (shown as 1.878 MB on the item page) and was updated on 2026-10-18 at 09:54.
 
 ## How Mindustry publishes a mod
 
@@ -172,9 +180,11 @@ FactoryScope supports:
 
 [h2]Compatibility[/h2]
 
-FactoryScope 1.2.0 targets Mindustry v8 Build 160+.
+FactoryScope 1.2.1 targets Mindustry v8 Build 160+.
 
-The 1.2.0 release was validated in the real game against Mindustry 160.7, in every supported language, and in multiplayer with an official dedicated server.
+FactoryScope 1.2.1 calls out buildings that the topology probe could not read. Network reports unreadable buildings in the selected area; Supply Trace and LiquidScope list unreadable buildings on a route and offer Locate. The route remains explicitly incomplete where evidence is missing.
+
+The 1.2.1 release was validated in the real game against Mindustry 160.7, in every supported language, and in multiplayer with an official dedicated server.
 
 Unit cargo and payload logistics are not modeled yet, and modded transport with its own routing code is shown as incomplete rather than guessed.
 
@@ -217,4 +227,17 @@ FactoryScope 1.2.0
 - Every vanilla item and liquid transport is now modeled: duct bridges, unloaders, plastanium and surge conveyors, mass drivers, bridge and armored conduits
 - Supply Trace lists only real dead ends
 - Validated in multiplayer on Mindustry 160.7
+```
+
+### 1.2.1 change note
+
+At most 400 characters, for the in-game **Update** dialog.
+
+```text
+FactoryScope 1.2.1
+
+- Network flags buildings the probe could not read.
+- Supply Trace and LiquidScope list unreadable buildings on a route and offer Locate.
+- Routes stay incomplete where evidence is missing.
+- English, Portuguese (Brazil), Russian, Simplified Chinese, Korean, and Spanish.
 ```

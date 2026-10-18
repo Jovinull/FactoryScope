@@ -173,6 +173,9 @@ final class NetworkDialog extends BaseDialog{
         if(network.completeness == NetworkCompleteness.partialUnsupportedTransport){
             body.add(FsBundle.get("network.partial")).color(Pal.lightOrange).wrap().padTop(10f).row();
         }
+        if(!network.probeFailures.isEmpty()){
+            body.add(FsBundle.get("network.unreadable")).color(Pal.lightOrange).wrap().padTop(6f).row();
+        }
         if(!network.boundaryPorts.isEmpty()) body.add(FsBundle.get("network.boundary-note")).color(Pal.accent).wrap().padTop(6f).row();
     }
 
@@ -269,6 +272,17 @@ final class NetworkDialog extends BaseDialog{
                     .color(Pal.lightOrange).growX().left().wrap().minWidth(0f);
                 row.button(Icon.zoomSmall, Styles.emptyi, () -> locate(interruption.transport)).size(34f)
                     .tooltip(FsBundle.ref("area.locate")).name("factoryscope-trace-unsupported-locate");
+            }).growX().padTop(4f).row();
+        }
+        if(!trace.unreadableBuildings.isEmpty()){
+            body.add(FsBundle.get("trace.unreadable")).color(Pal.lightOrange).wrap().padTop(8f).row();
+        }
+        for(BuildingRef unreadable : trace.unreadableBuildings){
+            body.table(row -> {
+                row.add(FsBundle.format("trace.unreadable-at", unreadable.blockName, unreadable.tileX, unreadable.tileY))
+                    .color(Pal.lightOrange).growX().left().wrap().minWidth(0f);
+                row.button(Icon.zoomSmall, Styles.emptyi, () -> locate(unreadable)).size(34f)
+                    .tooltip(FsBundle.ref("area.locate")).name("factoryscope-trace-unreadable-locate");
             }).growX().padTop(4f).row();
         }
         if(trace.diagnosticsIncomplete){

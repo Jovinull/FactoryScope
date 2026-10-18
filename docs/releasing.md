@@ -37,16 +37,18 @@ yet provide.
 
 ## Before tagging
 
-1. The documented clean test, artifact, acceptance, localization and benchmark tasks pass.
-2. `gradlew acceptanceTest` passes against a real Mindustry client. Launcher portability is checked on
-   Windows, Linux and macOS CI; the graphical real-client run is recorded only for platforms where it is
-   actually exercised.
-3. The isolated real-client smoke test passes; the current helper is `scripts/smoke-test.ps1` on Windows.
-4. `mod.hjson` carries the new `version`; `minGameVersion` is the earliest build that provides every
+1. `gradlew test` passes, covering the unit tests and all six localization bundles.
+2. The Build workflow passes for the exact `develop` commit, including the universal JAR build and
+   `verifyArtifacts`. Download that workflow's `FactoryScope.jar`; release and validate those exact bytes.
+3. Real-client acceptance passes in all six locales: English, Brazilian Portuguese, Russian, Simplified
+   Chinese, Korean, and Spanish.
+4. The isolated real-client smoke test passes against the same JAR; the current helper is
+   `scripts/smoke-test.ps1` on Windows.
+5. Multiplayer acceptance passes against the official v160.7 dedicated server and client.
+6. `mod.hjson` carries the new `version`; `minGameVersion` is the earliest build that provides every
    Mindustry API the mod uses. It need not repeat the patch version pinned in `build.gradle` when that
    API already exists earlier in the same major build line.
-5. The README describes what the release actually does. Anything on the roadmap stays on the roadmap.
-6. Translations are in step with the default bundle — `BundleTest` fails the build if they are not.
+7. The README describes what the release actually does. Anything on the roadmap stays on the roadmap.
 
 ## The artifact
 
@@ -81,8 +83,10 @@ targeting the running game line. Use a title such as `FactoryScope X.Y.Z [v160]`
 `vX.Y.Z`. The mod metadata's minimum build is an independent compatibility floor, not the release title.
 
 The indexer only downloads repository icons when the repository has at least two stars. It looks for
-`icon.png` at the root or under `assets/` and scales it to 64 by 64. FactoryScope currently has fewer
-than two stars, so an icon file would not appear in the browser yet.
+`icon.png` at the root or under `assets/` and scales it to 64 by 64. As of 2026-10-18, the official
+index records FactoryScope with 5 stars and `hasIcon: true`; the icon is present in the generated index.
+See [mod-browser-icon.md](mod-browser-icon.md) for the current index state and the distinction between
+the in-game icon and the indexer's cached icon.
 
 ## Steam Workshop
 

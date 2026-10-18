@@ -48,7 +48,7 @@ public final class LiquidTraceAnalyzer{
         if(network == null || !uses){
             return new LiquidTrace(target, liquid, direction, targetFound, uses, false, false,
                 requirementsIncomplete, network == null || !targetFound || requirementsIncomplete, List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of());
         }
 
         String rootChannel = direction == TraceDirection.input ? "in" : "out";
@@ -57,7 +57,7 @@ public final class LiquidTraceAnalyzer{
             return new LiquidTrace(target, liquid, direction, targetFound, true, false, false,
                 requirementsIncomplete, true, List.of(), List.of(), List.of(),
                 network.unsupportedTransport.contains(target) ? List.of(target) : List.of(),
-                List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of());
         }
 
         Search search = direction == TraceDirection.input
@@ -85,7 +85,8 @@ public final class LiquidTraceAnalyzer{
 
         return new LiquidTrace(target, liquid, direction, targetFound, true, complete, noRouteProven,
             requirementsIncomplete, topologyIncomplete, search.traversedEdges, endpoints, boundaries,
-            unsupported, interruptions, incompleteConnections, deadEnds);
+            unsupported, interruptions, incompleteConnections, deadEnds,
+            probeFailures.stream().map(failure -> failure.building).distinct().toList());
     }
 
     private static AreaEntry findEntry(List<AreaEntry> entries, BuildingRef ref){

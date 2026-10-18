@@ -30,7 +30,10 @@ available diagnostics for buildings that can affect the traversed item-specific 
 relevant boundary or unsupported continuation. Unrelated unsupported transport elsewhere in the area
 does not invalidate a local result. If a failed diagnostic probe has no recoverable building identity,
 FactoryScope remains conservative and withholds a complete conclusion. A target whose item ports are not
-modeled is distinguished from a building whose diagnostic snapshot could not be read.
+modeled is distinguished from a building whose diagnostic snapshot could not be read. A building whose state
+could not be read while the topology was built is listed in every trace that reaches it, with a Locate action,
+and the Network report notes that some buildings in the area could not be read. LiquidScope traces list them
+the same way.
 
 "No supported in-area producer or storage route reaches this input" is reserved for a complete search
 with no compatible topology path to such an endpoint. If a route reaches a known in-area dead end, the
