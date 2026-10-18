@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased
+## 1.2.1
 
 ### Fixed
 
-- A building whose state could not be read is no longer left unexplained: Supply Trace and LiquidScope traces
-  that reach it list it with a Locate action, and the Network report notes that some buildings in the area could
-  not be read. Before, such a trace was simply left without a conclusion.
+- Supply Trace and LiquidScope now identify buildings whose state the probe could not read, with a Locate
+  action for buildings on the route. Network also reports unreadable buildings in the selected area, so an
+  incomplete route no longer looks like an unexplained absence of evidence.
 
 ## 1.2.0
 

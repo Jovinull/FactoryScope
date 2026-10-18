@@ -12,24 +12,17 @@ whether that cached icon file exists. See
 [`ModUpdater.java`](https://github.com/Anuken/MindustryMods/blob/master/src/modupdater/ModUpdater.java#L179-L187)
 and [the field construction](https://github.com/Anuken/MindustryMods/blob/master/src/modupdater/ModUpdater.java#L245-L261).
 
-Before this presentation update, FactoryScope had no icon at either accepted repository path and had
-zero stars. This branch fixes the icon-path omission; the updater can read that asset after it reaches
-the default branch. As observed on 2026-10-04, the repository still had zero stars and the public
-index entry still reported `hasIcon: false`; the updater's two-star gate is therefore the remaining
-external condition. No index-side icon can be forced from this repository while that gate is unmet.
-If the threshold is reached, the indexer must run again before its cached `hasIcon` state changes.
-
-The same index snapshot still listed FactoryScope as `0.7.0`, although the public `1.0.0` release had
-already been published. MindustryMods documents a periodic refresh, so this version discrepancy is
-consistent with propagation delay; it is distinct from the icon gate. The current entry can be
-checked in [`mods.json`](https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json).
+The official [`mods.json`](https://raw.githubusercontent.com/Anuken/MindustryMods/master/mods.json)
+currently records FactoryScope with **5 stars** and **`hasIcon: true`** (checked 2026-10-18). The
+two-star threshold is met, and the indexer's cached icon is present. The index can still lag behind
+repository changes until its next refresh.
 
 These assets serve different purposes:
 
 - **Root `icon.png`:** in-game mod icon and an accepted source path for the indexer.
 - **`docs/media/`:** README and repository screenshots; these are not the in-game icon.
-- **MindustryMods `hasIcon`:** an indexer-generated flag for its own cached 64-pixel icon, subject to
-  its star gate and refresh schedule.
+- **MindustryMods `hasIcon`:** an indexer-generated flag for its own cached 64-pixel icon. FactoryScope's
+  current official entry has `hasIcon: true`.
 - **Steam Workshop preview:** a separate upload asset, [`branding/workshop-preview.png`](branding/workshop-preview.png),
   shipped as `preview.png` only in the Workshop folder; see [steam-workshop.md](steam-workshop.md).
 

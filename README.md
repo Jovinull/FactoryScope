@@ -97,7 +97,7 @@ valid route or a proven dead end.
 
 ## Support and validation
 
-FactoryScope targets Mindustry v8 Build 160 (`minGameVersion: 160`). FactoryScope 1.2.0 was
+FactoryScope targets Mindustry v8 Build 160 (`minGameVersion: 160`). FactoryScope 1.2.1 was
 validated in the real client against v160.7, the current validation build, in all six languages. The
 [support matrix](docs/support-matrix.md) lists modeled, partial, and deferred transport families.
 Common conveyor/conduit routes, junctions, routers, sorters, configured item
