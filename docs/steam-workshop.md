@@ -57,9 +57,10 @@ class from the previous version is left behind, then use **Update** (see below).
 2. Open **Mods** and confirm that FactoryScope 1.1.0 is listed once, enabled, and without errors.
 3. Press the publish (export) button on FactoryScope, accept the Steam Workshop legal agreement if Steam asks,
    and confirm. The item is created Private.
-4. On the item's Steam page, set the title and description below and add the six captures from
-   [`media/`](media/) in this order: Area Diagnostics, Supply Trace, Network overlay, PowerScope,
-   LiquidScope (gas), Liquid filter.
+4. On the item's Steam page, set the title and description below and add the 12 captures from
+   [`media/`](media/) in this order: Area Diagnostics, drill, turret, generator, unit factory, Network
+   overlay, Armored Conveyor trace, Unloader/Duct Bridge trace, Supply Trace, PowerScope, LiquidScope
+   (gas), Liquid filter.
 5. Edit the `<Created>` change note to the first change note below.
 6. While the item is still Private, test a real Workshop install: close Mindustry, move the local folder out of
    `saves/mods`, subscribe to the item, let Steam download it, start Mindustry, and confirm that only the
@@ -78,7 +79,8 @@ class from the previous version is left behind, then use **Update** (see below).
 3. Open **Mods** and confirm that FactoryScope shows the new version once, enabled, and without errors.
 4. Open the mod's Workshop menu, choose **Update**, and paste the change note for that release below. Leave
    **update description** unticked.
-5. On the item's Steam page, replace the description with the listing text below if it changed.
+5. On the item's Steam page, replace the description with the listing text below if it changed, and refresh
+   its screenshots from [`media/`](media/) in the order above.
 6. Close Mindustry, remove the local folder from `saves/mods`, subscribe again, and confirm that the Workshop
    copy loads with the new version.
 
