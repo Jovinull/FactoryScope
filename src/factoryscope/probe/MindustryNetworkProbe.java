@@ -1,6 +1,7 @@
 package factoryscope.probe;
 
 import arc.struct.Seq;
+import factoryscope.FsLog;
 import factoryscope.area.*;
 import factoryscope.model.*;
 import factoryscope.network.*;
@@ -43,6 +44,7 @@ public final class MindustryNetworkProbe{
         Map<NetworkPort, ItemConstraint> boundaryInputConstraints = new HashMap<>();
         List<BuildingRef> unsupported = new ArrayList<>();
         List<NetworkInterruption> interruptions = new ArrayList<>();
+        Set<TopologyProbeFailure> probeFailures = new TreeSet<>();
         List<BuildingRef> storage = new ArrayList<>();
         List<ResourceRef> resources = new ArrayList<>();
         Set<Building> itemSources = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -58,9 +60,9 @@ public final class MindustryNetworkProbe{
             FactorySnapshot snapshot = snapshots.get(ref);
             if(snapshot == null){
                 try{
-                    snapshot = MindustryFactoryProbe.probe(build);
-                }catch(Exception ignored){
-                    //Topology can still be reported when a custom diagnostic consumer cannot be read.
+                    snapshot = ProbeSnapshotReader.read(build);
+                }catch(Exception e){
+                    recordProbeFailure(probeFailures, ref, "snapshot", e);
                 }
             }
             if(snapshot != null) resolved.put(build, snapshot);
@@ -128,7 +130,7 @@ public final class MindustryNetworkProbe{
                 }else if(!refs.containsKey(neighbor)){
                     if(!acceptsTopologyFrom(target, neighbor)) continue;
                     ItemConstraint constraint = boundaryInputConstraint(neighbor, side.opposite(), viewer,
-                        itemSources, itemProducts);
+                        itemSources, itemProducts, probeFailures);
                     if(constraint != null){
                         NetworkPort port = input(targetRef, side);
                         boundaryInputs.add(port);
@@ -143,9 +145,9 @@ public final class MindustryNetworkProbe{
         addDirectionBridgeEdges(links, buildings, viewer);
         addStackTransferEdges(links, buildings, viewer);
         addMassDriverEdges(links, buildings, viewer);
-        addUnloaderSupply(links, interruptions, buildings, viewer, resolved);
+        addUnloaderSupply(links, interruptions, probeFailures, buildings, viewer, resolved);
         return new ItemNetwork(new NetworkGraph(ports, edges), boundary, boundaryInputs, unsupported,
-            interruptions, storage, resources, boundaryOutputConstraints, boundaryInputConstraints);
+            interruptions, storage, resources, boundaryOutputConstraints, boundaryInputConstraints, probeFailures);
     }
 
     private static List<Adjacent> adjacent(Building build){
@@ -276,6 +278,7 @@ public final class MindustryNetworkProbe{
      * reached it through its inputs. A transport neighbor passes on whatever entered it.
      */
     private static void addUnloaderSupply(Links links, List<NetworkInterruption> interruptions,
+                                          Set<TopologyProbeFailure> probeFailures,
                                           Map<BuildingRef, Building> selected, Team viewer,
                                           Map<Building, FactorySnapshot> snapshots){
         for(var entry : selected.entrySet()){
@@ -295,9 +298,9 @@ public final class MindustryNetworkProbe{
                 FactorySnapshot snapshot = snapshots.get(provider);
                 if(snapshot == null && providerRef == null){
                     try{
-                        snapshot = MindustryFactoryProbe.probe(provider);
-                    }catch(Exception ignored){
-                        //an unreadable neighbor contributes no known supply
+                        snapshot = ProbeSnapshotReader.read(provider);
+                    }catch(Exception e){
+                        recordProbeFailure(probeFailures, AreaProbe.refOf(provider), "unloader supply snapshot", e);
                     }
                 }
                 if(providerRef == null){
@@ -670,7 +673,8 @@ public final class MindustryNetworkProbe{
 
     private static ItemConstraint boundaryInputConstraint(Building build, NetworkSide outputSide, Team viewer,
                                                           Set<Building> itemSources,
-                                                          Map<Building, List<ResourceRef>> itemProducts){
+                                                          Map<Building, List<ResourceRef>> itemProducts,
+                                                          Set<TopologyProbeFailure> probeFailures){
         if(isKnownTransport(build)){
             if(!outputSides(build, viewer, itemSources).contains(outputSide)) return null;
             BuildingRef ref = AreaProbe.refOf(build);
@@ -687,9 +691,10 @@ public final class MindustryNetworkProbe{
         List<ResourceRef> products = itemProducts.get(build);
         if(products == null){
             try{
-                products = MindustryFactoryProbe.probe(build).producedItems;
-            }catch(Exception ignored){
-                return ItemConstraint.any();
+                products = ProbeSnapshotReader.read(build).producedItems;
+            }catch(Exception e){
+                recordProbeFailure(probeFailures, AreaProbe.refOf(build), "boundary producer snapshot", e);
+                return null;
             }
         }
         return products.isEmpty() ? null : ItemConstraint.oneOf(products);
@@ -700,6 +705,12 @@ public final class MindustryNetworkProbe{
         ItemConstraint existing = constraints.get(port);
         if(existing == null) constraints.put(port, addition);
         else constraints.put(port, ItemConstraint.anyOf(List.of(existing, addition)));
+    }
+
+    private static void recordProbeFailure(Set<TopologyProbeFailure> failures, BuildingRef ref, String operation, Exception cause){
+        failures.add(new TopologyProbeFailure(ref, operation));
+        FsLog.warnOnce("item-topology:" + operation + ":" + ref,
+            "item topology probe failed at " + ref + " while reading " + operation, cause);
     }
 
     private static ItemConstraint outputConstraint(Building build, Map<Building, List<ResourceRef>> itemProducts){

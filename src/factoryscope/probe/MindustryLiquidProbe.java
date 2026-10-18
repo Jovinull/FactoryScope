@@ -1,6 +1,7 @@
 package factoryscope.probe;
 
 import arc.struct.Seq;
+import factoryscope.FsLog;
 import factoryscope.area.*;
 import factoryscope.liquid.*;
 import factoryscope.model.*;
@@ -44,6 +45,7 @@ public final class MindustryLiquidProbe{
         Set<BuildingRef> unsupported = new TreeSet<>(REF_ORDER), storage = new TreeSet<>(REF_ORDER);
         Set<BuildingRef> incompleteInputs = new TreeSet<>(REF_ORDER), incompleteOutputs = new TreeSet<>(REF_ORDER);
         Set<LiquidInterruption> interruptions = new TreeSet<>();
+        Set<TopologyProbeFailure> probeFailures = new TreeSet<>();
         Set<LiquidUncertainty> incompleteConnections = new TreeSet<>();
         Map<BuildingRef, FactorySnapshot> resolvedSnapshots = new HashMap<>(snapshots);
         List<ResourceRef> resources = new ArrayList<>();
@@ -51,7 +53,7 @@ public final class MindustryLiquidProbe{
         for(var entry : buildings.entrySet()){
             Building build = entry.getValue();
             BuildingRef ref = entry.getKey();
-            FactorySnapshot snapshot = snapshot(build, ref, resolvedSnapshots);
+            FactorySnapshot snapshot = snapshot(build, ref, resolvedSnapshots, probeFailures);
             if(snapshot != null) addResources(resources, snapshot);
 
             if(build.block instanceof GenericCrafter crafter && crafter.outputLiquids != null){
@@ -117,7 +119,7 @@ public final class MindustryLiquidProbe{
                 if(sourceConstraint == null) continue;
                 BuildingRef targetRef = refs.get(neighbor);
                 if(targetRef == null){
-                    FactorySnapshot outsideSnapshot = snapshot(neighbor, AreaProbe.refOf(neighbor), resolvedSnapshots);
+                    FactorySnapshot outsideSnapshot = snapshot(neighbor, AreaProbe.refOf(neighbor), resolvedSnapshots, probeFailures);
                     LiquidConstraint targetConstraint = inputConstraint(neighbor, outsideSnapshot, sourceSide.opposite());
                     LiquidConstraint compatible = targetConstraint == null ? null : sourceConstraint.intersection(targetConstraint);
                     if(compatible != null){
@@ -208,7 +210,11 @@ public final class MindustryLiquidProbe{
                 if(targetConstraint == null || !source.block.hasLiquids) continue;
                 BuildingRef sourceRef = AreaProbe.refOf(source);
                 FactorySnapshot sourceSnapshot = null;
-                try{ sourceSnapshot = MindustryFactoryProbe.probe(source); }catch(Exception ignored){ }
+                try{
+                    sourceSnapshot = ProbeSnapshotReader.read(source);
+                }catch(Exception e){
+                    recordProbeFailure(probeFailures, sourceRef, "outside source snapshot", e);
+                }
                 LiquidConstraint sourceConstraint = outputConstraint(source, sourceSnapshot, targetSide.opposite());
                 if(isTransport(source) && !outputSides(source, sourceSnapshot).contains(targetSide.opposite())) continue;
                 if(isKnownEndpoint(source) && !outputSides(source, sourceSnapshot).contains(targetSide.opposite())) continue;
@@ -241,7 +247,7 @@ public final class MindustryLiquidProbe{
 
         return new LiquidNetwork(new LiquidNetworkGraph(ports, edges), boundaryOut, boundaryIn,
             boundaryOutConstraints, boundaryInConstraints, unsupported, interruptions, storage,
-            incompleteInputs, incompleteOutputs, incompleteConnections, resources);
+            incompleteInputs, incompleteOutputs, incompleteConnections, resources, probeFailures);
     }
 
     /**
@@ -310,16 +316,24 @@ public final class MindustryLiquidProbe{
             || source.block instanceof LiquidJunction || source.tile.absoluteRelativeTo(target.tile.x, target.tile.y) == target.rotation;
     }
 
-    private static FactorySnapshot snapshot(Building build, BuildingRef ref, Map<BuildingRef, FactorySnapshot> snapshots){
+    private static FactorySnapshot snapshot(Building build, BuildingRef ref, Map<BuildingRef, FactorySnapshot> snapshots,
+                                            Set<TopologyProbeFailure> probeFailures){
         FactorySnapshot snapshot = snapshots.get(ref);
         if(snapshot != null) return snapshot;
         try{
-            snapshot = MindustryFactoryProbe.probe(build);
+            snapshot = ProbeSnapshotReader.read(build);
             snapshots.put(ref, snapshot);
             return snapshot;
-        }catch(Exception ignored){
+        }catch(Exception e){
+            recordProbeFailure(probeFailures, ref, "snapshot", e);
             return null;
         }
+    }
+
+    private static void recordProbeFailure(Set<TopologyProbeFailure> failures, BuildingRef ref, String operation, Exception cause){
+        failures.add(new TopologyProbeFailure(ref, operation));
+        FsLog.warnOnce("liquid-topology:" + operation + ":" + ref,
+            "liquid topology probe failed at " + ref + " while reading " + operation, cause);
     }
 
     private static void addResources(List<ResourceRef> resources, FactorySnapshot snapshot){

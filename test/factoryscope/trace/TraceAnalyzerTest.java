@@ -639,6 +639,23 @@ class TraceAnalyzerTest{
         assertEquals(graph.edges.size(), highlighted.size());
     }
 
+    @Test
+    void probeFailureIsDistinctFromUnsupportedAndPreventsANoRouteProof(){
+        BuildingRef target = ref("smelter", 1);
+        NetworkPort input = port(target, NetworkSide.west, "in");
+        TopologyProbeFailure failure = new TopologyProbeFailure(target, "snapshot");
+        ItemNetwork network = new ItemNetwork(graph(List.of(input), List.of()), List.of(), List.of(), List.of(),
+            List.of(), List.of(), List.of(), Map.of(), Map.of(), List.of(failure));
+
+        SupplyTrace trace = input(network, target, sand, List.of(consumer(target, sand)));
+
+        assertEquals(List.of(failure), network.probeFailures);
+        assertTrue(network.unsupportedTransport.isEmpty());
+        assertFalse(trace.complete);
+        assertFalse(trace.noRouteProven);
+        assertTrue(trace.structuralDeadEnds.isEmpty());
+    }
+
     private static SupplyTrace input(ItemNetwork network, BuildingRef target, ResourceRef item, List<AreaEntry> entries){
         return TraceAnalyzer.input(area(network, entries), target, item);
     }
