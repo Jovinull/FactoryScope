@@ -77,7 +77,7 @@ public final class TraceAnalyzer{
             unsupportedInArea, deadEnds, noRouteProven);
         return new SupplyTrace(target, item, direction, targetUsesItem, complete, noRouteProven,
             diagnosticsIncomplete, topologyIncomplete, search.traversedEdges, endpoints, boundaries, interruptions, unsupportedInArea,
-            deadEnds, findings);
+            deadEnds, probeFailures.stream().map(failure -> failure.building).distinct().toList(), findings);
     }
 
     private static SupplyTrace empty(BuildingRef target, ResourceRef item, TraceDirection direction,
@@ -88,7 +88,7 @@ public final class TraceAnalyzer{
     private static SupplyTrace empty(BuildingRef target, ResourceRef item, TraceDirection direction,
                                      boolean targetUsesItem, boolean diagnosticsIncomplete, boolean topologyIncomplete){
         return new SupplyTrace(target, item, direction, targetUsesItem, false, false, diagnosticsIncomplete,
-            topologyIncomplete, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            topologyIncomplete, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     private static AreaEntry findEntry(List<AreaEntry> entries, BuildingRef ref){

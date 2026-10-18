@@ -502,6 +502,7 @@ class LiquidTraceAnalyzerTest{
         assertFalse(trace.complete);
         assertFalse(trace.noRouteProven);
         assertTrue(trace.structuralDeadEnds.isEmpty());
+        assertEquals(List.of(target), trace.unreadableBuildings);
     }
 
     private static AreaDiagnosticResult area(LiquidNetwork network, AreaEntry... entries){

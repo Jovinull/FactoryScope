@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A building whose state could not be read is no longer left unexplained: Supply Trace and LiquidScope traces
+  that reach it list it with a Locate action, and the Network report notes that some buildings in the area could
+  not be read. Before, such a trace was simply left without a conclusion.
+
 ## 1.2.0
 
 ### Added

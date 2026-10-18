@@ -23,6 +23,8 @@ public final class SupplyTrace{
     public final List<NetworkInterruption> unsupportedInterruptions;
     public final List<BuildingRef> unsupportedInArea;
     public final List<BuildingRef> structuralDeadEnds;
+    /** Buildings this trace reaches whose state could not be read while the topology was built. */
+    public final List<BuildingRef> unreadableBuildings;
     public final List<NetworkFinding> findings;
 
     SupplyTrace(BuildingRef target, ResourceRef item, TraceDirection direction, boolean targetUsesItem,
@@ -30,7 +32,8 @@ public final class SupplyTrace{
                 Collection<NetworkEdge> traversedEdges, Collection<TraceEndpoint> endpoints,
                 Collection<NetworkPort> boundaryContinuations,
                 Collection<NetworkInterruption> unsupportedInterruptions, Collection<BuildingRef> unsupportedInArea,
-                Collection<BuildingRef> structuralDeadEnds, Collection<NetworkFinding> findings){
+                Collection<BuildingRef> structuralDeadEnds, Collection<BuildingRef> unreadableBuildings,
+                Collection<NetworkFinding> findings){
         this.target = target;
         this.item = item;
         this.direction = direction;
@@ -45,6 +48,7 @@ public final class SupplyTrace{
         this.unsupportedInterruptions = List.copyOf(unsupportedInterruptions);
         this.unsupportedInArea = List.copyOf(unsupportedInArea);
         this.structuralDeadEnds = List.copyOf(structuralDeadEnds);
+        this.unreadableBuildings = List.copyOf(unreadableBuildings);
         this.findings = List.copyOf(findings);
     }
 

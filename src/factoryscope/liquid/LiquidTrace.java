@@ -27,6 +27,8 @@ public final class LiquidTrace{
     public final List<LiquidInterruption> unsupportedInterruptions;
     public final List<LiquidUncertainty> incompleteConnections;
     public final List<BuildingRef> structuralDeadEnds;
+    /** Buildings this trace reaches whose state could not be read while the topology was built. */
+    public final List<BuildingRef> unreadableBuildings;
 
     LiquidTrace(BuildingRef target, ResourceRef liquid, TraceDirection direction, boolean targetIncluded,
                 boolean targetUsesLiquid,
@@ -35,7 +37,8 @@ public final class LiquidTrace{
                 Collection<LiquidTraceEndpoint> endpoints, Collection<NetworkPort> boundaryContinuations,
                 Collection<BuildingRef> unsupportedTransports,
                 Collection<LiquidInterruption> unsupportedInterruptions,
-                Collection<LiquidUncertainty> incompleteConnections, Collection<BuildingRef> structuralDeadEnds){
+                Collection<LiquidUncertainty> incompleteConnections, Collection<BuildingRef> structuralDeadEnds,
+                Collection<BuildingRef> unreadableBuildings){
         this.target = target;
         this.liquid = liquid;
         this.direction = direction;
@@ -52,6 +55,7 @@ public final class LiquidTrace{
         this.unsupportedInterruptions = List.copyOf(unsupportedInterruptions);
         this.incompleteConnections = List.copyOf(incompleteConnections);
         this.structuralDeadEnds = List.copyOf(structuralDeadEnds);
+        this.unreadableBuildings = List.copyOf(unreadableBuildings);
     }
 
     public List<LiquidTraceEndpoint> producers(){
