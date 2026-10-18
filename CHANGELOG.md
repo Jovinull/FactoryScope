@@ -24,6 +24,9 @@
   from the turret itself, and inspection never reorders it.
 - A turret with no ammunition is counted once in Area Diagnostics, not once per accepted ammunition, and its
   ammunition is no longer repeated as an item shortage.
+- A failure to read a building's state while the topology was built went unnoticed, and an unreadable building just
+  outside the area was assumed to supply any item. Such a failure is now recorded and logged, and a trace that
+  touches it is never reported as complete, as a proven missing route, or as a dead end there.
 
 ### Validation
 
@@ -35,6 +38,9 @@
 ### Changed
 
 - The "with production rates" count in Area Diagnostics now counts every building with a derived rate.
+- Supply Trace and LiquidScope list a dead end only where a route actually stops. The free sides of a fed conveyor,
+  conduit or router are no longer reported, so a simple drill-to-smelter line no longer lists every conveyor on it.
+  A route that really ends, such as an unfed line or a junction crossing nothing feeds, is still reported.
 
 ## 1.1.0
 
