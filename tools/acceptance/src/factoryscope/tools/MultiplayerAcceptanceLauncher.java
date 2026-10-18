@@ -122,11 +122,12 @@ public final class MultiplayerAcceptanceLauncher{
                 Files.copy(gameLog, saved, StandardCopyOption.REPLACE_EXISTING);
                 Files.copy(serverLog, project.resolve("build/multiplayer-acceptance-server.log"), StandardCopyOption.REPLACE_EXISTING);
             }
-            return finish(sandbox, keep || !passed, passed ? 0 : 1);
         }finally{
             stop(clientProcess, null);
             stop(server, "exit");
         }
+        //the server keeps its log and world files open until it exits, so the sandbox can only go after both stop
+        return finish(sandbox, keep || !passed, passed ? 0 : 1);
     }
 
     /** The server jar must be the official build this tooling validates. */
