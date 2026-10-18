@@ -304,6 +304,10 @@ final class LiquidDialog extends BaseDialog{
             body.add(FsBundle.get("liquid.trace-incomplete-connections")).color(Pal.lightOrange).wrap().padTop(6f).row();
             for(LiquidUncertainty uncertainty : trace.incompleteConnections) endpointRow(uncertainty.building, "incomplete");
         }
+        if(!trace.unreadableBuildings.isEmpty()){
+            body.add(FsBundle.get("liquid.trace-unreadable")).color(Pal.lightOrange).wrap().padTop(6f).row();
+            for(BuildingRef unreadable : trace.unreadableBuildings) endpointRow(unreadable, "unreadable");
+        }
         if(!trace.structuralDeadEnds.isEmpty()){
             body.add(FsBundle.get("liquid.trace-dead-ends")).color(Pal.lightOrange).wrap().padTop(6f).row();
             for(BuildingRef ref : trace.structuralDeadEnds) endpointRow(ref, "dead-end");

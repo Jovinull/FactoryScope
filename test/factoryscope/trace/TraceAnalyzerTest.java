@@ -698,6 +698,21 @@ class TraceAnalyzerTest{
         assertFalse(trace.complete);
         assertFalse(trace.noRouteProven);
         assertTrue(trace.structuralDeadEnds.isEmpty());
+        assertEquals(List.of(target), trace.unreadableBuildings);
+    }
+
+    @Test
+    void anUnreadableBuildingTheTraceNeverReachesIsNotListed(){
+        BuildingRef target = ref("smelter", 1);
+        BuildingRef elsewhere = ref("drill", 2);
+        NetworkPort input = port(target, NetworkSide.west, "in");
+        ItemNetwork network = new ItemNetwork(graph(List.of(input), List.of()), List.of(), List.of(), List.of(),
+            List.of(), List.of(), List.of(), Map.of(), Map.of(), List.of(new TopologyProbeFailure(elsewhere, "snapshot")));
+
+        SupplyTrace trace = input(network, target, sand, List.of(consumer(target, sand)));
+
+        assertTrue(trace.unreadableBuildings.isEmpty());
+        assertTrue(trace.complete);
     }
 
     private static SupplyTrace input(ItemNetwork network, BuildingRef target, ResourceRef item, List<AreaEntry> entries){
