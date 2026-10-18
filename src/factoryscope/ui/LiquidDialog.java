@@ -46,6 +46,7 @@ final class LiquidDialog extends BaseDialog{
         hidden(() -> { if(!keepOverlay) FactoryScopeUI.stopLiquidOverlay(); });
         buttons.button(FsBundle.ref("liquid.view-world"), Icon.eye, this::viewInWorld)
             .size(220f, 64f).name("factoryscope-liquid-view-world");
+        if(FactoryScopeUI.compactDialogButtons()) buttons.row();
         buttons.button(FsBundle.ref("area.refresh"), Icon.refresh, () -> { if(onRefresh != null) onRefresh.run(); })
             .size(180f, 64f).name("factoryscope-liquid-refresh");
     }

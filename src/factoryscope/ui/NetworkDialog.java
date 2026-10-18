@@ -47,6 +47,7 @@ final class NetworkDialog extends BaseDialog{
         });
         buttons.button(FsBundle.ref("network.view-world"), Icon.eye, this::viewInWorld)
             .size(220f, 64f).name("factoryscope-network-view-world");
+        if(FactoryScopeUI.compactDialogButtons()) buttons.row();
         buttons.button(FsBundle.ref("area.refresh"), Icon.refresh, () -> {
             if(onRefresh != null) onRefresh.run();
         }).size(180f, 64f).name("factoryscope-network-refresh");

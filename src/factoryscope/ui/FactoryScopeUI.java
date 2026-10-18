@@ -125,6 +125,12 @@ public final class FactoryScopeUI{
         return picker != null;
     }
 
+    /** Whether fixed-width dialog actions need to wrap for the available screen width. */
+    static boolean compactDialogButtons(){
+        float scale = Scl.scl();
+        return scale > 0f && Core.graphics.getWidth() / scale < 760f;
+    }
+
     private static void toggle(){
         if(picking()){
             stopPicking();
@@ -173,10 +179,13 @@ public final class FactoryScopeUI{
         root.setFillParent(true);
         root.top();
         root.touchable = Touchable.disabled;
+        boolean compact = compactDialogButtons();
+        float width = Math.max(1f, Core.graphics.getWidth() / Scl.scl() - 32f);
         root.table(Tex.buttonEdge3, inner -> {
             inner.margin(10f);
-            inner.add(FsBundle.get("inspect.hint")).color(Pal.accent);
-        }).padTop(120f);
+            var label = inner.add(FsBundle.get("inspect.hint")).color(Pal.accent).growX().wrap();
+            if(compact) label.get().setFontScale(0.85f);
+        }).padTop(120f).width(width);
 
         hint = root;
         Vars.ui.hudGroup.addChild(root);
