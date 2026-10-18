@@ -2,8 +2,9 @@
 
 FactoryScope is distributed through GitHub Releases, the Mindustry Mod Browser, and the
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151) (item `3820843151`, first published
-2026-10-16 with the unchanged 1.1.0 release). The Workshop item is updated separately, by hand, from the owner's
-Steam client. This page records how Mindustry publishes a mod, how the Workshop folder is built from a release,
+2026-10-16 with the unchanged 1.1.0 release, and updated on 2026-10-18 to the unchanged 1.2.0 release: the uploaded
+content is 1,870,876 bytes, exactly the 1.2.0 jar's entries plus the preview). The Workshop item is updated separately,
+by hand, from the owner's Steam client. This page records how Mindustry publishes a mod, how the Workshop folder is built from a release,
 and the listing text.
 
 ## How Mindustry publishes a mod
