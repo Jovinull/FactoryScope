@@ -14,6 +14,23 @@ check the diagnosis and derived rates against the values the game itself compute
 placeable vanilla block and stand-ins for common modded block shapes, asserting nothing throws, no rate
 is unprintable, no cause is asserted without evidence, and that inspection never alters game state.
 
+`probe/ProductionModelsTest` covers the production models of non-crafter families against the real engine. Each
+current rate is checked against the value the engine computed for the block's own bar or power graph and against
+what the block actually produced while the simulation ran tick by tick: drills (including burst drills and plasma
+bores), cliff crushers, pumps and extractors, generators, unit factories. Separator estimates are checked as
+long-run shares over hundreds of real cycles. Verified stop conditions are exercised directly: no ore, ore and
+walls too hard for the tier, full buffers, no unit selected, the unit cap holding a finished unit, an empty
+reconstructor, a turret without ammunition, and a loaded turret with no target. A dedicated test proves that
+inspecting a turret never reorders its ammunition, which the engine's own `hasAmmo()` would do.
+`VanillaSweepTest` asserts that every placeable vanilla block of a modeled family receives its model with
+printable details, that only modeled families report rates or verified gates, and that turret ammunition order is
+part of the state inspection must leave untouched.
+
+`HeadlessGame.newWorld` starts each fixture with fresh team data, as `Logic.reset()` does for every map. The
+indexer creates a team's building quadtree once, with the bounds of the first world it sees, and only clears it on
+later loads; carrying team data over from a smaller fixture world silently drops buildings outside its bounds from
+area queries, which made the result depend on test order.
+
 For area diagnostics specifically:
 
 - `area/AreaSelectionTest` — tile arithmetic: the four drag directions normalising to one rectangle,
@@ -36,6 +53,16 @@ unsupported transport, Junction channels and cycle termination. `probe/Mindustry
 places a real Mindustry drill, conveyor and crafter to verify that a mined item can be traced as a
 structural product without inventing a production rate. It also covers a non-crafter item consumer, a
 multi-output AttributeCrafter's exact product constraints, and a producer outside the selected area.
+
+`probe/TransportFamiliesTest` checks every transport family modeled from engine link and state rules (Duct
+Bridges, Unloaders and Duct Unloaders, Plastanium and Surge Conveyors, Mass Drivers, Bridge and Phase
+Conduits, Reinforced Bridge Conduits, and armored conduits) twice: the topology says where a resource can go,
+then the engine runs (`HeadlessGame.run` updates power graphs, buildings and bullets) and must deliver there
+and nowhere the topology rules out. Acceptance rules are also compared with the engine's own `acceptItem` and
+`acceptLiquid` for every side and rotation.
+`probe/TraceDeadEndsTest` builds real conveyor, router and conduit layouts and checks that Supply Trace and
+LiquidScope name a dead end only where a route stops: a fed line has none, an unfed line ends at its first
+transport, and a router's unused outputs are not reported while its branch that leads nowhere is.
 Trace regressions cover local completeness when unrelated transport/diagnostic probes are skipped,
 separate no-endpoint versus no-route findings, multiple producer/dead-end branches, and output boundary
 and dead-end wording. An even-sized skipped multiblock fixture checks terminal adjacency against
@@ -54,19 +81,24 @@ Refresh and the electrical-connection overlay.
 LiquidScope has pure tests in `liquid/LiquidTraceAnalyzerTest` and real v160.7 transport fixtures in
 `probe/MindustryLiquidProbeTest`. They cover Conduit side acceptance/output direction, content-independent
 topology, Liquid Junction channel isolation (including real straight-through movement), router branches,
-Liquid Bridge interruption behavior and a real remote-transfer/local-routing differential, directed
+Liquid Bridge link and dump sides with a real remote-transfer/local-routing differential, directed
 multi-liquid crafter outputs, filter accepted sets, dynamic requirement refresh, placed pump products,
 SolidPump products before first update, multi-liquid module snapshots, gas resource identity, and unsupported
 transport adjacent to a consumer. Production topology is separately audited to ensure it never calls runtime
 `acceptLiquid()` to decide structural reachability.
 
-Remote multiplayer replication of liquid buffers, bridge configuration, and dynamic requirements has not been
-validated. LiquidScope reports the local client snapshot and applies the normal team/fog visibility checks.
+LiquidScope reports the local client snapshot and applies the normal team/fog visibility checks. The multiplayer
+acceptance run compares a client's water trace and shortage with the dedicated server's; replication of liquid
+bridge configuration and dynamic requirements is not separately validated.
 
 The LiquidScope acceptance path enters from a missing liquid in the single-building panel, selects an explicit
 area, follows Water to a real pump through a conduit, opens pump diagnostics, returns, refreshes, and uses the
 Area Diagnostics Liquids filter/Trace controls. It also checks the structural-only wording, high-scale layout,
-and every liquid-specific locale key. The complete real UI acceptance suite is run in every supported locale:
+and every liquid-specific locale key. Two scenarios trace through the linked and unloading transports: sand
+from a container through an Unloader and a pair of Duct Bridges, and water from a pump through a pair of
+Bridge Conduits and a Plated Conduit. Every vanilla transport is modeled, so the unsupported-transport
+scenarios use the sandbox Item and Liquid Sources, the vanilla blocks still outside the transport models.
+The complete real UI acceptance suite is run in every supported locale:
 English, Brazilian Portuguese, Russian, Simplified Chinese, Korean, and Spanish.
 
 ## 2. Acceptance suite
@@ -148,6 +180,12 @@ The suite drives the real overlay end to end. It does not call an internal "sele
 method, for the same reason the single-building test does not call `inspect(building)`: that would skip
 the code most likely to be wrong.
 
+The production-model acceptance path opens the real single-building panel, through the same click dispatch,
+for a drill on sand, a separator, an unfuelled generator, a unit factory with and without a selected unit, and an
+empty and a loaded turret. It checks the model applied and that the status headline, sections, details and notes
+render in the active locale, and captures each panel. Every production-model string is also resolved and
+formatted in the active locale.
+
 The Supply Trace acceptance path uses the real building inspector, starts area selection from a missing
 item, follows Sand from a real Drill through three real conveyors to a Silicon Smelter, opens the
 producer's diagnostics, and returns to the trace and Network. The harness also resolves every trace
@@ -178,6 +216,43 @@ after its preceding UI scenarios.
 The small `scripts/acceptance-test.ps1` remains only as a Windows compatibility wrapper around the same
 Gradle task. The launcher/path test runs in Windows, Linux, and macOS CI; the real graphical client has
 been exercised end to end on Windows, not claimed for platforms where it has not been run.
+
+### Multiplayer acceptance
+
+```
+./gradlew multiplayerAcceptanceTest -PserverJar="/games/server-release.jar" -PmindustryJar="/games/Mindustry.jar"
+```
+
+Needs the official v160.7 dedicated server (`server-release.jar` from the Mindustry release) besides the
+desktop client; the launcher refuses any other server build. It starts the server in its own sandbox with
+FactoryScope and `FactoryScopeMultiplayerFixture.jar`, a development-only server mod from
+`multiplayer/fixture`. The fixture builds a 160×160 world with fog of war and static fog: the player team's
+core, a running and a starved silicon smelter, an unpowered laser drill feeding the starved one, a kiln on a
+grid with only an unfuelled generator, a cryofluid mixer fed by an unpowered rotary pump, a loaded duo, a
+ground factory with no plan, one enemy kiln inside the team's vision, and one enemy smelter far outside it.
+The client then starts in its own sandbox with FactoryScope and the harness, joins over the loopback
+interface, and drives the real UI as in the single-player suite.
+
+The comparison is against the server, not against expected strings. On request, the server computes a
+digest of FactoryScope's result for every fixture building and for the area report (entries, power grids,
+the sand trace and the water trace) from its own authoritative state, and sends it in a custom packet; the
+client computes the same digest from what it was sent and fails on any difference. The run checks:
+
+- every fixture building's panel through a real click, with the server's family, verdict, severity, stop
+  condition, efficiency, power satisfaction, and rates;
+- Area Diagnostics, Network, Supply Trace from the starved smelter to the laser drill, PowerScope for the
+  kiln's grid, and LiquidScope from the mixer to the pump;
+- Inspect and Locate/Return from an area report;
+- team and fog visibility: the visible enemy building is left out of the area report and its power grids,
+  and the hidden one cannot be inspected.
+
+A vanilla server sends the synced state of every team's buildings to every client, fog or not (only units
+are filtered by fog), so the client does hold the hidden enemy smelter and its items. The run asserts that,
+and that FactoryScope refuses to show it: Mindustry reports the building in fog for the player's team, and
+neither the panel nor any report includes it. The same `-PmodJar`, `-PharnessJar`, `-Plocale`,
+`-Pcapture`, `-PkeepSandbox`, and `-PtimeoutSeconds` properties apply; `-PfixtureJar` selects a prebuilt
+fixture. One client on one machine is covered; latency, packet loss, several clients, and a client on the
+enemy team are not.
 
 ## 3. Load smoke test
 

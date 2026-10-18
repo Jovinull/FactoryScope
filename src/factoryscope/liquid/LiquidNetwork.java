@@ -1,6 +1,7 @@
 package factoryscope.liquid;
 
 import factoryscope.area.BuildingRef;
+import factoryscope.area.TopologyProbeFailure;
 import factoryscope.model.ResourceRef;
 import factoryscope.network.*;
 
@@ -17,6 +18,8 @@ public final class LiquidNetwork{
     public final Map<NetworkPort, LiquidConstraint> boundaryInputConstraints;
     public final List<BuildingRef> unsupportedTransport;
     public final List<LiquidInterruption> unsupportedConnections;
+    /** Unexpected live-probe failures; distinct from unsupported transport and incomplete metadata. */
+    public final List<TopologyProbeFailure> probeFailures;
     public final List<BuildingRef> storageEndpoints;
     public final List<BuildingRef> incompleteRequirements;
     public final List<BuildingRef> incompleteProducts;
@@ -36,7 +39,7 @@ public final class LiquidNetwork{
                          Collection<ResourceRef> resources){
         this(graph, boundaryPorts, boundaryInputs, boundaryOutputConstraints, boundaryInputConstraints,
             unsupportedTransport, unsupportedConnections, storageEndpoints, incompleteRequirements,
-            incompleteProducts, List.of(), resources);
+            incompleteProducts, List.of(), resources, List.of());
     }
 
     public LiquidNetwork(LiquidNetworkGraph graph, Collection<NetworkPort> boundaryPorts,
@@ -50,6 +53,23 @@ public final class LiquidNetwork{
                          Collection<BuildingRef> incompleteProducts,
                          Collection<LiquidUncertainty> incompleteConnections,
                          Collection<ResourceRef> resources){
+        this(graph, boundaryPorts, boundaryInputs, boundaryOutputConstraints, boundaryInputConstraints,
+            unsupportedTransport, unsupportedConnections, storageEndpoints, incompleteRequirements,
+            incompleteProducts, incompleteConnections, resources, List.of());
+    }
+
+    public LiquidNetwork(LiquidNetworkGraph graph, Collection<NetworkPort> boundaryPorts,
+                         Collection<NetworkPort> boundaryInputs,
+                         Map<NetworkPort, LiquidConstraint> boundaryOutputConstraints,
+                         Map<NetworkPort, LiquidConstraint> boundaryInputConstraints,
+                         Collection<BuildingRef> unsupportedTransport,
+                         Collection<LiquidInterruption> unsupportedConnections,
+                         Collection<BuildingRef> storageEndpoints,
+                         Collection<BuildingRef> incompleteRequirements,
+                         Collection<BuildingRef> incompleteProducts,
+                         Collection<LiquidUncertainty> incompleteConnections,
+                         Collection<ResourceRef> resources,
+                         Collection<TopologyProbeFailure> probeFailures){
         this.graph = Objects.requireNonNull(graph, "graph");
         this.boundaryPorts = orderedPorts(boundaryPorts);
         this.boundaryInputs = orderedPorts(boundaryInputs);
@@ -59,6 +79,7 @@ public final class LiquidNetwork{
         List<LiquidInterruption> interruptions = new ArrayList<>(unsupportedConnections);
         Collections.sort(interruptions);
         this.unsupportedConnections = List.copyOf(new LinkedHashSet<>(interruptions));
+        this.probeFailures = List.copyOf(new TreeSet<>(probeFailures));
         this.storageEndpoints = orderedRefs(storageEndpoints);
         this.incompleteRequirements = orderedRefs(incompleteRequirements);
         this.incompleteProducts = orderedRefs(incompleteProducts);
@@ -77,7 +98,7 @@ public final class LiquidNetwork{
     public boolean partial(){
         return !unsupportedTransport.isEmpty() || !unsupportedConnections.isEmpty()
             || !boundaryPorts.isEmpty() || !boundaryInputs.isEmpty() || !incompleteRequirements.isEmpty()
-            || !incompleteProducts.isEmpty() || !incompleteConnections.isEmpty();
+            || !incompleteProducts.isEmpty() || !incompleteConnections.isEmpty() || !probeFailures.isEmpty();
     }
 
     private static List<NetworkPort> orderedPorts(Collection<NetworkPort> ports){

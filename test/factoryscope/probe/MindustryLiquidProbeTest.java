@@ -472,7 +472,7 @@ class MindustryLiquidProbeTest{
 
     @Test
     void unsupportedTransportBesideConsumerPreventsFalseNoRouteProof(){
-        Building armored = place(Blocks.platedConduit, 10, 10, 0);
+        Building armored = place(ModdedBlocks.unknownLiquidTransport, 10, 10, 0);
         Building consumer = place(ModdedBlocks.liquidConsumer, 11, 10, 0);
         AreaSelection selection = AreaSelection.of(8, 8, 13, 12);
         AreaDiagnosticResult area = AreaProbe.scan(selection, Team.sharded);
@@ -485,7 +485,7 @@ class MindustryLiquidProbeTest{
 
     @Test
     void unsupportedTransportJustOutsideSelectionIsNotMisreportedAsKnownBoundary(){
-        Building armored = place(Blocks.platedConduit, 10, 10, 0);
+        Building armored = place(ModdedBlocks.unknownLiquidTransport, 10, 10, 0);
         Building consumer = place(ModdedBlocks.liquidConsumer, 11, 10, 0);
         AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(11, 9, 13, 12), Team.sharded);
 
@@ -500,7 +500,7 @@ class MindustryLiquidProbeTest{
     @Test
     void unsupportedTransportOutsideOutputTraceIsNotMisreportedAsBoundary(){
         Building source = place(ModdedBlocks.liquidSource, 10, 10, 0);
-        Building armored = place(Blocks.platedConduit, 11, 10, 0);
+        Building armored = place(ModdedBlocks.unknownLiquidTransport, 11, 10, 0);
         AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 8, 10, 12), Team.sharded);
 
         LiquidTrace trace = LiquidTraceAnalyzer.output(area, AreaProbe.refOf(source), water);
@@ -558,10 +558,9 @@ class MindustryLiquidProbeTest{
         BuildingRef sourceRef = AreaProbe.refOf(source), destinationRef = AreaProbe.refOf(destination);
         LiquidNetwork linked = scan(AreaSelection.of(6, 8, 20, 12));
         NetworkPort remoteOut = output(sourceRef, NetworkSide.east), remoteIn = input(destinationRef, NetworkSide.west);
-        assertTrue(linked.unsupportedTransport.contains(sourceRef));
-        assertTrue(linked.unsupportedTransport.contains(destinationRef));
-        assertFalse(linked.graph.isReachable(remoteOut, remoteIn, water),
-            "configured remote transfer is real, but its local/remote port rules are intentionally partial");
+        assertFalse(linked.unsupportedTransport.contains(sourceRef));
+        assertFalse(linked.unsupportedTransport.contains(destinationRef));
+        assertTrue(linked.graph.isReachable(remoteOut, remoteIn, water), "the configured remote transfer is one edge");
 
         source.liquids.add(Liquids.water, 5f);
         ((LiquidBridge.LiquidBridgeBuild)source).warmup = 1f;
@@ -604,10 +603,8 @@ class MindustryLiquidProbeTest{
 
         AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(7, 8, 17, 13), Team.sharded);
         LiquidTrace trace = LiquidTraceAnalyzer.input(area, AreaProbe.refOf(localConsumer), water);
-        assertFalse(trace.complete);
-        assertFalse(trace.noRouteProven, "the partial bridge prevents a complete no-route conclusion");
-        assertTrue(trace.unsupportedInterruptions.stream().anyMatch(value -> value.transport.equals(AreaProbe.refOf(bridge))),
-            "the relevant bridge is surfaced as an interruption, not silently omitted");
+        assertTrue(trace.complete, "the bridge is modeled, so the trace is complete");
+        assertTrue(trace.noRouteProven, "and it proves what the engine does: no water reaches this neighbor");
     }
 
     @Test
@@ -627,14 +624,14 @@ class MindustryLiquidProbeTest{
     }
 
     @Test
-    void armoredAndDirectionLiquidBridgesRemainExplicitlyPartial(){
+    void armoredConduitsAndDirectionLiquidBridgesAreModeledTransport(){
         Building armored = place(Blocks.platedConduit, 10, 10, 0);
         Building directional = place(Blocks.reinforcedBridgeConduit, 14, 10, 0);
         LiquidNetwork graph = scan(AreaSelection.of(8, 8, 16, 12));
 
-        assertTrue(graph.unsupportedTransport.contains(AreaProbe.refOf(armored)));
-        assertTrue(graph.unsupportedTransport.contains(AreaProbe.refOf(directional)));
-        assertTrue(graph.partial());
+        assertFalse(graph.unsupportedTransport.contains(AreaProbe.refOf(armored)));
+        assertFalse(graph.unsupportedTransport.contains(AreaProbe.refOf(directional)));
+        assertFalse(graph.partial());
     }
 
     @Test
@@ -712,6 +709,25 @@ class MindustryLiquidProbeTest{
             input(AreaProbe.refOf(consumer), NetworkSide.north), hydrogen));
         assertFalse(graph.graph.isReachable(output(AreaProbe.refOf(source), NetworkSide.south),
             input(AreaProbe.refOf(consumer), NetworkSide.north), water));
+    }
+
+    @Test
+    void snapshotFailureIsRecordedWithoutInventingASupportedLiquidRoute() throws Exception{
+        Building conduit = place(Blocks.conduit, 10, 10, 0);
+
+        try(AutoCloseable ignored = ProbeSnapshotReader.replaceForTests(build -> {
+            throw new IllegalStateException("controlled snapshot failure");
+        })){
+            LiquidNetwork network = scan(AreaSelection.of(8, 8, 12, 12));
+
+            assertEquals(1, network.probeFailures.size());
+            assertEquals(AreaProbe.refOf(conduit), network.probeFailures.get(0).building);
+            assertEquals("snapshot", network.probeFailures.get(0).operation);
+            assertTrue(network.unsupportedTransport.isEmpty());
+            assertTrue(network.graph.edges.stream().allMatch(edge -> edge.from.building.equals(edge.to.building)),
+                "a failed endpoint probe must not invent an external liquid route");
+            assertTrue(network.partial());
+        }
     }
 
     private static LiquidNetwork scan(AreaSelection selection){

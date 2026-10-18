@@ -2,6 +2,7 @@ package factoryscope.area;
 
 import factoryscope.analysis.*;
 import factoryscope.network.*;
+import factoryscope.model.*;
 import org.junit.jupiter.api.*;
 
 import java.util.*;
@@ -373,5 +374,23 @@ class AreaAnalyzerTest{
         List<Integer> counts = new ArrayList<>();
         for(AreaIssueGroup group : result.issues) counts.add(group.buildingCount());
         return counts;
+    }
+
+    @Test
+    void aTurretWithoutAmmunitionIsCountedOnceNotOncePerAcceptedAmmunition(){
+        List<ResourceRef> accepted = List.of(new ResourceRef(ResourceKind.item, "copper", "Copper"),
+            new ResourceRef(ResourceKind.item, "graphite", "Graphite"), new ResourceRef(ResourceKind.item, "silicon", "Silicon"));
+        List<AreaEntry> entries = new ArrayList<>();
+        for(int i = 0; i < 2; i++){
+            entries.add(Areas.entry(Areas.ref("duo", "Duo"), FactorySnapshot.builder("Duo")
+                .family(ProductionFamily.turret).shouldConsume(false).gate(ProductionGate.noAmmo, accepted).build()));
+        }
+
+        AreaDiagnosticResult result = AreaAnalyzer.analyze(AREA, entries.size(), entries);
+        List<AreaIssueGroup> ammo = result.issues.stream().filter(group -> group.issue.reason == DiagnosticReason.noAmmo).toList();
+
+        assertEquals(1, ammo.size(), "the accepted ammunition are alternatives, not separate shortages");
+        assertNull(ammo.get(0).issue.resource);
+        assertEquals(2, ammo.get(0).buildingCount());
     }
 }

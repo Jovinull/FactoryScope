@@ -314,4 +314,113 @@ class FactoryAnalyzerTest{
         result.findings.forEach(finding -> reasons.add(finding.reason));
         return reasons;
     }
+
+    // ------------------------------------------------------------------ verified production gates
+
+    @Test
+    void aVerifiedGateExplainsTheStateWithoutAFallback(){
+        FactorySnapshot snapshot = FactorySnapshot.builder("Mechanical Drill")
+            .family(ProductionFamily.drill)
+            .efficiency(0f, 0f)
+            .shouldConsume(false)
+            .gate(ProductionGate.noResource)
+            .build();
+
+        DiagnosticResult result = FactoryAnalyzer.analyze(snapshot);
+
+        assertEquals(DiagnosticReason.noResource, result.reason());
+        assertEquals(Severity.stopped, result.severity());
+        assertEquals("drill", result.primary.variant);
+        assertEquals(1, result.findings.size(), "the gate is the explanation; nothing is guessed on top of it");
+    }
+
+    @Test
+    void aDisabledBuildingOutranksItsGate(){
+        FactorySnapshot snapshot = FactorySnapshot.builder("Duo")
+            .family(ProductionFamily.turret)
+            .enabled(false)
+            .gate(ProductionGate.noAmmo)
+            .build();
+
+        assertEquals(DiagnosticReason.disabled, FactoryAnalyzer.analyze(snapshot).reason());
+    }
+
+    @Test
+    void anIdleTurretIsReadyRatherThanHaltedForAnUnknownCause(){
+        FactorySnapshot snapshot = FactorySnapshot.builder("Duo")
+            .family(ProductionFamily.turret)
+            .efficiency(0f, 1f)
+            .shouldConsume(false)
+            .gate(ProductionGate.idle)
+            .build();
+
+        DiagnosticResult result = FactoryAnalyzer.analyze(snapshot);
+
+        assertEquals(DiagnosticReason.turretIdle, result.reason());
+        assertEquals(Severity.normal, result.severity());
+        assertTrue(result.findings.stream().noneMatch(finding -> finding.reason == DiagnosticReason.haltedUnknownCause));
+    }
+
+    @Test
+    void gateResourcesBecomeTheFindingsSubject(){
+        ResourceRef titanium = new ResourceRef(ResourceKind.item, "titanium", "Titanium");
+        FactorySnapshot snapshot = FactorySnapshot.builder("Mechanical Drill")
+            .family(ProductionFamily.drill)
+            .shouldConsume(false)
+            .gate(ProductionGate.resourceTooHard, List.of(titanium))
+            .build();
+
+        DiagnosticResult result = FactoryAnalyzer.analyze(snapshot);
+
+        assertEquals(DiagnosticReason.resourceTooHard, result.reason());
+        assertEquals(List.of(titanium), result.primary.resources);
+    }
+
+    @Test
+    void extractorsWithoutTheirOwnWordingUseTheSharedOneOrThePumpOne(){
+        FactorySnapshot extractor = FactorySnapshot.builder("Water Extractor")
+            .family(ProductionFamily.solidPump).gate(ProductionGate.noResource).build();
+        FactorySnapshot generator = FactorySnapshot.builder("Generator")
+            .family(ProductionFamily.generator).gate(ProductionGate.noResource).build();
+
+        assertEquals("pump", FactoryAnalyzer.analyze(extractor).primary.variant);
+        assertNull(FactoryAnalyzer.analyze(generator).primary.variant);
+    }
+
+    @Test
+    void aMissingPayloadIsItsOwnShortage(){
+        FactorySnapshot snapshot = FactorySnapshot.builder("Tank Assembler")
+            .family(ProductionFamily.unitAssembler)
+            .efficiency(0f, 0f)
+            .input(ResourceState.of(ResourceKind.unit, "Stell").contentId("stell").satisfaction(0f)
+                .amounts(1, 4, RateUnit.perCraft).build())
+            .build();
+
+        DiagnosticResult result = FactoryAnalyzer.analyze(snapshot);
+
+        assertEquals(DiagnosticReason.missingPayloadInput, result.reason());
+        assertEquals("stell", result.primary.resources.get(0).id);
+    }
+
+    @Test
+    void aFindingRejectsAWordingItsReasonDoesNotHave(){
+        assertThrows(IllegalArgumentException.class,
+            () -> new Finding(DiagnosticReason.noAmmo, Severity.stopped, List.of(), true, "drill"));
+    }
+
+    @Test
+    void aTurretWithoutAmmunitionDoesNotRepeatItsAmmunitionAsAnItemShortage(){
+        ResourceRef copper = new ResourceRef(ResourceKind.item, "copper", "Copper");
+        FactorySnapshot snapshot = FactorySnapshot.builder("Duo")
+            .family(ProductionFamily.turret)
+            .efficiency(0f, 0f)
+            .input(ResourceState.of(ResourceKind.item, "Any accepted item").satisfaction(0f).build())
+            .gate(ProductionGate.noAmmo, List.of(copper))
+            .build();
+
+        DiagnosticResult result = FactoryAnalyzer.analyze(snapshot);
+
+        assertEquals(DiagnosticReason.noAmmo, result.reason());
+        assertEquals(1, result.findings.size(), "the ammunition shortage is already the gate");
+    }
 }

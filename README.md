@@ -18,8 +18,10 @@ does not change blocks, inventories, power, or the world.
 
 ## What it includes
 
-- **Building diagnostics** for operating state, recognized input shortages, output limits, and
-  supported production estimates.
+- **Building diagnostics** for operating state, recognized input shortages, output limits, and production
+  rates for crafters, drills, pumps and extractors, separators, generators and reactors, unit factories, and
+  turrets, each derived from the engine's own values and rules. What only an estimate can describe, such as a separator's
+  random output or a turret's fire while it has targets, is marked as an estimate.
 - **Area Diagnostics** to summarize selected friendly buildings and group their current findings.
 - **Network** to inspect supported, resource-aware item routes in a selected area.
 - **Supply Trace** to follow structural item routes to reachable producers, storage, boundaries, and
@@ -57,7 +59,7 @@ take a scheduled index refresh to reflect a new release.
 
 **Steam Workshop:** subscribe to
 [FactoryScope on the Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151)
-and start Mindustry from Steam. The Workshop item carries the unchanged 1.1.0 release.
+and start Mindustry from Steam. The Workshop item carries the same jar as the GitHub release.
 
 **GitHub Releases:** download [`FactoryScope.jar`](https://github.com/Jovinull/FactoryScope/releases/latest)
 and import it from Mindustry's Mods menu. This is the manual fallback if the browser listing has not
@@ -95,24 +97,27 @@ valid route or a proven dead end.
 
 ## Support and validation
 
-FactoryScope targets Mindustry v8 Build 160 (`minGameVersion: 160`). The published 1.1.0 artifact
-was validated in the real client against v160.5 and, unchanged, against v160.7, the current
-validation build. The [support matrix](docs/support-matrix.md) lists modeled, partial, and deferred
-transport families. Common conveyor/conduit routes, junctions, routers, sorters, configured item
-bridges, and the Armored Conveyor/Armored Duct insertion rules are modeled. Stateful stack transports,
-unloaders, Duct Bridges, Mass Drivers, armored conduits, and liquid bridges remain partial; unknown
-custom routing stays conservative.
+FactoryScope targets Mindustry v8 Build 160 (`minGameVersion: 160`). FactoryScope 1.2.0 was
+validated in the real client against v160.7, the current validation build, in all six languages. The
+[support matrix](docs/support-matrix.md) lists modeled, partial, and deferred transport families.
+Common conveyor/conduit routes, junctions, routers, sorters, configured item
+bridges, and the Armored Conveyor/Armored Duct insertion rules are modeled, and so are every other vanilla
+item and liquid transport: Plastanium and Surge Conveyors, Duct Bridges, Unloaders and Duct Unloaders, Mass
+Drivers, armored conduits, and liquid bridges. Unknown custom routing stays conservative.
 
 Desktop graphical acceptance has been performed on Windows. Launcher/path tests run on Windows,
 Linux, and macOS; that is not graphical validation on those platforms. The universal JAR contains a
 structurally validated DEX, but Android runtime and touch have not been independently validated.
-Remote multiplayer behavior has not been independently validated. See
+Multiplayer has been validated with an official v160.7 dedicated server and client: on a fog-of-war
+server, the client reaches the same diagnoses, area reports, traces, and power grids as the server,
+and enemy buildings hidden by fog stay out of reach. See
 [open Android validation issue #1](https://github.com/Jovinull/FactoryScope/issues/1).
 
 ## Bug reports and development
 
-When [reporting a bug](https://github.com/Jovinull/FactoryScope/issues/new), include the Mindustry
-build, steps to reproduce, and a screenshot or relevant log excerpt when possible. The project favors
+[Open an issue](https://github.com/Jovinull/FactoryScope/issues/new/choose) with the form that fits: a
+bug, a diagnosis the game contradicts, a feature request, or a translation problem. Each form asks for the
+Mindustry build, how to reproduce it, and a screenshot or log excerpt. The project favors
 reproducible tests and engine-backed evidence over speculative fixes.
 
 Builds require JDK 17. The Gradle wrapper downloads the pinned build dependencies.

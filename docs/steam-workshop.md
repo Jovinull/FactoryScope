@@ -1,7 +1,7 @@
 # Steam Workshop
 
 FactoryScope is distributed through GitHub Releases, the Mindustry Mod Browser, and the
-[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151) (item `3820843151`, published
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151) (item `3820843151`, first published
 2026-10-16 with the unchanged 1.1.0 release). The Workshop item is updated separately, by hand, from the owner's
 Steam client. This page records how Mindustry publishes a mod, how the Workshop folder is built from a release,
 and the listing text.
@@ -41,7 +41,7 @@ The Workshop content is the published release artifact, unpacked, plus the previ
    out of it.
 
 For a later release, delete the folder's contents except `preview.png` before extracting the new jar, so no
-class from the previous version is left behind, then use **Update**.
+class from the previous version is left behind, then use **Update** (see below).
 
 ## Publishing
 
@@ -58,6 +58,21 @@ class from the previous version is left behind, then use **Update**.
    Workshop copy is loaded. Check the building inspector, Area Diagnostics, Network, Supply Trace, PowerScope,
    and LiquidScope in a game.
 7. Make the item Public, and add the Workshop link to the README's install section.
+
+## Updating to a new release
+
+1. Close Mindustry. In the Workshop folder, delete everything except `preview.png`, then extract the new
+   release's `FactoryScope.jar` into it as described above.
+2. Unsubscribe from the Workshop item and let Steam remove its download. While it is subscribed, Mindustry
+   loads the Workshop copy instead of the local folder (`Mods.load` keeps the last mod found with a name, and
+   Workshop content is listed after `saves/mods`), and **Update** would upload that old copy again. Start
+   Mindustry from Steam.
+3. Open **Mods** and confirm that FactoryScope shows the new version once, enabled, and without errors.
+4. Open the mod's Workshop menu, choose **Update**, and paste the change note for that release below. Leave
+   **update description** unticked.
+5. On the item's Steam page, replace the description with the listing text below if it changed.
+6. Close Mindustry, remove the local folder from `saves/mods`, subscribe again, and confirm that the Workshop
+   copy loads with the new version.
 
 ## Listing text
 
@@ -80,7 +95,7 @@ Instead of adding new blocks, resources, units, or production chains, FactorySco
 
 [h2]Building Diagnostics[/h2]
 
-Inspect a building and see its current operating state, recognized input shortages, output limitations, and supported production estimates.
+Inspect a building and see its current operating state, recognized input shortages, output limitations, and production rates for crafters, drills, pumps, extractors, separators, generators, reactors, unit factories, and turrets, derived from the game's own values and rules. Values that only an estimate can describe are marked as estimates.
 
 [h2]Area Diagnostics[/h2]
 
@@ -90,9 +105,9 @@ Repeated findings are grouped together, making it easier to identify patterns ac
 
 [h2]Network[/h2]
 
-Inspect supported, resource-aware item connections across a selected factory area.
+Inspect resource-aware item connections across a selected factory area. Every vanilla item transport is modeled, including bridges, unloaders, plastanium and surge conveyors, and mass drivers.
 
-FactoryScope keeps unsupported or uncertain transport explicitly incomplete instead of guessing how it behaves.
+FactoryScope keeps modded transport it does not understand explicitly incomplete instead of guessing how it behaves.
 
 [h2]Supply Trace[/h2]
 
@@ -106,7 +121,7 @@ Inspect Mindustry's power grids using engine-maintained state, including generat
 
 [h2]LiquidScope[/h2]
 
-Inspect supported liquid and gas routes, producers, consumers, storage, and structural connectivity.
+Inspect liquid and gas routes, producers, consumers, storage, and structural connectivity, including bridge, phase, and armored conduits.
 
 [h2]Read-only by design[/h2]
 
@@ -157,11 +172,11 @@ FactoryScope supports:
 
 [h2]Compatibility[/h2]
 
-FactoryScope 1.1.0 targets Mindustry v8 Build 160+.
+FactoryScope 1.2.0 targets Mindustry v8 Build 160+.
 
-The 1.1.0 release was validated in the real game against Mindustry 160.5 and, unchanged, against Mindustry 160.7.
+The 1.2.0 release was validated in the real game against Mindustry 160.7, in every supported language, and in multiplayer with an official dedicated server.
 
-Some specialized and state-dependent transport remains intentionally partial rather than being approximated with unreliable routing. Remote multiplayer behavior has not been independently validated.
+Unit cargo and payload logistics are not modeled yet, and modded transport with its own routing code is shown as incomplete rather than guessed.
 
 [h2]Open Source[/h2]
 
@@ -169,7 +184,7 @@ FactoryScope is open source under GPL-3.0.
 
 [url=https://github.com/Jovinull/FactoryScope]GitHub Repository[/url]
 
-[url=https://github.com/Jovinull/FactoryScope/issues]Report an Issue[/url]
+[url=https://github.com/Jovinull/FactoryScope/issues/new/choose]Report an Issue[/url]
 
 Feedback is especially useful when you find incorrect diagnostics, unusual factory layouts, or transport that FactoryScope does not yet understand.
 ```
@@ -189,4 +204,17 @@ FactoryScope 1.1.0 — Initial Steam Workshop Release
 - Compatibility and diagnostic hardening for Mindustry v8
 
 FactoryScope is read-only and does not modify factory state.
+```
+
+### 1.2.0 change note
+
+At most 400 characters, for the in-game **Update** dialog.
+
+```text
+FactoryScope 1.2.0
+
+- Production rates and stop reasons for drills, pumps, extractors, separators, generators, reactors, unit factories and turrets
+- Every vanilla item and liquid transport is now modeled: duct bridges, unloaders, plastanium and surge conveyors, mass drivers, bridge and armored conduits
+- Supply Trace lists only real dead ends
+- Validated in multiplayer on Mindustry 160.7
 ```

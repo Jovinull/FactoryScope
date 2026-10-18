@@ -134,6 +134,7 @@ public final class FactoryScopePanel extends BaseDialog{
         buildVerdict(snapshot, result);
         if(snapshot.efficiencyTracked) buildEfficiency(snapshot);
         if(snapshot.hasKnownProduction()) buildProduction(snapshot);
+        if(!snapshot.facts.isEmpty()) buildFacts(snapshot);
         if(!snapshot.inputs.isEmpty()) buildInputs(snapshot);
         if(!snapshot.outputs.isEmpty()) buildBuffers(snapshot);
         if(snapshot.power != null || target.power != null) buildPower(snapshot.power);
@@ -203,9 +204,7 @@ public final class FactoryScopePanel extends BaseDialog{
                 table.table(row -> {
                     icon(row, output.kind, output.contentId);
                     name(row, output.name);
-                    row.add(FsBundle.format("value.rate",
-                            Numbers.rate(output.expectedPerSecond), Numbers.rate(output.theoreticalPerSecond)))
-                        .color(rateColor(output)).right();
+                    row.add(rateText(output)).color(rateColor(output)).right();
                 }).growX().padBottom(2f).row();
             }
             if(snapshot.craftTimeSeconds > 0f){
@@ -213,6 +212,20 @@ public final class FactoryScopePanel extends BaseDialog{
                     FsBundle.format("value.seconds", Numbers.rate(snapshot.craftTimeSeconds)), Pal.lightishGray);
             }
             table.labelWrap(FsBundle.get("panel.rate-note")).color(Pal.gray).growX().padTop(6f).row();
+        });
+    }
+
+    private void buildFacts(FactorySnapshot snapshot){
+        section("section.details");
+        panel(table -> {
+            for(Fact fact : snapshot.facts){
+                if(!fact.printable()) continue;
+                table.table(row -> {
+                    if(fact.iconKind != null) icon(row, fact.iconKind, fact.iconId);
+                    name(row, FsBundle.get(fact.labelKey));
+                    row.add(factText(fact)).color(toneColor(fact.tone)).right();
+                }).growX().padBottom(2f).row();
+            }
         });
     }
 
@@ -346,11 +359,18 @@ public final class FactoryScopePanel extends BaseDialog{
     }
 
     private void buildNotes(FactorySnapshot snapshot){
-        if(snapshot.support == SupportLevel.full && !snapshot.consumersBypassed) return;
+        boolean estimates = snapshot.hasEstimates();
+        if(snapshot.support == SupportLevel.full && !snapshot.consumersBypassed && !estimates && snapshot.notes.isEmpty()) return;
 
         panel(table -> {
             if(snapshot.support != SupportLevel.full){
                 table.labelWrap(FsBundle.get("panel.limited-support")).color(Pal.lightOrange).growX().row();
+            }
+            if(estimates){
+                table.labelWrap(FsBundle.get("panel.estimate-note")).color(Pal.lightishGray).growX().padTop(4f).row();
+            }
+            for(String note : snapshot.notes){
+                table.labelWrap(FsBundle.get(note)).color(Pal.lightishGray).growX().padTop(4f).row();
             }
             if(snapshot.consumersBypassed){
                 table.labelWrap(FsBundle.get("panel.consumers-bypassed")).color(Pal.accent).growX().padTop(4f).row();
@@ -413,6 +433,48 @@ public final class FactoryScopePanel extends BaseDialog{
         if(input.satisfied()) return BlockStatus.active.color;
         if(input.optional) return Pal.lightishGray;
         return input.missing() ? Pal.remove : Pal.lightOrange;
+    }
+
+    /** Current against nominal, in the unit the player reads each kind of output in. */
+    private static String rateText(OutputState output){
+        String text = switch(output.kind){
+            case power -> FsBundle.format("value.power-rate-pair",
+                Numbers.rate(output.expectedPerSecond), Numbers.rate(output.theoreticalPerSecond));
+            //a unit every 15 seconds reads better as 4 per minute than as 0.067 per second
+            case unit -> FsBundle.format("value.rate-per-minute",
+                Numbers.rate(output.expectedPerSecond * 60f), Numbers.rate(output.theoreticalPerSecond * 60f));
+            default -> FsBundle.format("value.rate",
+                Numbers.rate(output.expectedPerSecond), Numbers.rate(output.theoreticalPerSecond));
+        };
+        return output.estimate ? FsBundle.format("value.estimate", text) : text;
+    }
+
+    private static String factText(Fact fact){
+        String text = switch(fact.format){
+            case text -> fact.text;
+            case percent -> Numbers.percent(fact.value);
+            case amountOf -> FsBundle.format("value.of", Numbers.amount(fact.value), Numbers.amount(fact.total));
+            case seconds -> FsBundle.format("value.seconds", Numbers.rate(fact.value));
+            case multiplier -> Numbers.multiplier(fact.value);
+            case count -> Integer.toString(Math.round(fact.value));
+            case itemsPerSecond -> FsBundle.format("value.items-per-second", Numbers.rate(fact.value));
+            case liquidPerSecond -> FsBundle.format("value.liquid-per-second", Numbers.rate(fact.value));
+            case powerPerSecond -> FsBundle.format("value.power-rate", Numbers.rate(fact.value));
+            case perSecond -> FsBundle.format("value.times-per-second", Numbers.rate(fact.value));
+            case perMinute -> FsBundle.format("value.times-per-minute", Numbers.rate(fact.value));
+            case heat -> FsBundle.format("value.heat", Numbers.amount(fact.value));
+            case flag -> FsBundle.get(fact.value > 0f ? "value.yes" : "value.no");
+        };
+        return fact.estimate ? FsBundle.format("value.estimate", text) : text;
+    }
+
+    private static Color toneColor(Fact.Tone tone){
+        return switch(tone){
+            case normal -> Pal.lightishGray;
+            case good -> BlockStatus.active.color;
+            case warning -> Pal.lightOrange;
+            case danger -> Pal.remove;
+        };
     }
 
     private Color rateColor(OutputState output){

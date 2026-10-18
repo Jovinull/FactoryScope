@@ -202,6 +202,50 @@ class TraceAnalyzerTest{
     }
 
     @Test
+    void freeSidesOfAFedConveyorAreNotDeadEnds(){
+        BuildingRef producer = ref("drill", 1), belt = ref("conveyor", 2), target = ref("smelter", 3);
+        NetworkPort producerOut = port(producer, NetworkSide.east, "out");
+        NetworkPort back = port(belt, NetworkSide.west, "in"), left = port(belt, NetworkSide.north, "in"),
+            right = port(belt, NetworkSide.south, "in"), front = port(belt, NetworkSide.east, "out");
+        NetworkPort targetIn = port(target, NetworkSide.west, "in");
+        NetworkGraph graph = graph(List.of(producerOut, back, left, right, front, targetIn), List.of(
+            edge(producerOut, back, ItemConstraint.any()), edge(back, front, ItemConstraint.any()),
+            edge(left, front, ItemConstraint.any()), edge(right, front, ItemConstraint.any()),
+            edge(front, targetIn, ItemConstraint.any())));
+
+        SupplyTrace trace = input(network(graph), target, sand, List.of(
+            producer(producer, sand, DiagnosticReason.active), consumer(target, sand)));
+
+        assertTrue(trace.structuralDeadEnds.isEmpty(), "the unused sides belong to a route that is fed from behind");
+    }
+
+    @Test
+    void aJunctionAxisThatIsNotFedIsADeadEndEvenWhenItsOtherAxisIs(){
+        BuildingRef producer = ref("drill", 1), junction = ref("junction", 2), first = ref("conveyor", 3),
+            second = ref("conveyor", 4), target = ref("smelter", 5);
+        NetworkPort producerOut = port(producer, NetworkSide.south, "out");
+        NetworkPort fedIn = port(junction, NetworkSide.north, "in"), fedOut = port(junction, NetworkSide.south, "out");
+        NetworkPort deadIn = port(junction, NetworkSide.west, "in"), deadOut = port(junction, NetworkSide.east, "out");
+        NetworkPort firstIn = port(first, NetworkSide.north, "in"), firstOut = port(first, NetworkSide.east, "out");
+        NetworkPort secondIn = port(second, NetworkSide.west, "in"), secondOut = port(second, NetworkSide.east, "out");
+        NetworkPort targetSouth = port(target, NetworkSide.south, "in"), targetWest = port(target, NetworkSide.west, "in");
+        NetworkGraph graph = graph(List.of(producerOut, fedIn, fedOut, deadIn, deadOut, firstIn, firstOut, secondIn,
+            secondOut, targetSouth, targetWest), List.of(
+            edge(producerOut, fedIn, ItemConstraint.any()), edge(fedIn, fedOut, ItemConstraint.any()),
+            edge(deadIn, deadOut, ItemConstraint.any()), edge(fedOut, firstIn, ItemConstraint.any()),
+            edge(firstIn, firstOut, ItemConstraint.any()), edge(firstOut, targetSouth, ItemConstraint.any()),
+            edge(deadOut, secondIn, ItemConstraint.any()), edge(secondIn, secondOut, ItemConstraint.any()),
+            edge(secondOut, targetWest, ItemConstraint.any())));
+
+        SupplyTrace trace = input(network(graph), target, sand, List.of(
+            producer(producer, sand, DiagnosticReason.active), consumer(target, sand)));
+
+        assertEquals(List.of(producer), trace.producers().stream().map(endpoint -> endpoint.building).toList());
+        assertEquals(List.of(junction), trace.structuralDeadEnds,
+            "the west-to-east crossing leads nowhere even though the north-to-south crossing is fed");
+    }
+
+    @Test
     void boundaryContinuationPreventsNoRouteConclusion(){
         BuildingRef target = ref("smelter", 1);
         NetworkPort input = port(target, NetworkSide.west, "in");
@@ -637,6 +681,23 @@ class TraceAnalyzerTest{
         trace.endpoints.forEach(endpoint -> endpoint.path.addEdgesTo(highlighted));
 
         assertEquals(graph.edges.size(), highlighted.size());
+    }
+
+    @Test
+    void probeFailureIsDistinctFromUnsupportedAndPreventsANoRouteProof(){
+        BuildingRef target = ref("smelter", 1);
+        NetworkPort input = port(target, NetworkSide.west, "in");
+        TopologyProbeFailure failure = new TopologyProbeFailure(target, "snapshot");
+        ItemNetwork network = new ItemNetwork(graph(List.of(input), List.of()), List.of(), List.of(), List.of(),
+            List.of(), List.of(), List.of(), Map.of(), Map.of(), List.of(failure));
+
+        SupplyTrace trace = input(network, target, sand, List.of(consumer(target, sand)));
+
+        assertEquals(List.of(failure), network.probeFailures);
+        assertTrue(network.unsupportedTransport.isEmpty());
+        assertFalse(trace.complete);
+        assertFalse(trace.noRouteProven);
+        assertTrue(trace.structuralDeadEnds.isEmpty());
     }
 
     private static SupplyTrace input(ItemNetwork network, BuildingRef target, ResourceRef item, List<AreaEntry> entries){
