@@ -60,6 +60,9 @@ Conduits, Reinforced Bridge Conduits, and armored conduits) twice: the topology 
 then the engine runs (`HeadlessGame.run` updates power graphs, buildings and bullets) and must deliver there
 and nowhere the topology rules out. Acceptance rules are also compared with the engine's own `acceptItem` and
 `acceptLiquid` for every side and rotation.
+`probe/TraceDeadEndsTest` builds real conveyor, router and conduit layouts and checks that Supply Trace and
+LiquidScope name a dead end only where a route stops: a fed line has none, an unfed line ends at its first
+transport, and a router's unused outputs are not reported while its branch that leads nowhere is.
 Trace regressions cover local completeness when unrelated transport/diagnostic probes are skipped,
 separate no-endpoint versus no-route findings, multiple producer/dead-end branches, and output boundary
 and dead-end wording. An even-sized skipped multiblock fixture checks terminal adjacency against
