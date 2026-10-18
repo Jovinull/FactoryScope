@@ -312,15 +312,13 @@ public final class TraceAnalyzer{
         Set<BuildingRef> failed = new HashSet<>();
         for(TopologyProbeFailure failure : probeFailures) failed.add(failure.building);
         TreeSet<BuildingRef> result = new TreeSet<>(BUILDING_ORDER);
-        for(NetworkPort port : visited){
-            if(port.building.equals(target) || endpointRefs.contains(port.building)
-                || continuedOutside.contains(port) || failed.contains(port.building)) continue;
-            if(skipped.contains(port.building) || !skipped.adjacentTo(port).isEmpty()) continue;
-            boolean hasContinuation = direction == TraceDirection.input
-                ? graph.incoming(port).stream().anyMatch(edge -> edge.items.allows(item))
-                : graph.outgoing(port).stream().anyMatch(edge -> edge.items.allows(item));
-            if(!hasContinuation) result.add(port.building);
-        }
+        result.addAll(RouteDeadEnds.find(visited,
+            port -> direction == TraceDirection.input
+                ? graph.incoming(port).stream().filter(edge -> edge.items.allows(item)).map(edge -> edge.from).toList()
+                : graph.outgoing(port).stream().filter(edge -> edge.items.allows(item)).map(edge -> edge.to).toList(),
+            port -> continuedOutside.contains(port) || !skipped.adjacentTo(port).isEmpty(),
+            building -> building.equals(target) || endpointRefs.contains(building) || failed.contains(building)
+                || skipped.contains(building)));
         return List.copyOf(result);
     }
 
