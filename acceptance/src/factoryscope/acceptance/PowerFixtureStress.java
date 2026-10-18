@@ -60,8 +60,8 @@ final class PowerFixtureStress{
         if(current[1] != null) current[1].power.status = 1f;
         graph = current[0] == null ? null : current[0].power.graph;
         setupTick = state.tick;
-        harness.nextActionDelay = 1f;
-        harness.actions.insert(0, this::checkReady);
+        harness.context.nextActionDelay = 1f;
+        harness.context.actions.insert(0, this::checkReady);
     }
 
     private void checkReady(){
@@ -69,8 +69,8 @@ final class PowerFixtureStress{
         boolean ready = current[0] != null && current[0].getPowerProduction() > 0f
             && current[2] != null && current[2].shouldConsumePower;
         if(!ready && engineUpdates < 120){
-            harness.nextActionDelay = 1f;
-            harness.actions.insert(0, this::checkReady);
+            harness.context.nextActionDelay = 1f;
+            harness.context.actions.insert(0, this::checkReady);
             return;
         }
         if(graph != null) graph.update();
@@ -96,10 +96,10 @@ final class PowerFixtureStress{
         previousGraph = graph;
         iteration++;
         if(iteration < repetitions){
-            harness.nextActionDelay = 1f;
-            harness.actions.insert(0, this::prepare);
+            harness.context.nextActionDelay = 1f;
+            harness.context.actions.insert(0, this::prepare);
         }else{
-            harness.actions.add(harness::finish);
+            harness.context.actions.add(harness::finish);
         }
     }
 }

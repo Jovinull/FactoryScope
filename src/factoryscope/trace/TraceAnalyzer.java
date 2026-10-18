@@ -64,12 +64,13 @@ public final class TraceAnalyzer{
         List<TraceEndpoint> endpoints = endpoints(area.entries, network, portsByBuilding, target, item, direction, search);
         List<NetworkPort> boundaries = relevantBoundaries(network, search.visited, item, direction);
         List<NetworkInterruption> interruptions = relevantInterruptions(network, search.visited, direction);
+        List<TopologyProbeFailure> probeFailures = relevantProbeFailures(network, search.visited, target);
         List<BuildingRef> unsupportedInArea = relevantUnsupported(network, target, interruptions);
         List<BuildingRef> deadEnds = deadEnds(network.graph, search.visited, target, item, direction, endpoints,
-            boundaries, interruptions, relevantSkippedIndex, unlocatedSkipped > 0);
+            boundaries, interruptions, relevantSkippedIndex, unlocatedSkipped > 0, probeFailures);
 
         boolean complete = !diagnosticsIncomplete && !topologyIncomplete && unsupportedInArea.isEmpty()
-            && interruptions.isEmpty() && boundaries.isEmpty();
+            && interruptions.isEmpty() && boundaries.isEmpty() && probeFailures.isEmpty();
         boolean noRouteProven = endpoints.isEmpty() && complete && search.traversedEdges.isEmpty();
 
         List<NetworkFinding> findings = findings(direction, targetUsesItem, complete, endpoints, boundaries,
@@ -253,6 +254,16 @@ public final class TraceAnalyzer{
         return List.copyOf(result);
     }
 
+    private static List<TopologyProbeFailure> relevantProbeFailures(ItemNetwork network, Set<NetworkPort> visited,
+                                                                     BuildingRef target){
+        TreeSet<TopologyProbeFailure> result = new TreeSet<>();
+        for(TopologyProbeFailure failure : network.probeFailures){
+            if(failure.building.equals(target)) result.add(failure);
+            for(NetworkPort port : visited) if(port.building.equals(failure.building)) result.add(failure);
+        }
+        return List.copyOf(result);
+    }
+
     private static List<BuildingRef> relevantSkipped(SkippedBuildingIndex skipped, Set<NetworkPort> visited,
                                                       BuildingRef target, TraceDirection direction){
         String terminalChannel = direction == TraceDirection.input ? "in" : "out";
@@ -291,16 +302,19 @@ public final class TraceAnalyzer{
     private static List<BuildingRef> deadEnds(NetworkGraph graph, Set<NetworkPort> visited, BuildingRef target,
                                                ResourceRef item, TraceDirection direction, List<TraceEndpoint> endpoints,
                                                List<NetworkPort> boundaries, List<NetworkInterruption> interruptions,
-                                               SkippedBuildingIndex skipped, boolean hasUnlocatedSkipped){
+                                               SkippedBuildingIndex skipped, boolean hasUnlocatedSkipped,
+                                               List<TopologyProbeFailure> probeFailures){
         if(hasUnlocatedSkipped) return List.of();
         Set<BuildingRef> endpointRefs = new HashSet<>();
         for(TraceEndpoint endpoint : endpoints) endpointRefs.add(endpoint.building);
         Set<NetworkPort> continuedOutside = new HashSet<>(boundaries);
         for(NetworkInterruption interruption : interruptions) continuedOutside.add(interruption.port);
+        Set<BuildingRef> failed = new HashSet<>();
+        for(TopologyProbeFailure failure : probeFailures) failed.add(failure.building);
         TreeSet<BuildingRef> result = new TreeSet<>(BUILDING_ORDER);
         for(NetworkPort port : visited){
             if(port.building.equals(target) || endpointRefs.contains(port.building)
-                || continuedOutside.contains(port)) continue;
+                || continuedOutside.contains(port) || failed.contains(port.building)) continue;
             if(skipped.contains(port.building) || !skipped.adjacentTo(port).isEmpty()) continue;
             boolean hasContinuation = direction == TraceDirection.input
                 ? graph.incoming(port).stream().anyMatch(edge -> edge.items.allows(item))
