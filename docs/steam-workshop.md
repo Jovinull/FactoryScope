@@ -7,6 +7,13 @@ from the exact public release JAR; this entry records its size and digest below)
 by hand, from the owner's Steam client. This page records how Mindustry publishes a mod, how the Workshop folder is built from a release,
 and the listing text.
 
+## 1.2.1 release artifact
+
+The Workshop payload was extracted from the public [FactoryScope 1.2.1 GitHub release](https://github.com/Jovinull/FactoryScope/releases/tag/v1.2.1).
+Its `FactoryScope.jar` is 615,109 bytes, SHA-256
+`6967ce5040d438316273f129ea49057f124c958e2ed13a4881dac701e0128a7c`. The uploaded Workshop folder contains
+1,878,423 bytes (shown as 1.878 MB on the item page) and was updated on 2026-10-18 at 09:54.
+
 ## How Mindustry publishes a mod
 
 Checked against the Mindustry v160.7 sources (`Mods.LoadedMod`, `ModsDialog`, and the desktop `SWorkshop`):
