@@ -1,5 +1,6 @@
 package factoryscope.ui;
 
+import arc.Core;
 import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.math.*;
@@ -53,17 +54,19 @@ final class LocateOverlay{
         bar.setFillParent(true);
         bar.top();
         bar.update(this::update);
+        boolean compact = FactoryScopeUI.compactDialogButtons();
+        float width = Math.max(1f, Core.graphics.getWidth() / Scl.scl() - 32f);
         bar.table(Tex.buttonEdge3, inner -> {
             inner.margin(8f);
             inner.image(Icon.zoomSmall).size(24f).padRight(6f);
-            inner.add(build.block.localizedName).color(Pal.accent).padRight(4f);
-            inner.add(FsBundle.format("area.coordinates", ref.tileX, ref.tileY)).color(Pal.gray).padRight(12f);
+            inner.add(build.block.localizedName).color(Pal.accent).growX().ellipsis(true).minWidth(0f).padRight(4f);
+            inner.add(FsBundle.format("area.coordinates", ref.tileX, ref.tileY)).color(Pal.gray).padRight(compact ? 6f : 12f);
             //sized rather than left to shrink: an unsized icon-and-text button squeezes the two together
             inner.button(FsBundle.ref("area.return"), Icon.left, Styles.flatt, onReturn::run)
-                .size(210f, 44f).padRight(4f).name("factoryscope-locate-return");
+                .size(compact ? 160f : 210f, 44f).padRight(4f).name("factoryscope-locate-return");
             inner.button(Icon.cancelSmall, Styles.emptyi, onDismiss::run).size(36f)
                 .name("factoryscope-locate-dismiss");
-        }).padTop(90f);
+        }).padTop(90f).width(width);
 
         Vars.ui.hudGroup.addChild(bar);
     }

@@ -77,10 +77,12 @@ public final class AreaDiagnosticsDialog extends BaseDialog{
             .size(190f, 64f).name("factoryscope-area-refresh");
         buttons.button(FsBundle.ref("area.select-another"), Icon.grid, this::selectAnother)
             .size(250f, 64f).name("factoryscope-area-select");
+        if(FactoryScopeUI.compactDialogButtons()) buttons.row();
         buttons.button(FsBundle.ref("network.open"), Icon.list, this::openNetwork)
             .size(180f, 64f).name("factoryscope-area-network");
         buttons.button(FsBundle.ref("power.open"), Icon.power, this::openPower)
             .size(170f, 64f).name("factoryscope-area-power");
+        if(FactoryScopeUI.compactDialogButtons()) buttons.row();
         buttons.button(FsBundle.ref("liquid.open"), Icon.liquid, this::openLiquids)
             .size(185f, 64f).name("factoryscope-area-liquids");
         addCloseButton();
