@@ -19,6 +19,8 @@ public final class ItemNetwork{
     public final List<BuildingRef> unsupportedTransport;
     /** Known ports adjacent to unsupported transports, without inventing an edge through them. */
     public final List<NetworkInterruption> unsupportedConnections;
+    /** Unexpected live-probe failures; distinct from unsupported transport. */
+    public final List<TopologyProbeFailure> probeFailures;
     public final List<BuildingRef> storageEndpoints;
     public final NetworkCompleteness completeness;
     /** Items whose configuration or production metadata makes them relevant to this selection. */
@@ -33,7 +35,7 @@ public final class ItemNetwork{
                        Collection<BuildingRef> unsupportedTransport, Collection<NetworkInterruption> unsupportedConnections,
                        Collection<BuildingRef> storageEndpoints, Collection<ResourceRef> resources){
         this(graph, boundaryPorts, boundaryInputs, unsupportedTransport, unsupportedConnections, storageEndpoints,
-            resources, Map.of(), Map.of());
+            resources, Map.of(), Map.of(), List.of());
     }
 
     public ItemNetwork(NetworkGraph graph, Collection<NetworkPort> boundaryPorts, Collection<NetworkPort> boundaryInputs,
@@ -41,6 +43,16 @@ public final class ItemNetwork{
                        Collection<BuildingRef> storageEndpoints, Collection<ResourceRef> resources,
                        Map<NetworkPort, ItemConstraint> boundaryOutputConstraints,
                        Map<NetworkPort, ItemConstraint> boundaryInputConstraints){
+        this(graph, boundaryPorts, boundaryInputs, unsupportedTransport, unsupportedConnections, storageEndpoints,
+            resources, boundaryOutputConstraints, boundaryInputConstraints, List.of());
+    }
+
+    public ItemNetwork(NetworkGraph graph, Collection<NetworkPort> boundaryPorts, Collection<NetworkPort> boundaryInputs,
+                       Collection<BuildingRef> unsupportedTransport, Collection<NetworkInterruption> unsupportedConnections,
+                       Collection<BuildingRef> storageEndpoints, Collection<ResourceRef> resources,
+                       Map<NetworkPort, ItemConstraint> boundaryOutputConstraints,
+                       Map<NetworkPort, ItemConstraint> boundaryInputConstraints,
+                       Collection<TopologyProbeFailure> probeFailures){
         this.graph = Objects.requireNonNull(graph, "graph");
         this.boundaryPorts = ordered(boundaryPorts);
         this.boundaryInputs = ordered(boundaryInputs);
@@ -50,9 +62,11 @@ public final class ItemNetwork{
         List<NetworkInterruption> interruptions = new ArrayList<>(unsupportedConnections);
         Collections.sort(interruptions);
         this.unsupportedConnections = List.copyOf(interruptions);
+        this.probeFailures = List.copyOf(new TreeSet<>(probeFailures));
         this.storageEndpoints = orderedRefs(storageEndpoints);
-        this.completeness = this.unsupportedTransport.isEmpty() && this.unsupportedConnections.isEmpty()
-            ? NetworkCompleteness.complete : NetworkCompleteness.partialUnsupportedTransport;
+        this.completeness = !this.unsupportedTransport.isEmpty() || !this.unsupportedConnections.isEmpty()
+            ? NetworkCompleteness.partialUnsupportedTransport
+            : this.probeFailures.isEmpty() ? NetworkCompleteness.complete : NetworkCompleteness.partialProbeFailure;
         TreeSet<ResourceRef> orderedResources = new TreeSet<>(Comparator.comparing(ResourceRef::key));
         orderedResources.addAll(resources);
         this.resources = List.copyOf(orderedResources);

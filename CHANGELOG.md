@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Production models for drills, burst drills, plasma bores, cliff crushers, pumps, water and oil extractors,
+  separators, generators and reactors, unit factories, reconstructors, unit assemblers, and turrets: current and
+  nominal rates derived from the engine's own values and rules, verified stop conditions, and family-specific details.
+- New verdicts: nothing to extract, ore or walls too hard for the drill (named), no unit selected, unit cap reached,
+  waiting for a unit to upgrade (accepted units named), no ammunition (accepted ammunition named), payload shortage,
+  and a loaded turret that is ready with no target.
+- Estimates are marked as such: a separator's per-item output and a turret's fire and ammunition use while firing.
+- Separators, plasma bores and cliff crushers are structural item producers in Network and Supply Trace.
+- Every remaining vanilla transport is modeled in Network, Supply Trace and LiquidScope: Duct Bridges, Unloaders and
+  Duct Unloaders, Plastanium and Surge Conveyors, Mass Drivers, Plated and Reinforced Conduits, Bridge and Phase
+  Conduits, and Reinforced Bridge Conduits. Each follows the engine's own link, acceptance and state rules and is
+  checked against the running engine. They are no longer reported as unsupported transport.
+
+### Fixed
+
+- An unlinked item bridge was treated as able to dump toward a bridge linked into it, which the engine refuses.
+- A loaded item turret was reported as short of items, and an idle one as not consuming; its ammunition is now read
+  from the turret itself, and inspection never reorders it.
+- A turret with no ammunition is counted once in Area Diagnostics, not once per accepted ammunition, and its
+  ammunition is no longer repeated as an item shortage.
+- A failure to read a building's state while the topology was built went unnoticed, and an unreadable building just
+  outside the area was assumed to supply any item. Such a failure is now recorded and logged, and a trace that
+  touches it is never reported as complete, as a proven missing route, or as a dead end there.
+
+### Validation
+
+- Multiplayer: a new acceptance run joins an isolated official v160.7 dedicated server from an isolated official
+  client and checks that building diagnostics, Area Diagnostics, Network, Supply Trace, PowerScope, LiquidScope,
+  Inspect, and Locate give on the client what FactoryScope computes on the server, and that enemy buildings hidden
+  by fog stay out of reach although the client holds their synced state.
+
+### Changed
+
+- The "with production rates" count in Area Diagnostics now counts every building with a derived rate.
+- Supply Trace and LiquidScope list a dead end only where a route actually stops. The free sides of a fed conveyor,
+  conduit or router are no longer reported, so a simple drill-to-smelter line no longer lists every conveyor on it.
+  A route that really ends, such as an unfed line or a junction crossing nothing feeds, is still reported.
+
 ## 1.1.0
 
 ### Post-release validation

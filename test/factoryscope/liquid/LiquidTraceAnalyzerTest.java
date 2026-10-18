@@ -487,6 +487,23 @@ class LiquidTraceAnalyzerTest{
         assertEquals(List.of(pump), trace.producers().stream().map(endpoint -> endpoint.building).toList());
     }
 
+    @Test
+    void probeFailureIsDistinctFromUnsupportedAndPreventsANoRouteProof(){
+        BuildingRef target = ref("crafter", 1);
+        NetworkPort input = port(target, NetworkSide.west, "in");
+        TopologyProbeFailure failure = new TopologyProbeFailure(target, "snapshot");
+        LiquidNetwork network = new LiquidNetwork(graph(List.of(input), List.of()), List.of(), List.of(), Map.of(), Map.of(),
+            List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(water), List.of(failure));
+
+        LiquidTrace trace = LiquidTraceAnalyzer.input(area(network, entry(target, consumer(water))), target, water);
+
+        assertEquals(List.of(failure), network.probeFailures);
+        assertTrue(network.unsupportedTransport.isEmpty());
+        assertFalse(trace.complete);
+        assertFalse(trace.noRouteProven);
+        assertTrue(trace.structuralDeadEnds.isEmpty());
+    }
+
     private static AreaDiagnosticResult area(LiquidNetwork network, AreaEntry... entries){
         AreaDiagnosticResult area = AreaAnalyzer.analyze(selection, entries.length, List.of(entries));
         return area.withLiquids(network);

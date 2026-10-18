@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or feedback
+    url: https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151
+    about: Ask in the Steam Workshop comments. Open an issue when something in FactoryScope is wrong.
+  - name: Which blocks FactoryScope models
+    url: https://github.com/Jovinull/FactoryScope/blob/main/docs/support-matrix.md
+    about: Check the support matrix first. A block marked partial, deferred or limited shows less detail by design.

@@ -16,6 +16,11 @@ public final class AreaEntry{
     public final FactorySnapshot snapshot;
     public final DiagnosticResult result;
     public final AreaStatus status;
+    /**
+     * Whether FactoryScope derived a production rate for this building. Without a snapshot only the
+     * support level is known, and a fully supported building is assumed to have one.
+     */
+    public final boolean withRates;
 
     public AreaEntry(BuildingRef ref, SupportLevel support, DiagnosticResult result){
         this(ref, support, null, result);
@@ -31,6 +36,7 @@ public final class AreaEntry{
         this.snapshot = snapshot;
         this.result = result;
         this.status = AreaStatus.of(result.reason());
+        this.withRates = snapshot != null ? snapshot.hasKnownProduction() : support == SupportLevel.full;
     }
 
     @Override

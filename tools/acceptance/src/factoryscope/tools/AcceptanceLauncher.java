@@ -17,7 +17,7 @@ public final class AcceptanceLauncher{
     private static final Pattern RESULT = Pattern.compile("(?m)^.*\\[HARNESS] RESULT (PASS|FAIL)\\s*$");
     private static final Pattern STEAM_LIBRARY = Pattern.compile("\\\"path\\\"\\s+\\\"([^\\\"]+)\\\"");
     private static final Pattern MOD_VERSION = Pattern.compile("(?m)^\\s*version\\s*:\\s*\"([^\"]+)\"");
-    private static final String GAME_VERSION = "160.7";
+    static final String GAME_VERSION = "160.7";
     private static final String MOD_NAME = "factory-scope";
     private static final String HARNESS_NAME = "factory-scope-acceptance";
     private static final Map<String, String> ACCEPTANCE_LOCALES = Map.of(
@@ -355,7 +355,7 @@ public final class AcceptanceLauncher{
         result.add(path.toAbsolutePath().normalize());
     }
 
-    private static Path javaExecutable(OperatingSystem os){
+    static Path javaExecutable(OperatingSystem os){
         Path bin = Paths.get(System.getProperty("java.home"), "bin");
         Path candidate = bin.resolve(os == OperatingSystem.windows ? "java.exe" : "java");
         return Files.isRegularFile(candidate) ? candidate : Paths.get(os == OperatingSystem.windows ? "java.exe" : "java");

@@ -21,6 +21,11 @@ import java.util.*;
  *   <li>Finally {@code updateEfficiencyMultiplier()} scales the result by {@code efficiencyScale()},
  *       a block-specific multiplier (heat, terrain attributes).</li>
  * </ol>
+ *
+ * <p>A building covered by a production model can also carry a {@link ProductionGate}: a stopping
+ * condition the probe checked against that family's own rules (no ore under a drill, a unit factory with
+ * nothing selected, a turret without ammunition). It is evaluated right after the enabled check, because
+ * each one is a condition the engine tests before the building produces anything.
  */
 public final class FactoryAnalyzer{
     private static final float EPSILON = ResourceState.EPSILON;
@@ -52,11 +57,16 @@ public final class FactoryAnalyzer{
             return;
         }
 
+        if(s.gate != ProductionGate.none){
+            findings.add(gateFinding(s));
+            return;
+        }
+
         if(!s.shouldConsume){
             if(s.support == SupportLevel.full && s.outputBufferFull){
                 findings.add(Finding.of(DiagnosticReason.outputBlocked, Severity.stopped, blockedOutputs(s)));
             }else{
-                //only GenericCrafter has verified semantics for why a building declines to consume
+                //without a verified gate there is no telling why a building declines to consume
                 findings.add(Finding.of(DiagnosticReason.notConsuming, Severity.stopped));
             }
             return;
@@ -76,7 +86,10 @@ public final class FactoryAnalyzer{
     private static void addInputFindings(FactorySnapshot s, List<Finding> findings){
         if(s.consumersBypassed) return;
 
-        List<ResourceState> mandatory = s.mandatoryInputs();
+        List<ResourceState> mandatory = new ArrayList<>(s.mandatoryInputs());
+        //a turret's ammunition is declared as an input; when the ammunition gate already explains the
+        //state, the same shortage is not repeated as an input finding
+        if(s.gate == ProductionGate.noAmmo) mandatory.removeIf(input -> isAmmunition(s, input));
         if(mandatory.isEmpty()) return;
 
         float min = 1f;
@@ -124,6 +137,8 @@ public final class FactoryAnalyzer{
      */
     private static void addFallbackFinding(FactorySnapshot s, List<Finding> findings){
         if(!s.efficiencyTracked) return;
+        //a verified gate already explains the state, including the idle turret whose efficiency is zero
+        if(s.gate != ProductionGate.none) return;
         if(hasSeverity(findings, Severity.stopped) || hasSeverity(findings, Severity.reduced)) return;
         if(s.efficiency >= FULL) return;
 
@@ -142,9 +157,38 @@ public final class FactoryAnalyzer{
         return switch(kind){
             case item -> DiagnosticReason.missingItemInput;
             case liquid -> DiagnosticReason.missingLiquidInput;
+            case unit, block -> DiagnosticReason.missingPayloadInput;
             case power -> DiagnosticReason.insufficientPower;
             case other -> DiagnosticReason.otherConsumerLimited;
         };
+    }
+
+    private static boolean isAmmunition(FactorySnapshot s, ResourceState input){
+        if(input.kind != ResourceKind.item && input.kind != ResourceKind.liquid) return false;
+        return input.contentId == null || s.gateResources.contains(input.ref());
+    }
+
+    private static Finding gateFinding(FactorySnapshot s){
+        return switch(s.gate){
+            case outputFull -> Finding.of(DiagnosticReason.outputBlocked, Severity.stopped,
+                s.gateResources.isEmpty() ? blockedOutputs(s) : s.gateResources);
+            case noResource -> new Finding(DiagnosticReason.noResource, Severity.stopped, s.gateResources, true,
+                variant(DiagnosticReason.noResource, s.family));
+            case resourceTooHard -> new Finding(DiagnosticReason.resourceTooHard, Severity.stopped, s.gateResources, true,
+                variant(DiagnosticReason.resourceTooHard, s.family));
+            case noPlan -> Finding.of(DiagnosticReason.noPlanSelected, Severity.stopped);
+            case unitCapReached -> Finding.of(DiagnosticReason.unitCapReached, Severity.stopped, s.gateResources);
+            case waitingForUnit -> Finding.of(DiagnosticReason.waitingForUnit, Severity.stopped, s.gateResources);
+            case noAmmo -> Finding.of(DiagnosticReason.noAmmo, Severity.stopped, s.gateResources);
+            case idle -> Finding.of(DiagnosticReason.turretIdle, Severity.normal);
+            case none -> throw new IllegalStateException("no gate");
+        };
+    }
+
+    /** The family wording for a reason, or null when the family has none and the shared sentence applies. */
+    private static String variant(DiagnosticReason reason, ProductionFamily family){
+        String variant = family == ProductionFamily.solidPump ? "pump" : DiagnosticReason.slug(family.name());
+        return reason.variants().contains(variant) ? variant : null;
     }
 
     private static List<ResourceRef> blockedOutputs(FactorySnapshot s){

@@ -1,13 +1,16 @@
 package factoryscope.probe;
 
 import arc.struct.Seq;
+import factoryscope.FsLog;
 import factoryscope.area.*;
 import factoryscope.liquid.*;
 import factoryscope.model.*;
 import factoryscope.network.*;
 import mindustry.game.Team;
 import mindustry.gen.Building;
+import mindustry.world.blocks.distribution.DirectionBridge;
 import mindustry.world.blocks.distribution.DirectionLiquidBridge;
+import mindustry.world.blocks.distribution.ItemBridge;
 import mindustry.world.blocks.liquid.*;
 import mindustry.world.blocks.power.ConsumeGenerator;
 import mindustry.world.blocks.power.ThermalGenerator;
@@ -42,6 +45,7 @@ public final class MindustryLiquidProbe{
         Set<BuildingRef> unsupported = new TreeSet<>(REF_ORDER), storage = new TreeSet<>(REF_ORDER);
         Set<BuildingRef> incompleteInputs = new TreeSet<>(REF_ORDER), incompleteOutputs = new TreeSet<>(REF_ORDER);
         Set<LiquidInterruption> interruptions = new TreeSet<>();
+        Set<TopologyProbeFailure> probeFailures = new TreeSet<>();
         Set<LiquidUncertainty> incompleteConnections = new TreeSet<>();
         Map<BuildingRef, FactorySnapshot> resolvedSnapshots = new HashMap<>(snapshots);
         List<ResourceRef> resources = new ArrayList<>();
@@ -49,7 +53,7 @@ public final class MindustryLiquidProbe{
         for(var entry : buildings.entrySet()){
             Building build = entry.getValue();
             BuildingRef ref = entry.getKey();
-            FactorySnapshot snapshot = snapshot(build, ref, resolvedSnapshots);
+            FactorySnapshot snapshot = snapshot(build, ref, resolvedSnapshots, probeFailures);
             if(snapshot != null) addResources(resources, snapshot);
 
             if(build.block instanceof GenericCrafter crafter && crafter.outputLiquids != null){
@@ -110,12 +114,12 @@ public final class MindustryLiquidProbe{
                 Building neighbor = adjacent.building;
                 if(neighbor == null || neighbor.team != viewer || !MindustryFactoryProbe.canInspect(neighbor, viewer)) continue;
                 NetworkSide sourceSide = adjacent.side;
-                if(!outputSides(source, sourceSnapshot).contains(sourceSide)) continue;
+                if(!outputSides(source, sourceSnapshot).contains(sourceSide) || !acceptsLiquidFrom(neighbor, source)) continue;
                 LiquidConstraint sourceConstraint = outputConstraint(source, sourceSnapshot, sourceSide);
                 if(sourceConstraint == null) continue;
                 BuildingRef targetRef = refs.get(neighbor);
                 if(targetRef == null){
-                    FactorySnapshot outsideSnapshot = snapshot(neighbor, AreaProbe.refOf(neighbor), resolvedSnapshots);
+                    FactorySnapshot outsideSnapshot = snapshot(neighbor, AreaProbe.refOf(neighbor), resolvedSnapshots, probeFailures);
                     LiquidConstraint targetConstraint = inputConstraint(neighbor, outsideSnapshot, sourceSide.opposite());
                     LiquidConstraint compatible = targetConstraint == null ? null : sourceConstraint.intersection(targetConstraint);
                     if(compatible != null){
@@ -160,7 +164,7 @@ public final class MindustryLiquidProbe{
             for(Adjacent adjacent : adjacent(source)){
                 Building target = adjacent.building;
                 BuildingRef targetRef = refs.get(target);
-                if(targetRef == null || unsupported.contains(targetRef)) continue;
+                if(targetRef == null || unsupported.contains(targetRef) || !acceptsLiquidFrom(target, source)) continue;
                 LiquidConstraint targetConstraint = inputConstraint(target, resolvedSnapshots.get(targetRef),
                     adjacent.side.opposite());
                 if(targetConstraint != null) incompleteConnections.add(new LiquidUncertainty(
@@ -182,7 +186,7 @@ public final class MindustryLiquidProbe{
                 Building source = adjacent.building;
                 if(source == null || source.team != viewer || !MindustryFactoryProbe.canInspect(source, viewer)) continue;
                 BuildingRef sourceRef = refs.get(source);
-                if(sourceRef == null || !unsupported.contains(sourceRef)) continue;
+                if(sourceRef == null || !unsupported.contains(sourceRef) || !acceptsLiquidFrom(target, source)) continue;
                 NetworkSide targetSide = adjacent.side;
                 LiquidConstraint targetConstraint = inputConstraint(target, targetSnapshot, targetSide);
                 if(targetConstraint == null) continue;
@@ -200,13 +204,17 @@ public final class MindustryLiquidProbe{
             for(Adjacent adjacent : adjacent(target)){
                 Building source = adjacent.building;
                 if(source == null || source.team != viewer || refs.containsKey(source)
-                    || !MindustryFactoryProbe.canInspect(source, viewer)) continue;
+                    || !MindustryFactoryProbe.canInspect(source, viewer) || !acceptsLiquidFrom(target, source)) continue;
                 NetworkSide targetSide = adjacent.side;
                 LiquidConstraint targetConstraint = inputConstraint(target, targetSnapshot, targetSide);
                 if(targetConstraint == null || !source.block.hasLiquids) continue;
                 BuildingRef sourceRef = AreaProbe.refOf(source);
                 FactorySnapshot sourceSnapshot = null;
-                try{ sourceSnapshot = MindustryFactoryProbe.probe(source); }catch(Exception ignored){ }
+                try{
+                    sourceSnapshot = ProbeSnapshotReader.read(source);
+                }catch(Exception e){
+                    recordProbeFailure(probeFailures, sourceRef, "outside source snapshot", e);
+                }
                 LiquidConstraint sourceConstraint = outputConstraint(source, sourceSnapshot, targetSide.opposite());
                 if(isTransport(source) && !outputSides(source, sourceSnapshot).contains(targetSide.opposite())) continue;
                 if(isKnownEndpoint(source) && !outputSides(source, sourceSnapshot).contains(targetSide.opposite())) continue;
@@ -234,21 +242,98 @@ public final class MindustryLiquidProbe{
             }
         }
 
+        addRemoteEdges(buildings, refs, viewer, ports, edges, boundaryOut, boundaryIn, boundaryOutConstraints,
+            boundaryInConstraints, interruptions);
+
         return new LiquidNetwork(new LiquidNetworkGraph(ports, edges), boundaryOut, boundaryIn,
             boundaryOutConstraints, boundaryInConstraints, unsupported, interruptions, storage,
-            incompleteInputs, incompleteOutputs, incompleteConnections, resources);
+            incompleteInputs, incompleteOutputs, incompleteConnections, resources, probeFailures);
     }
 
-    private static FactorySnapshot snapshot(Building build, BuildingRef ref, Map<BuildingRef, FactorySnapshot> snapshots){
+    /**
+     * Bridge transfers. A linked bridge sends to its target instead of its neighbors; a bridge that others link to
+     * receives on the side they arrive from. Endpoints outside the area become boundary continuations.
+     */
+    private static void addRemoteEdges(Map<BuildingRef, Building> buildings, Map<Building, BuildingRef> refs, Team viewer,
+                                       List<NetworkPort> ports, List<LiquidNetworkEdge> edges,
+                                       Set<NetworkPort> boundaryOut, Set<NetworkPort> boundaryIn,
+                                       Map<NetworkPort, LiquidConstraint> boundaryOutConstraints,
+                                       Map<NetworkPort, LiquidConstraint> boundaryInConstraints,
+                                       Set<LiquidInterruption> interruptions){
+        for(var entry : buildings.entrySet()){
+            Building build = entry.getValue();
+            BuildingRef ref = entry.getKey();
+            if(!isTransport(build)) continue;
+            Building target = bridgeTarget(build);
+            if(target != null){
+                NetworkSide side = TransportLinks.sideTo(build, target);
+                if(build instanceof DirectionBridge.DirectionBridgeBuild) side = NetworkSide.rotation(build.rotation);
+                NetworkPort out = out(ref, side);
+                ports.add(out);
+                BuildingRef targetRef = refs.get(target);
+                if(isUnsupportedTransport(target, null)){
+                    interruptions.add(new LiquidInterruption(out, targetRef == null ? AreaProbe.refOf(target) : targetRef,
+                        LiquidInterruption.Direction.outgoing, LiquidConstraint.any()));
+                }else if(targetRef == null){
+                    boundaryOut.add(out);
+                    merge(boundaryOutConstraints, out, LiquidConstraint.any());
+                }else{
+                    edges.add(new LiquidNetworkEdge(out, in(targetRef, side.opposite()), LiquidConstraint.any()));
+                }
+            }
+            for(Building source : bridgeSources(build)){
+                NetworkPort port = in(ref, TransportLinks.sideTo(build, source));
+                ports.add(port);
+                if(!refs.containsKey(source)){
+                    boundaryIn.add(port);
+                    merge(boundaryInConstraints, port, LiquidConstraint.any());
+                }
+            }
+        }
+    }
+
+    /** The bridge {@code build} transfers to, or null when it is not a linked bridge. */
+    private static Building bridgeTarget(Building build){
+        if(build instanceof LiquidBridge.LiquidBridgeBuild bridge) return TransportLinks.bridgeTarget(bridge, build.team);
+        if(build instanceof DirectionLiquidBridge.DuctBridgeBuild bridge) return TransportLinks.directionTarget(bridge, build.team);
+        return null;
+    }
+
+    /** The bridges linked into {@code build}. */
+    private static List<Building> bridgeSources(Building build){
+        if(build instanceof LiquidBridge.LiquidBridgeBuild bridge) return List.copyOf(TransportLinks.bridgeSources(bridge, build.team));
+        if(build instanceof DirectionLiquidBridge.DuctBridgeBuild bridge) return List.copyOf(TransportLinks.directionSources(bridge, build.team));
+        return List.of();
+    }
+
+    /**
+     * {@code ArmoredConduitBuild.acceptLiquid}: beside its back, an armored conduit only accepts conduits, liquid
+     * junctions and directional liquid bridges. Every other modeled block accepts any source on an input side.
+     */
+    private static boolean acceptsLiquidFrom(Building target, Building source){
+        if(!(target.block instanceof ArmoredConduit) || target.tile == null || source.tile == null) return true;
+        return source.block instanceof Conduit || source.block instanceof DirectionLiquidBridge
+            || source.block instanceof LiquidJunction || source.tile.absoluteRelativeTo(target.tile.x, target.tile.y) == target.rotation;
+    }
+
+    private static FactorySnapshot snapshot(Building build, BuildingRef ref, Map<BuildingRef, FactorySnapshot> snapshots,
+                                            Set<TopologyProbeFailure> probeFailures){
         FactorySnapshot snapshot = snapshots.get(ref);
         if(snapshot != null) return snapshot;
         try{
-            snapshot = MindustryFactoryProbe.probe(build);
+            snapshot = ProbeSnapshotReader.read(build);
             snapshots.put(ref, snapshot);
             return snapshot;
-        }catch(Exception ignored){
+        }catch(Exception e){
+            recordProbeFailure(probeFailures, ref, "snapshot", e);
             return null;
         }
+    }
+
+    private static void recordProbeFailure(Set<TopologyProbeFailure> failures, BuildingRef ref, String operation, Exception cause){
+        failures.add(new TopologyProbeFailure(ref, operation));
+        FsLog.warnOnce("liquid-topology:" + operation + ":" + ref,
+            "liquid topology probe failed at " + ref + " while reading " + operation, cause);
     }
 
     private static void addResources(List<ResourceRef> resources, FactorySnapshot snapshot){
@@ -267,24 +352,24 @@ public final class MindustryLiquidProbe{
     }
 
     private static boolean isTransport(Building build){
-        return usesRecognizedLiquidTransportBuild(build) && (build instanceof Conduit.ConduitBuild && !(build.block instanceof ArmoredConduit)
+        return usesRecognizedLiquidTransportBuild(build) && (build instanceof Conduit.ConduitBuild
             || build instanceof LiquidJunction.LiquidJunctionBuild
-            || build instanceof LiquidRouter.LiquidRouterBuild);
+            || build instanceof LiquidRouter.LiquidRouterBuild
+            || build instanceof LiquidBridge.LiquidBridgeBuild
+            || build instanceof DirectionLiquidBridge.DuctBridgeBuild);
     }
 
     private static boolean usesRecognizedLiquidTransportBuild(Building build){
         Class<?> type = build.getClass();
         return type == Conduit.ConduitBuild.class
+            || type == ArmoredConduit.ArmoredConduitBuild.class
             || type == LiquidJunction.LiquidJunctionBuild.class
-            || type == LiquidRouter.LiquidRouterBuild.class;
+            || type == LiquidRouter.LiquidRouterBuild.class
+            || type == LiquidBridge.LiquidBridgeBuild.class
+            || type == DirectionLiquidBridge.DuctBridgeBuild.class;
     }
 
     private static boolean isUnsupportedTransport(Building build, FactorySnapshot snapshot){
-        if(build.block instanceof ArmoredConduit || build instanceof DirectionLiquidBridge.DuctBridgeBuild) return true;
-        // ItemBridge-backed LiquidBridge has state-dependent local routing: with a valid remote link,
-        // updates transmit to that endpoint instead of locally dumping; when unlinked, local
-        // acceptance/output use different incoming-link rules. Until those ports are represented
-        // exactly, expose the family as a local partial interruption rather than a router.
         if(isTransport(build) || isKnownEndpoint(build)) return false;
         if(!build.block.hasLiquids && !build.block.outputsLiquid) return false;
         boolean declaredConsumer = snapshot != null && snapshot.inputs.stream().anyMatch(MindustryLiquidProbe::isLiquidInput);
@@ -310,11 +395,37 @@ public final class MindustryLiquidProbe{
             result.remove(NetworkSide.rotation(build.rotation));
             return result;
         }
+        if(build instanceof LiquidBridge.LiquidBridgeBuild bridge){
+            //ItemBridgeBuild.checkAccept: only a linked bridge accepts from neighbors, and not from the side it sends toward
+            ItemBridge.ItemBridgeBuild target = TransportLinks.bridgeTarget(bridge, build.team);
+            if(target == null) return EnumSet.noneOf(NetworkSide.class);
+            EnumSet<NetworkSide> result = EnumSet.allOf(NetworkSide.class);
+            result.remove(TransportLinks.sideTo(bridge, target));
+            return result;
+        }
+        if(build instanceof DirectionLiquidBridge.DuctBridgeBuild bridge){
+            //DirectionLiquidBridge's acceptLiquid: a linked bridge accepts from neighbors except at its front and on
+            //the sides a linked bridge arrives from
+            if(TransportLinks.directionTarget(bridge, build.team) == null) return EnumSet.noneOf(NetworkSide.class);
+            EnumSet<NetworkSide> result = EnumSet.allOf(NetworkSide.class);
+            result.remove(NetworkSide.rotation(build.rotation));
+            for(Building source : bridgeSources(build)) result.remove(TransportLinks.sideTo(build, source));
+            return result;
+        }
         return EnumSet.allOf(NetworkSide.class);
     }
 
     private static EnumSet<NetworkSide> outputSides(Building build, FactorySnapshot snapshot){
         if(build instanceof Conduit.ConduitBuild) return EnumSet.of(NetworkSide.rotation(build.rotation));
+        if(build instanceof LiquidBridge.LiquidBridgeBuild || build instanceof DirectionLiquidBridge.DuctBridgeBuild){
+            //a linked bridge only sends to its target; the remote output is added with the bridge transfers
+            if(bridgeTarget(build) != null) return EnumSet.noneOf(NetworkSide.class);
+            if(build instanceof DirectionLiquidBridge.DuctBridgeBuild) return EnumSet.of(NetworkSide.rotation(build.rotation));
+            //ItemBridgeBuild.checkDump: an unlinked bridge does not dump toward a bridge linked into it
+            EnumSet<NetworkSide> result = EnumSet.allOf(NetworkSide.class);
+            for(Building source : bridgeSources(build)) result.remove(TransportLinks.sideTo(build, source));
+            return result;
+        }
         if(build instanceof GenericCrafter.GenericCrafterBuild && build.block instanceof GenericCrafter crafter){
             EnumSet<NetworkSide> result = EnumSet.noneOf(NetworkSide.class);
             int count = crafter.outputLiquids == null ? 0 : crafter.outputLiquids.length;
@@ -345,6 +456,16 @@ public final class MindustryLiquidProbe{
         }else if(build instanceof LiquidRouter.LiquidRouterBuild){
             for(NetworkSide incoming : NetworkSide.values()) for(NetworkSide destination : NetworkSide.values())
                 if(incoming != destination) edges.add(new LiquidNetworkEdge(in(ref, incoming), out(ref, destination), LiquidConstraint.any()));
+        }else if(build instanceof LiquidBridge.LiquidBridgeBuild || build instanceof DirectionLiquidBridge.DuctBridgeBuild){
+            EnumSet<NetworkSide> entries = inputSides(build);
+            for(Building source : bridgeSources(build)) entries.add(TransportLinks.sideTo(build, source));
+            Building target = bridgeTarget(build);
+            EnumSet<NetworkSide> exits = target == null ? outputSides(build, snapshot)
+                : EnumSet.of(build instanceof DirectionBridge.DirectionBridgeBuild ? NetworkSide.rotation(build.rotation)
+                    : TransportLinks.sideTo(build, target));
+            for(NetworkSide entry : entries) for(NetworkSide exit : exits){
+                if(entry != exit) edges.add(new LiquidNetworkEdge(in(ref, entry), out(ref, exit), LiquidConstraint.any()));
+            }
         }
     }
 

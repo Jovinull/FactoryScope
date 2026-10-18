@@ -18,8 +18,10 @@ does not change blocks, inventories, power, or the world.
 
 ## What it includes
 
-- **Building diagnostics** for operating state, recognized input shortages, output limits, and
-  supported production estimates.
+- **Building diagnostics** for operating state, recognized input shortages, output limits, and production
+  rates for crafters, drills, pumps and extractors, separators, generators and reactors, unit factories, and
+  turrets, each derived from the engine's own values and rules. What only an estimate can describe, such as a separator's
+  random output or a turret's fire while it has targets, is marked as an estimate.
 - **Area Diagnostics** to summarize selected friendly buildings and group their current findings.
 - **Network** to inspect supported, resource-aware item routes in a selected area.
 - **Supply Trace** to follow structural item routes to reachable producers, storage, boundaries, and
@@ -99,14 +101,16 @@ FactoryScope targets Mindustry v8 Build 160 (`minGameVersion: 160`). The publish
 was validated in the real client against v160.5 and, unchanged, against v160.7, the current
 validation build. The [support matrix](docs/support-matrix.md) lists modeled, partial, and deferred
 transport families. Common conveyor/conduit routes, junctions, routers, sorters, configured item
-bridges, and the Armored Conveyor/Armored Duct insertion rules are modeled. Stateful stack transports,
-unloaders, Duct Bridges, Mass Drivers, armored conduits, and liquid bridges remain partial; unknown
-custom routing stays conservative.
+bridges, and the Armored Conveyor/Armored Duct insertion rules are modeled, and so are every other vanilla
+item and liquid transport: Plastanium and Surge Conveyors, Duct Bridges, Unloaders and Duct Unloaders, Mass
+Drivers, armored conduits, and liquid bridges. Unknown custom routing stays conservative.
 
 Desktop graphical acceptance has been performed on Windows. Launcher/path tests run on Windows,
 Linux, and macOS; that is not graphical validation on those platforms. The universal JAR contains a
 structurally validated DEX, but Android runtime and touch have not been independently validated.
-Remote multiplayer behavior has not been independently validated. See
+Multiplayer has been validated with an official v160.7 dedicated server and client: on a fog-of-war
+server, the client reaches the same diagnoses, area reports, traces, and power grids as the server,
+and enemy buildings hidden by fog stay out of reach. See
 [open Android validation issue #1](https://github.com/Jovinull/FactoryScope/issues/1).
 
 ## Bug reports and development
