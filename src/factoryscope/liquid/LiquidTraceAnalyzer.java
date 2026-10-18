@@ -4,6 +4,7 @@ import factoryscope.analysis.DiagnosticResult;
 import factoryscope.area.*;
 import factoryscope.model.*;
 import factoryscope.network.*;
+import factoryscope.trace.RouteDeadEnds;
 import factoryscope.trace.TraceDirection;
 import factoryscope.trace.TraceEndpointKind;
 
@@ -256,14 +257,12 @@ public final class LiquidTraceAnalyzer{
         Set<BuildingRef> failed = new HashSet<>();
         for(TopologyProbeFailure failure : probeFailures) failed.add(failure.building);
         TreeSet<BuildingRef> result = new TreeSet<>(BUILDING_ORDER);
-        for(NetworkPort port : visited){
-            if(port.building.equals(target) || endpointRefs.contains(port.building) || continuations.contains(port)
-                || failed.contains(port.building)) continue;
-            boolean more = direction == TraceDirection.input
-                ? graph.incoming(port).stream().anyMatch(edge -> edge.liquids.allows(liquid))
-                : graph.outgoing(port).stream().anyMatch(edge -> edge.liquids.allows(liquid));
-            if(!more) result.add(port.building);
-        }
+        result.addAll(RouteDeadEnds.find(visited,
+            port -> direction == TraceDirection.input
+                ? graph.incoming(port).stream().filter(edge -> edge.liquids.allows(liquid)).map(edge -> edge.from).toList()
+                : graph.outgoing(port).stream().filter(edge -> edge.liquids.allows(liquid)).map(edge -> edge.to).toList(),
+            continuations::contains,
+            building -> building.equals(target) || endpointRefs.contains(building) || failed.contains(building)));
         return List.copyOf(result);
     }
 

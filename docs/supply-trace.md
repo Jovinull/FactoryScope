@@ -44,9 +44,16 @@ known. A multi-output producer only continues the resources declared in its snap
 resource-aware transport projects its configured internal item constraints onto the boundary port.
 Unknown or unreadable evidence must not be turned into a complete no-route claim.
 
-A structural dead end is an in-area known route termination. It is not a suggested repair. A reachable
-producer that is disabled or has another diagnostic problem is an independent current-state observation;
-FactoryScope does not claim that it caused the target's shortage.
+A structural dead end is a building where a known route stops inside the area: the route enters it, and
+nothing reachable from that entry inside the building leads on to another building or past the area's known
+edge. A side no route uses is not a dead end by itself: the free sides of a conveyor whose back is fed, or
+the other outputs of a router that does feed the target, belong to a route that continues. Each route
+through a building is judged on its own, so the unfed crossing of a Junction is a dead end even when its
+other crossing is fed. LiquidScope traces apply the same rule to conduits and liquid routers.
+
+A dead end is not a suggested repair. A reachable producer that is disabled or has another diagnostic
+problem is an independent current-state observation; FactoryScope does not claim that it caused the
+target's shortage.
 
 ## Limits
 
