@@ -16,6 +16,8 @@ import mindustry.world.blocks.power.*;
 import mindustry.world.blocks.production.*;
 import mindustry.world.consumers.*;
 import mindustry.world.modules.*;
+import mindustry.world.blocks.payloads.*;
+import mindustry.world.blocks.units.*;
 
 import java.util.*;
 
@@ -100,6 +102,8 @@ public final class MindustryFactoryProbe{
             ProductionModels.apply(new ProductionModels.Context(build, snapshot, frameTicks, timeScale, shouldConsume));
         }
         addConventionalLiquidProduction(build, snapshot);
+        addPayloadProduction(build, snapshot);
+        addPayloadRequirements(build, snapshot);
         if(build instanceof Drill.DrillBuild drill && drill.dominantItem != null){
             snapshot.producedItem(new ResourceRef(ResourceKind.item, drill.dominantItem.name, drill.dominantItem.localizedName));
         }
@@ -497,4 +501,52 @@ public final class MindustryFactoryProbe{
             snapshot.producedLiquid(liquidRef(generator.outputLiquid.liquid));
         }
     }
+
+    /** Payload routes carry whole units or blocks; direct unit-factory outputs are intentionally excluded. */
+    private static void addPayloadProduction(Building build, FactorySnapshot.Builder snapshot){
+        if(build instanceof UnitAssembler.UnitAssemblerBuild assembler){
+            UnitAssembler.AssemblerUnitPlan plan = assembler.plan();
+            UnitType unit = plan == null ? null : plan.unit;
+            if(unit != null) snapshot.producedPayload(payloadRef(unit));
+        }
+        if(build instanceof BlockProducer.BlockProducerBuild producer){
+            Block product = producer.recipe();
+            if(product != null) snapshot.producedPayload(payloadRef(product));
+        }
+        if(build instanceof Reconstructor.ReconstructorBuild reconstructor){
+            UnitType product = reconstructor.unit();
+            if(product != null) snapshot.producedPayload(payloadRef(product));
+        }
+        if(build instanceof PayloadSource.PayloadSourceBuild source){
+            if(source.configBlock != null) snapshot.producedPayload(payloadRef(source.configBlock));
+            if(source.unit != null) snapshot.producedPayload(payloadRef(source.unit));
+        }
+        if(build.block.outputsPayload){
+            try{
+                Payload payload = build.getPayload();
+                if(payload != null) snapshot.producedPayload(payloadRef(payload.content()));
+            }catch(Exception e){
+                FsLog.warnOnce("payload-product:" + build.block.name,
+                    "failed to read payload output on " + describe(build), e);
+            }
+        }
+    }
+
+    /** Reconstructors accept only the input units declared by their upgrade pairs. */
+    private static void addPayloadRequirements(Building build, FactorySnapshot.Builder snapshot){
+        if(!(build instanceof Reconstructor.ReconstructorBuild)) return;
+        Reconstructor reconstructor = (Reconstructor)build.block;
+        for(int i = 0; i < reconstructor.upgrades.size; i++){
+            UnitType[] upgrade = reconstructor.upgrades.get(i);
+            if(upgrade == null || upgrade.length < 2 || upgrade[0] == null || upgrade[1] == null) continue;
+            if(upgrade[1].isBanned() || upgrade[0].isBanned()) continue;
+            snapshot.acceptedPayload(payloadRef(upgrade[0]));
+        }
+    }
+
+    private static ResourceRef payloadRef(UnlockableContent content){
+        ResourceKind kind = content instanceof UnitType ? ResourceKind.unit : ResourceKind.block;
+        return new ResourceRef(kind, content.name, content.localizedName);
+    }
+
 }

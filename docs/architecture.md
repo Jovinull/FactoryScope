@@ -17,7 +17,7 @@ what a structural edge means.
 ## The data path
 
 Live engine access is handled by a small family of adapters rather than one universal probe. Each adapter
-owns the conversion for its subject: building diagnostics, area collection, item topology, power graphs,
+owns the conversion for its subject: building diagnostics, area collection, item and payload topology, power graphs,
 or liquid topology. UI and lifecycle code also use Mindustry/Arc APIs at the outer edge to receive input,
 resolve current navigation targets, and render reports; they do not own the underlying diagnostic rules.
 
@@ -202,21 +202,26 @@ An area result can say *"eight buildings are short of sand"* because it counted 
 report a sand shortage. A route can show that Sand is structurally reachable, but it cannot say that
 Sand production is the bottleneck or the cause of that condition.
 
-## Static item topology
+## Static resource topology
 
 `FactoryAnalyzer` remains the authority for current building diagnostics. The separate
-`MindustryNetworkProbe` reads only structural state (block type, rotation, item configuration and item-bridge
-links) and creates a pure directed `NetworkGraph`. Its edges mean that an item can structurally travel;
-they never describe current flow, measured throughput, blockage, or a cause of a diagnostic finding.
+`MindustryNetworkProbe` reads structural state (block type, rotation, item and payload configuration,
+and bridge links) and creates a pure directed `NetworkGraph`. Its resource constraints distinguish
+items from whole block/unit payloads. An edge means that the identified resource can structurally
+travel; it never describes current flow, measured throughput, blockage, or a cause of a diagnostic
+finding.
 
-Each physical side has distinct input and output ports. This prevents a Junction from becoming one fully
-connected building: north-south and east-west remain independent internal channels. Sorter and Duct Router
-edges carry explicit item constraints, while gates are marked conditional because their choice depends on
-runtime receiver availability without removing any structurally possible route.
+Each physical side has distinct input and output ports, with separate channels for item and payload
+transport. This prevents a Junction from becoming one fully connected building: north-south and
+east-west remain independent internal channels. Sorter, Duct Router, payload router, and Unit Cargo
+edges carry explicit resource constraints, while gates are marked conditional because their choice
+depends on runtime receiver availability without removing any structurally possible route.
 
-Graphs stay area-scoped. A direct friendly connection leaving the selection becomes a boundary continuation
-and is not recursively explored. Unrecognised item transport is omitted and marks the graph partial rather
-than inventing neighbour edges.
+Graphs stay area-scoped. A direct friendly connection leaving the selection becomes a boundary
+continuation and is not recursively explored. Unit Cargo can resolve a same-team, visible peer outside
+the selected area to represent that continuation; the peer's connected network is not traversed.
+Unrecognised item or payload transport is omitted and marks the graph partial rather than inventing
+neighbour edges.
 
 The graph describes possible structure, not current item movement. Mindustry 160.5 exposes no public event
 that reports a successful transfer together with its source, destination, and item. Its building flow
@@ -225,9 +230,9 @@ per-edge throughput therefore remains deferred; see [the throughput research](th
 
 ## Supply Trace
 
-`TraceAnalyzer` receives one `AreaDiagnosticResult`, a target `BuildingRef`, and an item `ResourceRef`.
+`TraceAnalyzer` receives one `AreaDiagnosticResult`, a target `BuildingRef`, and a resource `ResourceRef`.
 It walks the existing directed graph in reverse for an input or forward for an output, applying the
-graph's item constraints at every edge. It returns unique producer, consumer, and storage endpoints,
+graph's item or payload constraints at every edge. It returns unique producer, consumer, and storage endpoints,
 one deterministic shortest representative path per endpoint, plus any reached boundary or unsupported
 connection. It does not enumerate all possible paths.
 
@@ -239,7 +244,7 @@ distinct from production. No trace finding turns a producer's diagnostic state i
 target's condition.
 
 A no-route conclusion is emitted only when the target snapshot and relevant diagnostics are available,
-the target actually consumes or produces the requested item, the target's item ports are modeled, and the
+the target actually consumes or produces the requested resource, the target's corresponding ports are modeled, and the
 resource-specific search finds no route to an in-area producer/storage or consumer/storage endpoint.
 Relevant boundary continuations and unsupported interruptions withhold that conclusion. An unrelated
 unsupported block elsewhere in the selection does not invalidate a locally complete trace. Missing target

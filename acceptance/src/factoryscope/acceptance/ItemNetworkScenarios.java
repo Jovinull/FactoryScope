@@ -23,6 +23,8 @@ import mindustry.gen.*;
 import mindustry.type.*;
 import mindustry.world.*;
 import mindustry.world.blocks.environment.Floor;
+import mindustry.world.blocks.payloads.*;
+import mindustry.world.blocks.units.UnitCargoUnloadPoint;
 
 import java.util.*;
 
@@ -46,6 +48,11 @@ final class ItemNetworkScenarios{
     }
 
     void queueTransportFamilies(){ transportFamilyScenarios(); }
+    void queueResourceTransportShowcase(){
+        payloadNetworkView();
+        reconstructorPayloadTrace();
+        unitCargoTrace();
+    }
     void queueUnsupportedLocate(){ unsupportedTraceLocate(); }
     void queueTinyDrag(){ tinyDragIsAClick(); }
     void queueAfterTinyDrag(){
@@ -112,7 +119,7 @@ final class ItemNetworkScenarios{
             SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(target), sand);
             check("the area topology reaches the drill for Sand",
                 trace != null && trace.producers().stream().anyMatch(endpoint -> endpoint.building.equals(AreaProbe.refOf(producer))),
-                trace == null ? "no trace" : "complete=" + trace.complete + " targetUsesItem=" + trace.targetUsesItem
+                trace == null ? "no trace" : "complete=" + trace.complete + " targetUsesResource=" + trace.targetUsesResource
                     + " diagnosticsIncomplete=" + trace.diagnosticsIncomplete + " edges=" + report.network.graph.edges.size());
             check("each reachable Sand producer appears once",
                 trace != null && trace.producers().size() == 2
@@ -253,8 +260,8 @@ final class ItemNetworkScenarios{
         queue(() -> check("the active dialog is the production Network view",
             Core.scene.getDialog() != null && Core.scene.getDialog().name.equals("factoryscope-network-dialog")));
         queue(() -> {
-            check("Network offers the Sand resource filter", dialogHasNamed("factoryscope-network-item-sand"));
-            if(dialogHasNamed("factoryscope-network-item-sand")) clickNamedInDialog("factoryscope-network-item-sand");
+            check("Network offers the Sand resource filter", dialogHasNamed("factoryscope-network-resource-sand"));
+            if(dialogHasNamed("factoryscope-network-resource-sand")) clickNamedInDialog("factoryscope-network-resource-sand");
         });
         queue(this::scrollReportToBottom);
         queue(() -> {
@@ -567,8 +574,8 @@ final class ItemNetworkScenarios{
         queue(() -> check("the output-trace selection produced an area report", FactoryScopeUI.areaReport() != null));
         queue(() -> clickNamed("factoryscope-area-network"));
         queue(() -> check("the produced item is available as a Network filter",
-            Core.scene.find("factoryscope-network-item-graphite") != null));
-        queue(() -> clickNamed("factoryscope-network-item-graphite"));
+            Core.scene.find("factoryscope-network-resource-graphite") != null));
+        queue(() -> clickNamed("factoryscope-network-resource-graphite"));
         queue(() -> clickNamed("factoryscope-network-building", 0));
         queue(() -> check("the producer exposes an output trace action",
             Core.scene.find("factoryscope-network-trace-output") != null));
@@ -601,7 +608,7 @@ final class ItemNetworkScenarios{
         queue(() -> dragTiles(x - 1, y - 1, x + 3, y + 1));
         queue(() -> check("the output dead-end selection produced an area report", FactoryScopeUI.areaReport() != null));
         queue(() -> clickNamed("factoryscope-area-network"));
-        queue(() -> clickNamed("factoryscope-network-item-graphite"));
+        queue(() -> clickNamed("factoryscope-network-resource-graphite"));
         queue(() -> clickNamed("factoryscope-network-building", 0));
         queue(() -> clickNamed("factoryscope-network-trace-output"));
         queue(() -> {
@@ -733,9 +740,9 @@ final class ItemNetworkScenarios{
         queue(() -> clickNamed("factoryscope-area-network"));
         queue(() -> {
             check("the Network view opened", Core.scene.find("factoryscope-network-dialog") != null);
-            check("the configured item is offered as a filter", Core.scene.find("factoryscope-network-item-copper") != null);
+            check("the configured item is offered as a filter", Core.scene.find("factoryscope-network-resource-copper") != null);
         });
-        queue(() -> clickNamed("factoryscope-network-item-copper"));
+        queue(() -> clickNamed("factoryscope-network-resource-copper"));
         queue(() -> check("the Network view remains open after selecting an item", Core.scene.find("factoryscope-network-dialog") != null));
         queue(() -> clickNamed("factoryscope-network-building"));
         queue(() -> check("a network building opens topology detail", Core.scene.find("factoryscope-network-dialog") != null));
@@ -761,6 +768,137 @@ final class ItemNetworkScenarios{
         queue(() -> renderer.targetscale = renderer.camerascale = 1.5f);
     }
 
+    private void payloadNetworkView(){
+        int x = rx() + 2, y = ry() + 4;
+        scenario("Network filters a whole-block payload route independently from item routes");
+        queue(this::closeAnyDialog);
+        queue(this::closeAnyDialog);
+        queue(this::ensurePickerOff);
+        queue(() -> {
+            clearRegion();
+            renderer.targetscale = renderer.camerascale = 1.5f;
+            Building source = placeAt(Blocks.payloadSource, x, y);
+            ((PayloadSource.PayloadSourceBuild)source).configBlock = Blocks.copperWall;
+            Building conveyor = placeAt(Blocks.payloadConveyor, adjacentX(source, NetworkSide.east, Blocks.payloadConveyor.size), y, 0);
+            Building router = placeAt(Blocks.payloadRouter, adjacentX(conveyor, NetworkSide.east, Blocks.payloadRouter.size), y, 0);
+            ((PayloadRouter.PayloadRouterBuild)router).sorted = Blocks.copperWall;
+            placeAt(Blocks.payloadConveyor, adjacentX(router, NetworkSide.east, Blocks.payloadConveyor.size), y, 0);
+        });
+        queue(this::armPicker);
+        queue(() -> dragTiles(x - 1, y - 2, x + 17, y + 3));
+        queue(() -> clickNamed("factoryscope-area-network"));
+        queue(() -> {
+            check("Network lists the identified block payload", Core.scene.find("factoryscope-network-resource-copper-wall") != null);
+            check("Network retains the selected area report", FactoryScopeUI.areaReport() != null
+                && FactoryScopeUI.areaReport().network != null);
+        });
+        queue(() -> clickNamed("factoryscope-network-resource-copper-wall"));
+        queue(() -> check("the payload filter keeps Network open", Core.scene.find("factoryscope-network-dialog") != null));
+        queue(() -> clickNamed("factoryscope-network-view-world"));
+        queue(() -> delayNextAction(30f));
+        queue(() -> check("the block payload routes can be viewed over the world", Core.scene.find("factoryscope-network-viewing") != null));
+        queue(() -> capture("payload-network"));
+        queue(() -> clickNamed("factoryscope-network-return"));
+        queue(() -> delayNextAction(30f));
+        queue(this::closeAnyDialog);
+        queue(this::closeAnyDialog);
+    }
+
+    private void unitCargoTrace(){
+        int x = rx() + 2, y = ry() + 5;
+        scenario("Supply Trace follows an item through a configured Unit Cargo route");
+        queue(this::closeAnyDialog);
+        queue(this::closeAnyDialog);
+        queue(this::ensurePickerOff);
+        queue(() -> {
+            clearRegion();
+            for(int floorX = x; floorX <= x + 1; floorX++) for(int floorY = y; floorY <= y + 1; floorY++){
+                Tile tile = world.tile(floorX, floorY);
+                tile.setFloor((Floor)Blocks.sand);
+                tile.clearOverlay();
+            }
+            producer = placeAt(Blocks.mechanicalDrill, x, y);
+            Building loader = placeAt(Blocks.unitCargoLoader,
+                adjacentX(producer, NetworkSide.east, Blocks.unitCargoLoader.size), y, 0);
+            Building point = placeAt(Blocks.unitCargoUnloadPoint,
+                adjacentX(loader, NetworkSide.east, Blocks.unitCargoUnloadPoint.size), y, 0);
+            ((UnitCargoUnloadPoint.UnitCargoUnloadPointBuild)point).item = Items.sand;
+            target = placeAt(Blocks.siliconSmelter,
+                adjacentX(point, NetworkSide.east, Blocks.siliconSmelter.size), y, 0);
+        });
+        queue(this::clickToggleButton);
+        queue(() -> clickBuilding(target));
+        queue(() -> check("the silicon smelter offers a Sand trace", Core.scene.find("factoryscope-trace-input-sand") != null));
+        queue(() -> clickNamed("factoryscope-trace-input-sand"));
+        queue(() -> check("the trace picker opens for the Unit Cargo factory", FactoryScopeUI.picking()));
+        queue(() -> dragTiles(x - 1, y - 3, x + 15, y + 3));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            ResourceRef sand = new ResourceRef(ResourceKind.item, "sand", "Sand");
+            SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(target), sand);
+            TraceEndpoint endpoint = trace == null ? null : trace.producers().stream()
+                .filter(candidate -> candidate.building.equals(AreaProbe.refOf(producer))).findFirst().orElse(null);
+            boolean crossesCargo = endpoint != null && endpoint.path.ports().stream().anyMatch(port -> port.building.blockId.equals(Blocks.unitCargoLoader.name))
+                && endpoint.path.ports().stream().anyMatch(port -> port.building.blockId.equals(Blocks.unitCargoUnloadPoint.name));
+            check("the Unit Cargo trace reaches the real Sand drill", trace != null && trace.complete && endpoint != null,
+                trace == null ? "no trace" : "complete=" + trace.complete + " producers=" + trace.producers().size());
+            check("the representative path includes the loader and configured unload point", crossesCargo,
+                endpoint == null ? "no producer path" : endpoint.path.ports().toString());
+            check("the Supply Trace dialog remains open", Core.scene.find("factoryscope-trace-back") != null);
+        });
+        queue(() -> capture("unit-cargo-trace"));
+        queue(this::closeAnyDialog);
+        queue(this::closeAnyDialog);
+    }
+
+    private void reconstructorPayloadTrace(){
+        int x = rx() + 2, y = ry() + 6;
+        scenario("Supply Trace follows a unit payload to a reconstructor that accepts it");
+        queue(this::closeAnyDialog);
+        queue(this::ensurePickerOff);
+        queue(() -> {
+            clearRegion();
+            producer = placeAt(Blocks.payloadSource, x, y);
+            ((PayloadSource.PayloadSourceBuild)producer).unit = UnitTypes.dagger;
+            Building conveyor = placeAt(Blocks.payloadConveyor,
+                adjacentX(producer, NetworkSide.east, Blocks.payloadConveyor.size), y, 0);
+            target = placeAt(Blocks.additiveReconstructor,
+                adjacentX(conveyor, NetworkSide.east, Blocks.additiveReconstructor.size), y, 0);
+        });
+        queue(this::clickToggleButton);
+        queue(() -> clickBuilding(target));
+        queue(() -> check("the Reconstructor lists Dagger as an accepted payload input",
+            Core.scene.find("factoryscope-trace-payload-input-dagger") != null));
+        queue(() -> clickNamed("factoryscope-trace-payload-input-dagger"));
+        queue(() -> check("the unit payload trace picker opens", FactoryScopeUI.picking()));
+        queue(() -> dragTiles(x - 2, y - 3, x + 9, y + 3));
+        queue(() -> {
+            AreaDiagnosticResult report = FactoryScopeUI.areaReport();
+            ResourceRef dagger = new ResourceRef(ResourceKind.unit, UnitTypes.dagger.name, UnitTypes.dagger.localizedName);
+            SupplyTrace trace = report == null ? null : TraceAnalyzer.input(report, AreaProbe.refOf(target), dagger);
+            TraceEndpoint endpoint = trace == null ? null : trace.producers().stream()
+                .filter(candidate -> candidate.building.equals(AreaProbe.refOf(producer))).findFirst().orElse(null);
+            boolean hasConveyor = endpoint != null && endpoint.path.ports().stream()
+                .anyMatch(port -> port.building.blockId.equals(Blocks.payloadConveyor.name));
+            check("the unit payload trace recognizes the Reconstructor input", trace != null && trace.targetUsesResource);
+            check("the trace reaches the configured Dagger payload source", trace != null && endpoint != null,
+                trace == null ? "no trace" : "complete=" + trace.complete + " producers=" + trace.producers().size());
+            check("the representative route includes the payload conveyor", hasConveyor,
+                endpoint == null ? "no producer path" : endpoint.path.ports().toString());
+            check("the trace dialog remains open", Core.scene.find("factoryscope-trace-back") != null);
+        });
+        queue(() -> capture("reconstructor-payload-trace"));
+        queue(this::closeAnyDialog);
+    }
+
+    private static int adjacentX(Building source, NetworkSide side, int targetSize){
+        int offset = -(source.block.size - 1) / 2;
+        int targetOffset = -(targetSize - 1) / 2;
+        if(side == NetworkSide.east) return source.tile.x + offset + source.block.size - targetOffset;
+        if(side == NetworkSide.west) return source.tile.x + offset - 1 - targetOffset;
+        return source.tile.x;
+    }
+
 
 
     private void scenario(String name){ harness.scenario(name); }
@@ -772,6 +910,7 @@ final class ItemNetworkScenarios{
     private int rx(){ return harness.rx(); }
     private int ry(){ return harness.ry(); }
     private void armPicker(){ harness.armPicker(); }
+    private void clickToggleButton(){ harness.clickToggleButton(); }
     private void clickBuilding(Building building){ harness.clickBuilding(building); }
     private void clickNamed(String name){ harness.clickNamed(name); }
     private void clickNamed(String name, int occurrence){ harness.clickNamed(name, occurrence); }

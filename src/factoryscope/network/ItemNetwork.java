@@ -12,10 +12,10 @@ public final class ItemNetwork{
     public final List<NetworkPort> boundaryPorts;
     /** Input ports with a compatible known neighbor just outside the selected area. */
     public final List<NetworkPort> boundaryInputs;
-    /** Item constraints imposed by known sources beyond each outgoing boundary port. */
-    public final Map<NetworkPort, ItemConstraint> boundaryOutputConstraints;
-    /** Item constraints imposed by known sources beyond each incoming boundary port. */
-    public final Map<NetworkPort, ItemConstraint> boundaryInputConstraints;
+    /** Resource constraints imposed by known sources beyond each outgoing boundary port. */
+    public final Map<NetworkPort, ResourceConstraint> boundaryOutputConstraints;
+    /** Resource constraints imposed by known sources beyond each incoming boundary port. */
+    public final Map<NetworkPort, ResourceConstraint> boundaryInputConstraints;
     public final List<BuildingRef> unsupportedTransport;
     /** Known ports adjacent to unsupported transports, without inventing an edge through them. */
     public final List<NetworkInterruption> unsupportedConnections;
@@ -23,7 +23,7 @@ public final class ItemNetwork{
     public final List<TopologyProbeFailure> probeFailures;
     public final List<BuildingRef> storageEndpoints;
     public final NetworkCompleteness completeness;
-    /** Items whose configuration or production metadata makes them relevant to this selection. */
+    /** Resources whose configuration or production metadata makes them relevant to this selection. */
     public final List<ResourceRef> resources;
 
     public ItemNetwork(NetworkGraph graph, Collection<NetworkPort> boundaryPorts, Collection<BuildingRef> unsupportedTransport,
@@ -41,8 +41,8 @@ public final class ItemNetwork{
     public ItemNetwork(NetworkGraph graph, Collection<NetworkPort> boundaryPorts, Collection<NetworkPort> boundaryInputs,
                        Collection<BuildingRef> unsupportedTransport, Collection<NetworkInterruption> unsupportedConnections,
                        Collection<BuildingRef> storageEndpoints, Collection<ResourceRef> resources,
-                       Map<NetworkPort, ItemConstraint> boundaryOutputConstraints,
-                       Map<NetworkPort, ItemConstraint> boundaryInputConstraints){
+                       Map<NetworkPort, ResourceConstraint> boundaryOutputConstraints,
+                       Map<NetworkPort, ResourceConstraint> boundaryInputConstraints){
         this(graph, boundaryPorts, boundaryInputs, unsupportedTransport, unsupportedConnections, storageEndpoints,
             resources, boundaryOutputConstraints, boundaryInputConstraints, List.of());
     }
@@ -50,8 +50,8 @@ public final class ItemNetwork{
     public ItemNetwork(NetworkGraph graph, Collection<NetworkPort> boundaryPorts, Collection<NetworkPort> boundaryInputs,
                        Collection<BuildingRef> unsupportedTransport, Collection<NetworkInterruption> unsupportedConnections,
                        Collection<BuildingRef> storageEndpoints, Collection<ResourceRef> resources,
-                       Map<NetworkPort, ItemConstraint> boundaryOutputConstraints,
-                       Map<NetworkPort, ItemConstraint> boundaryInputConstraints,
+                       Map<NetworkPort, ResourceConstraint> boundaryOutputConstraints,
+                       Map<NetworkPort, ResourceConstraint> boundaryInputConstraints,
                        Collection<TopologyProbeFailure> probeFailures){
         this.graph = Objects.requireNonNull(graph, "graph");
         this.boundaryPorts = ordered(boundaryPorts);
@@ -72,11 +72,11 @@ public final class ItemNetwork{
         this.resources = List.copyOf(orderedResources);
     }
 
-    private static Map<NetworkPort, ItemConstraint> constraints(Collection<NetworkPort> ports,
-                                                                  Map<NetworkPort, ItemConstraint> constraints){
-        Map<NetworkPort, ItemConstraint> result = new TreeMap<>();
+    private static Map<NetworkPort, ResourceConstraint> constraints(Collection<NetworkPort> ports,
+                                                                  Map<NetworkPort, ResourceConstraint> constraints){
+        Map<NetworkPort, ResourceConstraint> result = new TreeMap<>();
         for(NetworkPort port : ports){
-            ItemConstraint constraint = constraints.get(port);
+            ResourceConstraint constraint = constraints.get(port);
             if(constraint != null) result.put(port, constraint);
         }
         return Collections.unmodifiableMap(result);

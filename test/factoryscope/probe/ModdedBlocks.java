@@ -26,6 +26,7 @@ final class ModdedBlocks{
     static Block oddBuilding;
     static Block coalConsumer;
     static Block unknownTransport;
+    static Block unknownPayloadTransport;
     static Conveyor inheritedConveyor;
     static Conveyor rejectingConveyor;
     static Conduit inheritedConduit;
@@ -103,6 +104,7 @@ final class ModdedBlocks{
         oddBuilding = new OddBlock("fs-test-odd");
         coalConsumer = new ItemConsumerBlock("fs-test-item-consumer", Items.coal);
         unknownTransport = new UnknownTransportBlock("fs-test-unknown-transport");
+        unknownPayloadTransport = new UnknownPayloadTransportBlock("fs-test-unknown-payload-transport");
         inheritedConveyor = new Conveyor("fs-test-inherited-conveyor");
         rejectingConveyor = new RejectingConveyor("fs-test-rejecting-conveyor");
         inheritedConduit = new Conduit("fs-test-inherited-conduit");
@@ -306,6 +308,20 @@ final class ModdedBlocks{
         }
 
         class UnknownTransportBuild extends Building{
+        }
+    }
+
+    static class UnknownPayloadTransportBlock extends Block{
+        UnknownPayloadTransportBlock(String name){
+            super(name);
+            group = BlockGroup.payloads;
+            acceptsPayload = true;
+            solid = true;
+            update = true;
+            buildType = UnknownPayloadTransportBuild::new;
+        }
+
+        class UnknownPayloadTransportBuild extends Building{
         }
     }
 }

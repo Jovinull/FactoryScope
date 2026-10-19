@@ -41,4 +41,9 @@ public final class NetworkPort implements Comparable<NetworkPort>{
     public int hashCode(){
         return Objects.hash(building, side, channel);
     }
+
+    @Override
+    public String toString(){
+        return channel + ":" + side + "@" + building.tileX + "," + building.tileY + "/" + building.blockId;
+    }
 }

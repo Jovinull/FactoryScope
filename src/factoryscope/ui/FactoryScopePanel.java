@@ -136,6 +136,7 @@ public final class FactoryScopePanel extends BaseDialog{
         if(snapshot.hasKnownProduction()) buildProduction(snapshot);
         if(!snapshot.facts.isEmpty()) buildFacts(snapshot);
         if(!snapshot.inputs.isEmpty()) buildInputs(snapshot);
+        if(!snapshot.acceptedPayloads.isEmpty()) buildAcceptedPayloadInputs(snapshot);
         if(!snapshot.outputs.isEmpty()) buildBuffers(snapshot);
         if(snapshot.power != null || target.power != null) buildPower(snapshot.power);
         buildNotes(snapshot);
@@ -246,6 +247,23 @@ public final class FactoryScopePanel extends BaseDialog{
         }
     }
 
+    private void buildAcceptedPayloadInputs(FactorySnapshot snapshot){
+        section("section.payload-inputs");
+        panel(table -> {
+            for(ResourceRef payload : snapshot.acceptedPayloads){
+                table.table(row -> {
+                    icon(row, payload.kind, payload.id);
+                    name(row, payload.name);
+                    if(target != null && onTrace != null){
+                        row.button(FsBundle.ref("trace.open"), Icon.list, Styles.flatt,
+                            () -> onTrace.accept(target, payload))
+                            .height(34f).padLeft(6f).name("factoryscope-trace-payload-input-" + payload.id);
+                    }
+                }).growX().padBottom(2f).row();
+            }
+        });
+    }
+
     private void inputRow(Table table, ResourceState input){
         table.table(row -> {
             icon(row, input.kind, input.contentId);
@@ -255,7 +273,7 @@ public final class FactoryScopePanel extends BaseDialog{
                 row.add(amountText(input)).color(Pal.lightishGray).right().padRight(8f);
             }
             row.add(satisfactionText(input)).color(satisfactionColor(input)).right();
-            if(target != null && onTrace != null && !input.optional && input.kind == ResourceKind.item
+            if(target != null && onTrace != null && !input.optional && traceable(input.kind)
                 && input.contentId != null && input.missing()){
                 row.button(FsBundle.ref("trace.open"), Icon.list, Styles.flatt,
                     () -> onTrace.accept(target, input.ref()))
@@ -277,6 +295,10 @@ public final class FactoryScopePanel extends BaseDialog{
         if(!input.recognised){
             table.add(FsBundle.get("panel.unknown-consumer")).color(Pal.gray).padLeft(ICON_SIZE + 6f).left().row();
         }
+    }
+
+    private static boolean traceable(ResourceKind kind){
+        return kind == ResourceKind.item || kind == ResourceKind.unit || kind == ResourceKind.block;
     }
 
     private void chooseLiquid(ResourceState input){
