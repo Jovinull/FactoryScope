@@ -47,12 +47,19 @@ For area diagnostics specifically:
 The headless boot downloads the Mindustry `assets.jar` once and unpacks the non-sprite part of it into
 `build/mindustry-assets`; that is why the first `gradlew test` is slower than the rest.
 
-Trace coverage includes `trace/TraceAnalyzerTest`, which exercises pure item-aware forward/reverse
+Trace coverage includes `trace/TraceAnalyzerTest`, which exercises pure resource-aware forward/reverse
 traversal, unique endpoints, deterministic representative paths, storage distinction, boundaries,
 unsupported transport, Junction channels and cycle termination. `probe/MindustryNetworkProbeTest` also
 places a real Mindustry drill, conveyor and crafter to verify that a mined item can be traced as a
 structural product without inventing a production rate. It also covers a non-crafter item consumer, a
 multi-output AttributeCrafter's exact product constraints, and a producer outside the selected area.
+
+The same probe suite covers the added resource families against real v160.7 content: Unit Cargo loader
+to configured same-team unload point routes, out-of-area continuations without recursive traversal,
+and exclusion of another team's buildings; payload conveyors, routers and their reinforced variants;
+payload loaders/unloaders, deconstructor size limits, reconstructor unit-input constraints, and
+configured payload mass-driver links. Typed traces verify that item, unit, and block resources stay
+distinct across payload ports and that selected payload constraints are preserved through routing.
 
 `probe/TransportFamiliesTest` checks every transport family modeled from engine link and state rules (Duct
 Bridges, Unloaders and Duct Unloaders, Plastanium and Surge Conveyors, Mass Drivers, Bridge and Phase

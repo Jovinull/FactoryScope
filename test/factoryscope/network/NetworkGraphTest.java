@@ -16,8 +16,8 @@ class NetworkGraphTest{
     void directedReachabilityDoesNotInventAReverseConveyor(){
         NetworkPort a = port(1), b = port(2), c = port(3);
         NetworkGraph graph = graph(a, b, c,
-            new NetworkEdge(a, b, ItemConstraint.only(copper), false),
-            new NetworkEdge(b, c, ItemConstraint.only(copper), false));
+            new NetworkEdge(a, b, ResourceConstraint.only(copper), false),
+            new NetworkEdge(b, c, ResourceConstraint.only(copper), false));
 
         assertTrue(graph.isReachable(a, c, copper));
         assertFalse(graph.isReachable(c, a, copper));
@@ -27,8 +27,8 @@ class NetworkGraphTest{
     void resourceConstraintsChangeReachability(){
         NetworkPort in = port(1), selected = port(2), other = port(3);
         NetworkGraph graph = graph(in, selected, other,
-            new NetworkEdge(in, selected, ItemConstraint.only(copper), false),
-            new NetworkEdge(in, other, ItemConstraint.except(copper), false));
+            new NetworkEdge(in, selected, ResourceConstraint.only(copper), false),
+            new NetworkEdge(in, other, ResourceConstraint.except(copper), false));
 
         assertTrue(graph.isReachable(in, selected, copper));
         assertFalse(graph.isReachable(in, other, copper));
@@ -48,8 +48,8 @@ class NetworkGraphTest{
     void reverseReachabilityFindsUpstreamPorts(){
         NetworkPort a = port(1), b = port(2), c = port(3);
         NetworkGraph graph = graph(a, b, c,
-            new NetworkEdge(a, b, ItemConstraint.only(copper), false),
-            new NetworkEdge(b, c, ItemConstraint.only(copper), false));
+            new NetworkEdge(a, b, ResourceConstraint.only(copper), false),
+            new NetworkEdge(b, c, ResourceConstraint.only(copper), false));
 
         assertEquals(Set.of(a, b, c), graph.reaching(c, copper));
         assertEquals(Set.of(c), graph.reaching(c, lead));
@@ -93,7 +93,7 @@ class NetworkGraphTest{
     }
 
     private static NetworkEdge edge(NetworkPort from, NetworkPort to){
-        return new NetworkEdge(from, to, ItemConstraint.any(), false);
+        return new NetworkEdge(from, to, ResourceConstraint.any(), false);
     }
 
     private static NetworkPort port(int x){

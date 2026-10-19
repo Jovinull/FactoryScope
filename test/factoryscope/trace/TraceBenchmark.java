@@ -142,7 +142,7 @@ class TraceBenchmark{
 
     private static BuildingRef ref(String block, int x){ return new BuildingRef(x, 1, block, block, 1, 1); }
     private static NetworkPort port(BuildingRef ref, NetworkSide side, String channel){ return new NetworkPort(ref, side, channel); }
-    private static NetworkEdge edge(NetworkPort from, NetworkPort to){ return new NetworkEdge(from, to, ItemConstraint.any(), false); }
+    private static NetworkEdge edge(NetworkPort from, NetworkPort to){ return new NetworkEdge(from, to, ResourceConstraint.any(), false); }
 
     private record Fixture(AreaDiagnosticResult area, BuildingRef target){
     }

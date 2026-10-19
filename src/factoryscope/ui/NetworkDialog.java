@@ -18,7 +18,7 @@ import mindustry.ui.dialogs.*;
 import java.util.*;
 import java.util.function.Consumer;
 
-/** Area-scoped static item topology. It deliberately never reports measured transfer. */
+/** Area-scoped static resource topology. It deliberately never reports measured transfer. */
 final class NetworkDialog extends BaseDialog{
     private AreaDiagnosticResult areaResult;
     private ItemNetwork network;
@@ -100,9 +100,9 @@ final class NetworkDialog extends BaseDialog{
         this.network = areaResult == null ? null : areaResult.network;
         if(trace != null && network != null){
             trace = trace.direction == TraceDirection.input
-                ? TraceAnalyzer.input(areaResult, trace.target, trace.item)
-                : TraceAnalyzer.output(areaResult, trace.target, trace.item);
-            selected = trace.item;
+                ? TraceAnalyzer.input(areaResult, trace.target, trace.resource)
+                : TraceAnalyzer.output(areaResult, trace.target, trace.resource);
+            selected = trace.resource;
             FactoryScopeUI.showNetworkOverlay(network, selected, trace);
         }
         if(network != null) rebuild();
@@ -164,9 +164,9 @@ final class NetworkDialog extends BaseDialog{
                 table.left().defaults().height(42f).growX().left();
                 table.button(FsBundle.get("network.all-items"), Styles.flatt, () -> { selected = null; FactoryScopeUI.showNetworkOverlay(network, null); rebuild(); })
                     .checked(button -> selected == null).name("factoryscope-network-all").row();
-                for(ResourceRef item : network.resources){
-                    table.button(item.name, Styles.flatt, () -> { selected = item; FactoryScopeUI.showNetworkOverlay(network, item); rebuild(); })
-                        .checked(button -> item.equals(selected)).name("factoryscope-network-item-" + item.id).row();
+                for(ResourceRef resource : network.resources){
+                    table.button(resource.name, Styles.flatt, () -> { selected = resource; FactoryScopeUI.showNetworkOverlay(network, resource); rebuild(); })
+                        .checked(button -> resource.equals(selected)).name("factoryscope-network-resource-" + resource.id).row();
                 }
             }).growX().left().row();
         }
@@ -226,12 +226,18 @@ final class NetworkDialog extends BaseDialog{
             if(entry != null && entry.snapshot != null){
                 Set<String> seen = new HashSet<>();
                 for(ResourceState input : entry.snapshot.inputs){
-                    if(input.kind != ResourceKind.item || input.contentId == null || !seen.add(input.ref().key())) continue;
-                    table.button(FsBundle.format("trace.input-action", input.name), Styles.flatt,
-                        () -> showTrace(areaResult, selectedBuilding, input.ref()))
-                        .height(36f).name("factoryscope-network-trace-input").row();
+                    if(!traceable(input.kind)) continue;
+                    List<ResourceRef> resources = input.contentId == null ? input.acceptedResources : List.of(input.ref());
+                    for(ResourceRef resource : resources){
+                        if(!seen.add(resource.key())) continue;
+                        table.button(FsBundle.format("trace.input-action", resource.name), Styles.flatt,
+                            () -> showTrace(areaResult, selectedBuilding, resource))
+                            .height(36f).name("factoryscope-network-trace-input").row();
+                    }
                 }
-                for(ResourceRef output : entry.snapshot.producedItems){
+                List<ResourceRef> outputs = new ArrayList<>(entry.snapshot.producedItems);
+                outputs.addAll(entry.snapshot.producedPayloads);
+                for(ResourceRef output : outputs){
                     if(!seen.add(output.key())) continue;
                     table.button(FsBundle.format("trace.output-action", output.name), Styles.flatt,
                         () -> showOutputTrace(areaResult, selectedBuilding, output))
@@ -243,8 +249,8 @@ final class NetworkDialog extends BaseDialog{
 
     private void buildTrace(){
         body.add(FsBundle.format("trace.target", trace.target.blockName)).color(Pal.lightishGray).wrap().row();
-        body.add(trace.item.name).color(Pal.accent).padTop(4f).row();
-        if(!trace.targetUsesItem){
+        body.add(trace.resource.name).color(Pal.accent).padTop(4f).row();
+        if(!trace.targetUsesResource){
             body.add(FsBundle.get("trace.target-missing")).color(Pal.lightOrange).wrap().padTop(6f).row();
         }
         if(trace.noRouteProven){
@@ -430,5 +436,9 @@ final class NetworkDialog extends BaseDialog{
             row.add(FsBundle.get(key)).growX().left();
             row.add(value).color(Pal.lightishGray).right();
         }).row();
+    }
+
+    private static boolean traceable(ResourceKind kind){
+        return kind == ResourceKind.item || kind == ResourceKind.unit || kind == ResourceKind.block;
     }
 }

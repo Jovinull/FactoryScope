@@ -45,13 +45,14 @@ FactoryScope cannot observe are marked as estimates (≈) in the panel.
 | Turrets (`ItemTurret`, `LiquidTurret`, `PowerTurret`, `ContinuousTurret`, `ContinuousLiquidTurret`, `LaserTurret`, `PointDefenseTurret`, `TractorBeamTurret`) | 28 | Turrets produce nothing; shots and ammunition use while firing are **estimates** that assume continuous fire at full efficiency without coolant | No usable ammunition (accepted ammunition is named); loaded and reloaded with no target, reported as normal | Ammunition held and loaded, reload, heat requirement, whether it is engaging |
 
 Other blocks - projectors, menders, cores and storage, incinerators, constructors, payload and unit logistics -
-keep limited diagnostics: their state and declared requirements, without rates or block-specific verdicts.
+keep limited building diagnostics: their state and declared requirements, without rates or block-specific
+production verdicts. The separate topology views below can still trace supported cargo routes.
 
 A model applies only to a building whose runtime build class is the engine's own. A mod block that reuses a
 vanilla build class gets the vanilla model; a mod that replaces the build class may have changed exactly the rules
 the model relies on, so its buildings keep the general diagnostics.
 
-## Item topology and Supply Trace
+## Item topology
 
 | Vanilla family | Status | Scope and limitation |
 | --- | --- | --- |
@@ -71,8 +72,25 @@ the model relies on, so its buildings keep the general diagnostics.
 | Unloader and Duct Unloader | SUPPORTED | An Unloader takes from each neighbor that can be unloaded and gives to its other neighbors except storage and cores; a Duct Unloader takes from behind and gives to its front, storage included. A configured item limits the route. What may be taken: anything in storage, a block's products, the items a block holds for its own use, and whatever entered a transport. Turret ammunition is not in the item module and is never taken. Which neighbor is chosen at a given moment is not claimed. |
 | Mass Driver | SUPPORTED | Uses the configured link when the engine accepts it (same block and team, in range). A linked driver accepts items and fires them; a driver fired at dumps what it receives, and a relay does both. Power, reload, aiming and the shooter queue decide when a shot happens, not whether the route exists. |
 | Unknown modded item transport | PARTIAL | A custom runtime Build class is an interruption. Blocks that reuse a recognized vanilla Build class use that structural model, but mod-specific field/configuration changes are not independently verified. |
-| Unit Cargo Loader and Unit Cargo Unload Point | DEFERRED | These move units/cargo rather than item resources and are outside the item topology model. |
-| Payload Conveyor/Router, reinforced payload variants, Payload/Large Payload Mass Driver, Payload Loader/Unloader | DEFERRED | Payload logistics move whole blocks/units rather than item or liquid resources and are outside the Network resource model. |
+
+## Payload topology and Supply Trace
+
+| Vanilla family | Status | Scope and limitation |
+| --- | --- | --- |
+| Payload Conveyor and Reinforced Payload Conveyor | SUPPORTED | Directed whole-payload route; only blocks or units within the transport's declared size limit are included. Transfer position and timing are not measured. |
+| Payload Router and Reinforced Payload Router | SUPPORTED | Routes whole payloads by the configured block or unit selection, including inverted configuration; no branch timing or arbitration claim. |
+| Payload Loader and Payload Unloader | SUPPORTED | Models the forward payload channel for item/liquid containers and buffered batteries that fit the declared size limit; arbitrary blocks and unit payloads are excluded. |
+| Payload Mass Driver and Large Payload Mass Driver | SUPPORTED | Uses a valid configured same-team link, in-range endpoints and payload size limits. A receiver can dump a payload into adjacent supported payload transport. Power and transfer timing are not measured. |
+| Payload Deconstructor and Small Deconstructor | SUPPORTED | Accepts blocks or units with build requirements that fit its declared size limit; output item recovery is outside the payload graph. |
+| Unit Cargo Loader and Unit Cargo Unload Point | SUPPORTED | Traces configured item delivery from a same-team loader to an unload point. The loader can connect to multiple same-team points; an unload point only forwards its selected item. Unit movement, pickup timing and cargo state are not measured. An out-of-area peer is represented only as a boundary continuation; it is not recursively traversed. |
+| Payload-producing and payload-consuming buildings | SUPPORTED | Unit assemblers and constructors expose their selected products; reconstructors accept only their declared upgrade inputs and expose a unit product when one is held. The sandbox payload source exposes its configured product. Unit factories' direct unit output remains outside this payload transport route. |
+| Unknown modded payload transport | PARTIAL | A custom runtime Build class interrupts a payload trace and is reported as incomplete rather than assigned guessed ports. |
+
+Payload routes carry identified whole blocks or units, with item and payload channels kept separate.
+They are structural possibilities only: Network and Supply Trace do not claim a payload is presently
+moving, establish throughput, or prove quantitative supply sufficiency. All topology stays scoped to
+the selected area. Unit Cargo boundary lookup uses same-team, fog-visible buildings and reports a
+continuation without recursively inspecting the peer's network.
 
 ## Liquid topology and LiquidScope
 

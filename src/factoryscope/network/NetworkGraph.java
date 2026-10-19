@@ -4,7 +4,7 @@ import factoryscope.model.*;
 
 import java.util.*;
 
-/** Immutable, deterministic directed item topology. */
+/** Immutable, deterministic directed resource topology. */
 public final class NetworkGraph{
     public final List<NetworkPort> ports;
     public final List<NetworkEdge> edges;
@@ -41,7 +41,7 @@ public final class NetworkGraph{
         while(!pending.isEmpty()){
             NetworkPort current = pending.removeFirst();
             for(NetworkEdge edge : outgoing.getOrDefault(current, List.of())){
-                if(edge.items.allows(item) && visited.add(edge.to)) pending.addLast(edge.to);
+                if(edge.resources.allows(item) && visited.add(edge.to)) pending.addLast(edge.to);
             }
         }
         return Collections.unmodifiableSet(visited);
@@ -57,7 +57,7 @@ public final class NetworkGraph{
         while(!pending.isEmpty()){
             NetworkPort current = pending.removeFirst();
             for(NetworkEdge edge : incoming.getOrDefault(current, List.of())){
-                if(edge.items.allows(item) && visited.add(edge.from)) pending.addLast(edge.from);
+                if(edge.resources.allows(item) && visited.add(edge.from)) pending.addLast(edge.from);
             }
         }
         return Collections.unmodifiableSet(visited);

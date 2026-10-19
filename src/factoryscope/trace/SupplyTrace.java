@@ -6,12 +6,12 @@ import factoryscope.network.*;
 
 import java.util.*;
 
-/** Immutable result for one item trace within one area snapshot. */
+/** Immutable result for one resource trace within one area snapshot. */
 public final class SupplyTrace{
     public final BuildingRef target;
-    public final ResourceRef item;
+    public final ResourceRef resource;
     public final TraceDirection direction;
-    public final boolean targetUsesItem;
+    public final boolean targetUsesResource;
     public final boolean complete;
     public final boolean noRouteProven;
     public final boolean diagnosticsIncomplete;
@@ -27,7 +27,7 @@ public final class SupplyTrace{
     public final List<BuildingRef> unreadableBuildings;
     public final List<NetworkFinding> findings;
 
-    SupplyTrace(BuildingRef target, ResourceRef item, TraceDirection direction, boolean targetUsesItem,
+    SupplyTrace(BuildingRef target, ResourceRef resource, TraceDirection direction, boolean targetUsesResource,
                 boolean complete, boolean noRouteProven, boolean diagnosticsIncomplete, boolean topologyIncomplete,
                 Collection<NetworkEdge> traversedEdges, Collection<TraceEndpoint> endpoints,
                 Collection<NetworkPort> boundaryContinuations,
@@ -35,9 +35,9 @@ public final class SupplyTrace{
                 Collection<BuildingRef> structuralDeadEnds, Collection<BuildingRef> unreadableBuildings,
                 Collection<NetworkFinding> findings){
         this.target = target;
-        this.item = item;
+        this.resource = resource;
         this.direction = direction;
-        this.targetUsesItem = targetUsesItem;
+        this.targetUsesResource = targetUsesResource;
         this.complete = complete;
         this.noRouteProven = noRouteProven;
         this.diagnosticsIncomplete = diagnosticsIncomplete;

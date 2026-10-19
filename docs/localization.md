@@ -38,7 +38,7 @@ These terms describe FactoryScope's evidence, not additional Mindustry mechanics
 
 | English concept | ru | zh_CN | ko | es |
 | --- | --- | --- | --- | --- |
-| Network (item topology) | Сеть предметов | 物品网络 | 아이템 네트워크 | Red de objetos |
+| Network (item and payload routes) | Сеть ресурсов | 资源网络 | 자원 네트워크 | Red de recursos |
 | Supply Trace | Трассировка снабжения | 供应追踪 | 공급 추적 | Rastreo de suministro |
 | Snapshot (captured evidence) | Снимок данных | 证据快照 | 증거 스냅샷 | Instantánea de la evidencia |
 | Structural route | Структурный маршрут | 结构路径 | 구조적 경로 | Ruta estructural |

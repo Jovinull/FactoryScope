@@ -11,6 +11,8 @@ import mindustry.gen.*;
 import mindustry.world.*;
 import mindustry.world.blocks.environment.Floor;
 import mindustry.world.blocks.distribution.ItemBridge;
+import mindustry.world.blocks.payloads.*;
+import mindustry.world.blocks.units.*;
 import org.junit.jupiter.api.*;
 
 import java.util.*;
@@ -511,7 +513,7 @@ class MindustryNetworkProbeTest{
             "source=" + source.tile.x + "," + source.tile.y + " size=" + source.block.size
                 + " target=" + target.tile.x + "," + target.tile.y + " size=" + target.block.size
                 + " boundary=" + area.network.boundaryInputs);
-        ItemConstraint boundaryItems = area.network.boundaryInputConstraints.get(input(AreaProbe.refOf(target), NetworkSide.west));
+        ResourceConstraint boundaryItems = area.network.boundaryInputConstraints.get(input(AreaProbe.refOf(target), NetworkSide.west));
         assertNotNull(boundaryItems);
         assertTrue(boundaryItems.allows(new ResourceRef(ResourceKind.item, "graphite", "Graphite")));
         assertTrue(boundaryItems.allows(new ResourceRef(ResourceKind.item, "silicon", "Silicon")));
@@ -730,7 +732,7 @@ class MindustryNetworkProbeTest{
         AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
         SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(unknown), sand);
 
-        assertTrue(trace.targetUsesItem);
+        assertTrue(trace.targetUsesResource);
         assertFalse(trace.diagnosticsIncomplete);
         assertTrue(trace.topologyIncomplete);
         assertFalse(trace.noRouteProven);
@@ -786,9 +788,9 @@ class MindustryNetworkProbeTest{
                 && edge.to.building.equals(AreaProbe.refOf(belt)))
             .findFirst().orElseThrow();
 
-        assertTrue(sourceEdge.items.allows(new ResourceRef(ResourceKind.item, "graphite", "Graphite")));
-        assertTrue(sourceEdge.items.allows(new ResourceRef(ResourceKind.item, "silicon", "Silicon")));
-        assertFalse(sourceEdge.items.allows(copper));
+        assertTrue(sourceEdge.resources.allows(new ResourceRef(ResourceKind.item, "graphite", "Graphite")));
+        assertTrue(sourceEdge.resources.allows(new ResourceRef(ResourceKind.item, "silicon", "Silicon")));
+        assertFalse(sourceEdge.resources.allows(copper));
         assertTrue(copperTrace.endpoints.isEmpty());
         assertEquals(List.of(AreaProbe.refOf(target)), graphiteTrace.endpoints.stream()
             .map(endpoint -> endpoint.building).toList());
@@ -805,7 +807,7 @@ class MindustryNetworkProbeTest{
         SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(target),
             new ResourceRef(ResourceKind.item, "coal", "Coal"));
 
-        assertTrue(trace.targetUsesItem);
+        assertTrue(trace.targetUsesResource);
         assertFalse(trace.diagnosticsIncomplete);
         assertEquals(List.of(AreaProbe.refOf(source)), trace.producers().stream().map(endpoint -> endpoint.building).toList());
     }
@@ -847,6 +849,278 @@ class MindustryNetworkProbeTest{
         }
     }
 
+    @Test
+    void unitCargoCarriesConfiguredItemsBetweenSameTeamBuildingsAndAppearsInSupplyTrace(){
+        Building source = place(ModdedBlocks.conventional, 8, 10, 0);
+        Building loader = place(Blocks.unitCargoLoader, adjacentX(source, NetworkSide.east, Blocks.unitCargoLoader.size), 10, 0);
+        Building point = place(Blocks.unitCargoUnloadPoint, 20, 10, 0);
+        ((UnitCargoUnloadPoint.UnitCargoUnloadPointBuild)point).item = Items.graphite;
+        Building consumer = place(ModdedBlocks.traceConsumer,
+            adjacentX(point, NetworkSide.east, ModdedBlocks.traceConsumer.size), 10, 0);
+
+        AreaDiagnosticResult area = AreaProbe.scan(AreaSelection.of(6, 8, 23, 13), Team.sharded);
+        BuildingRef loaderRef = AreaProbe.refOf(loader), pointRef = AreaProbe.refOf(point);
+        NetworkPort loaderCargoOut = new NetworkPort(loaderRef, NetworkSide.east, "cargo-out");
+        NetworkPort pointCargoIn = new NetworkPort(pointRef, NetworkSide.west, "cargo-in");
+        SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(consumer),
+            new ResourceRef(ResourceKind.item, "graphite", "Graphite"));
+
+        assertTrue(area.network.graph.isReachable(new NetworkPort(loaderRef, NetworkSide.west, "in"),
+            new NetworkPort(pointRef, NetworkSide.east, "out"), new ResourceRef(ResourceKind.item, "graphite", "Graphite")),
+            () -> "Unit Cargo route missing: " + area.network.graph.edges + " resources=" + area.network.resources
+                + " source=" + source + " loader=" + loader + " point=" + point);
+        assertTrue(area.network.graph.edges.stream().anyMatch(edge -> edge.from.equals(loaderCargoOut)
+            && edge.to.equals(pointCargoIn) && edge.conditional), "Unit Cargo is shown as a conditional remote item route");
+        assertFalse(area.network.graph.isReachable(new NetworkPort(loaderRef, NetworkSide.west, "in"),
+            new NetworkPort(pointRef, NetworkSide.east, "out"), new ResourceRef(ResourceKind.item, "sand", "Sand")),
+            "a Unit Cargo point configured for Graphite must not forward Sand");
+        assertEquals(List.of(AreaProbe.refOf(source)), trace.producers().stream().map(endpoint -> endpoint.building).toList());
+        assertTrue(trace.complete);
+    }
+
+    @Test
+    void unitCargoShowsOutsideAreaContinuationAndDoesNotReadAnotherTeam(){
+        Building outsideLoader = place(Blocks.unitCargoLoader, 8, 10, 0);
+        Building point = place(Blocks.unitCargoUnloadPoint, 20, 10, 0);
+        ((UnitCargoUnloadPoint.UnitCargoUnloadPointBuild)point).item = Items.graphite;
+
+        ItemNetwork selectedPoint = MindustryNetworkProbe.scan(AreaSelection.of(19, 9, 21, 11), Team.sharded);
+        NetworkPort cargoInput = new NetworkPort(AreaProbe.refOf(point), NetworkSide.west, "cargo-in");
+        assertTrue(selectedPoint.boundaryInputs.contains(cargoInput));
+        assertTrue(selectedPoint.boundaryInputConstraints.get(cargoInput).allows(
+            new ResourceRef(ResourceKind.item, "graphite", "Graphite")));
+
+        HeadlessGame.newWorld(32);
+        Building selectedLoader = place(Blocks.unitCargoLoader, 10, 10, 0);
+        Building outsidePoint = place(Blocks.unitCargoUnloadPoint, 20, 10, 0);
+        ((UnitCargoUnloadPoint.UnitCargoUnloadPointBuild)outsidePoint).item = Items.graphite;
+        ItemNetwork selectedLoaderNetwork = MindustryNetworkProbe.scan(AreaSelection.of(8, 8, 12, 12), Team.sharded);
+        NetworkPort cargoOutput = new NetworkPort(AreaProbe.refOf(selectedLoader), NetworkSide.east, "cargo-out");
+        assertTrue(selectedLoaderNetwork.boundaryPorts.contains(cargoOutput));
+        assertTrue(selectedLoaderNetwork.boundaryOutputConstraints.get(cargoOutput).allows(
+            new ResourceRef(ResourceKind.item, "graphite", "Graphite")));
+
+        HeadlessGame.newWorld(32);
+        Building enemyLoader = place(Blocks.unitCargoLoader, 8, 10, Team.crux, 0);
+        Building isolatedPoint = place(Blocks.unitCargoUnloadPoint, 20, 10, 0);
+        ((UnitCargoUnloadPoint.UnitCargoUnloadPointBuild)isolatedPoint).item = Items.graphite;
+        ItemNetwork noEnemy = MindustryNetworkProbe.scan(AreaSelection.of(19, 9, 21, 11), Team.sharded);
+        assertFalse(noEnemy.boundaryInputs.contains(new NetworkPort(AreaProbe.refOf(isolatedPoint), NetworkSide.west, "cargo-in")));
+        assertNotNull(outsideLoader);
+        assertNotNull(enemyLoader);
+    }
+
+    @Test
+    void payloadConveyorsAndRoutersKeepBlockAndUnitRoutesSeparate(){
+        Building source = place(Blocks.payloadSource, 6, 10, 0);
+        ((PayloadSource.PayloadSourceBuild)source).configBlock = Blocks.copperWall;
+        ResourceRef copperWall = new ResourceRef(ResourceKind.block, "copper-wall", "Copper Wall");
+        assertTrue(MindustryFactoryProbe.probe(source).producedPayloads.contains(copperWall),
+            "a configured Payload Source is a typed block-payload producer");
+        Building conveyor = place(Blocks.payloadConveyor,
+            adjacentX(source, NetworkSide.east, Blocks.payloadConveyor.size), 10, 0);
+        Building router = place(Blocks.payloadRouter,
+            adjacentX(conveyor, NetworkSide.east, Blocks.payloadRouter.size), 10, 0);
+        PayloadRouter.PayloadRouterBuild routerBuild = (PayloadRouter.PayloadRouterBuild)router;
+        routerBuild.sorted = Blocks.copperWall;
+        PayloadConveyor.PayloadConveyorBuild conveyorBuild = (PayloadConveyor.PayloadConveyorBuild)conveyor;
+        conveyorBuild.item = new BuildPayload(Blocks.titaniumWall, Team.sharded);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 13, 13), Team.sharded);
+        BuildingRef routerRef = AreaProbe.refOf(router), sourceRef = AreaProbe.refOf(source);
+        ResourceRef titaniumWall = new ResourceRef(ResourceKind.block, "titanium-wall", "Titanium Wall");
+        NetworkPort routerInput = new NetworkPort(routerRef, NetworkSide.west, "payload-in");
+        NetworkPort routerForward = new NetworkPort(routerRef, NetworkSide.east, "payload-out");
+        NetworkPort routerSide = new NetworkPort(routerRef, NetworkSide.north, "payload-out");
+
+        assertTrue(network.graph.isReachable(new NetworkPort(sourceRef, NetworkSide.east, "payload-out"),
+            routerForward, copperWall), () -> "Payload route missing: " + network.graph.edges + " resources=" + network.resources
+                + " source=" + source + " conveyor=" + conveyor + " router=" + router);
+        assertFalse(network.graph.isReachable(routerInput, routerForward, titaniumWall));
+        assertTrue(network.graph.isReachable(routerInput, routerSide, titaniumWall));
+        assertFalse(network.graph.isReachable(routerInput, routerSide, copperWall));
+    }
+
+    @Test
+    void unknownModdedPayloadTransportIsAnInterruptionWithoutInventedEdges(){
+        Building source = place(Blocks.payloadSource, 6, 10, 0);
+        ((PayloadSource.PayloadSourceBuild)source).configBlock = Blocks.copperWall;
+        Building unknown = place(ModdedBlocks.unknownPayloadTransport,
+            adjacentX(source, NetworkSide.east, ModdedBlocks.unknownPayloadTransport.size), 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(4, 8, 12, 12), Team.sharded);
+        BuildingRef sourceRef = AreaProbe.refOf(source), unknownRef = AreaProbe.refOf(unknown);
+        assertTrue(network.unsupportedTransport.contains(unknownRef));
+        assertEquals(NetworkCompleteness.partialUnsupportedTransport, network.completeness);
+        assertTrue(network.graph.edges.stream().noneMatch(edge -> edge.from.building.equals(sourceRef)
+            && edge.to.building.equals(unknownRef)), "unknown payload routing is not guessed");
+    }
+
+    @Test
+    void payloadLoaderAndUnloaderRouteOnlySupportedContainerBlocksAlongTheirForwardChannel(){
+        Building source = place(Blocks.payloadSource, 6, 10, 0);
+        PayloadSource.PayloadSourceBuild sourceBuild = (PayloadSource.PayloadSourceBuild)source;
+        sourceBuild.configBlock = Blocks.copperWall;
+        Building loader = place(Blocks.payloadLoader,
+            adjacentX(source, NetworkSide.east, Blocks.payloadLoader.size), 10, 0);
+        Building conveyor = place(Blocks.payloadConveyor,
+            adjacentX(loader, NetworkSide.east, Blocks.payloadConveyor.size), 10, 0);
+        Building unloader = place(Blocks.payloadUnloader,
+            adjacentX(conveyor, NetworkSide.east, Blocks.payloadUnloader.size), 10, 0);
+
+        AreaSelection selection = AreaSelection.of(5, 8, 22, 13);
+        ItemNetwork network = MindustryNetworkProbe.scan(selection, Team.sharded);
+        ResourceRef copperWall = new ResourceRef(ResourceKind.block, "copper-wall", "Copper Wall");
+        NetworkPort from = new NetworkPort(AreaProbe.refOf(source), NetworkSide.east, "payload-out");
+        NetworkPort to = new NetworkPort(AreaProbe.refOf(unloader), NetworkSide.east, "payload-out");
+        assertFalse(network.graph.isReachable(from, to, copperWall),
+            "a loader only accepts blocks that can act as item/liquid containers or buffered batteries");
+
+        sourceBuild.configBlock = Blocks.container;
+        network = MindustryNetworkProbe.scan(selection, Team.sharded);
+        ResourceRef container = new ResourceRef(ResourceKind.block, "container", "Container");
+
+        assertTrue(network.graph.isReachable(from, to, container),
+            "supported container payload route missing: " + network.graph.edges);
+    }
+
+    @Test
+    void reconstructorPayloadInputsMatchItsDeclaredUpgradePairs(){
+        Building source = place(Blocks.payloadSource, 6, 10, 0);
+        PayloadSource.PayloadSourceBuild sourceBuild = (PayloadSource.PayloadSourceBuild)source;
+        sourceBuild.unit = UnitTypes.dagger;
+        Building conveyor = place(Blocks.payloadConveyor,
+            adjacentX(source, NetworkSide.east, Blocks.payloadConveyor.size), 10, 0);
+        Building reconstructor = place(Blocks.additiveReconstructor,
+            adjacentX(conveyor, NetworkSide.east, Blocks.additiveReconstructor.size), 10, 0);
+
+        ResourceRef dagger = new ResourceRef(ResourceKind.unit, "dagger", "Dagger");
+        ResourceRef zenith = new ResourceRef(ResourceKind.unit, "zenith", "Zenith");
+        FactorySnapshot snapshot = MindustryFactoryProbe.probe(reconstructor);
+        assertTrue(snapshot.acceptedPayloads.contains(dagger), "the reconstructor exposes its declared input units");
+
+        AreaSelection selection = AreaSelection.of(4, 7, 18, 13);
+        ItemNetwork network = MindustryNetworkProbe.scan(selection, Team.sharded);
+        NetworkPort from = new NetworkPort(AreaProbe.refOf(source), NetworkSide.east, "payload-out");
+        NetworkPort into = new NetworkPort(AreaProbe.refOf(reconstructor), NetworkSide.west, "payload-in");
+        assertTrue(network.graph.isReachable(from, into, dagger), "Dagger can enter its configured upgrade route");
+        AreaDiagnosticResult area = AreaProbe.scan(selection, Team.sharded);
+        SupplyTrace trace = TraceAnalyzer.input(area, AreaProbe.refOf(reconstructor), dagger);
+        assertTrue(trace.targetUsesResource, "an accepted payload is a valid Supply Trace input");
+        assertEquals(List.of(AreaProbe.refOf(source)), trace.producers().stream().map(endpoint -> endpoint.building).toList());
+        assertFalse(network.graph.isReachable(from,
+            new NetworkPort(AreaProbe.refOf(reconstructor), NetworkSide.east, "payload-in"), dagger),
+            "the reconstructor cannot receive payload from its output-facing side");
+
+        sourceBuild.unit = UnitTypes.zenith;
+        network = MindustryNetworkProbe.scan(selection, Team.sharded);
+        assertFalse(network.graph.isReachable(from, into, zenith),
+            "a payload transport cannot bypass the reconstructor's declared input set");
+    }
+
+    @Test
+    void payloadDeconstructorAcceptsOnlySizedPayloadsWithBuildRequirements(){
+        Building source = place(Blocks.payloadSource, 6, 10, 0);
+        ((PayloadSource.PayloadSourceBuild)source).configBlock = Blocks.titaniumWallLarge;
+        Building conveyor = place(Blocks.payloadConveyor,
+            adjacentX(source, NetworkSide.east, Blocks.payloadConveyor.size), 10, 0);
+        Building deconstructor = place(Blocks.smallDeconstructor,
+            adjacentX(conveyor, NetworkSide.east, Blocks.smallDeconstructor.size), 10, 0);
+        PayloadDeconstructor block = (PayloadDeconstructor)Blocks.smallDeconstructor;
+        float previousLimit = block.maxPayloadSize;
+        ResourceRef largeWall = new ResourceRef(ResourceKind.block, "titanium-wall-large", "Large Titanium Wall");
+        NetworkPort from = new NetworkPort(AreaProbe.refOf(source), NetworkSide.east, "payload-out");
+        NetworkPort into = new NetworkPort(AreaProbe.refOf(deconstructor), NetworkSide.west, "payload-in");
+        AreaSelection selection = AreaSelection.of(4, 7, 18, 13);
+        try{
+            ItemNetwork network = MindustryNetworkProbe.scan(selection, Team.sharded);
+            assertTrue(network.graph.isReachable(from, into, largeWall),
+                "a sized payload with build requirements can enter the deconstructor");
+
+            block.maxPayloadSize = 1f;
+            network = MindustryNetworkProbe.scan(selection, Team.sharded);
+            assertFalse(network.graph.isReachable(from, into, largeWall),
+                "the deconstructor's declared payload size cap is respected");
+        }finally{
+            block.maxPayloadSize = previousLimit;
+        }
+    }
+
+    @Test
+    void payloadConveyorHonorsItsDeclaredSizeLimit(){
+        Building source = place(Blocks.payloadSource, 6, 10, 0);
+        ((PayloadSource.PayloadSourceBuild)source).configBlock = Blocks.copperWall;
+        Building conveyor = place(Blocks.payloadConveyor,
+            adjacentX(source, NetworkSide.east, Blocks.payloadConveyor.size), 10, 0);
+        PayloadConveyor block = (PayloadConveyor)Blocks.payloadConveyor;
+        float previousLimit = block.payloadLimit;
+        try{
+            block.payloadLimit = 0.5f;
+            ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(5, 8, 13, 13), Team.sharded);
+            assertFalse(network.graph.isReachable(new NetworkPort(AreaProbe.refOf(source), NetworkSide.east, "payload-out"),
+                new NetworkPort(AreaProbe.refOf(conveyor), NetworkSide.east, "payload-out"),
+                new ResourceRef(ResourceKind.block, "copper-wall", "Copper Wall")),
+                "a size-1 wall cannot pass a conveyor with a 0.5-tile payload limit");
+        }finally{
+            block.payloadLimit = previousLimit;
+        }
+    }
+
+    @Test
+    void selectedPayloadMassDriverShowsLinkedOutsideSenderAsAResourceAwareBoundary(){
+        HeadlessGame.newWorld(48);
+        Building sender = place(Blocks.payloadMassDriver, 10, 10, 0);
+        Building receiver = place(Blocks.payloadMassDriver, 22, 10, 0);
+        ((PayloadMassDriver.PayloadDriverBuild)sender).link = receiver.pos();
+        Building source = place(Blocks.payloadSource, 34, 10, 0);
+        ((PayloadSource.PayloadSourceBuild)source).configBlock = Blocks.copperWall;
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(20, 8, 36, 13), Team.sharded);
+        BuildingRef receiverRef = AreaProbe.refOf(receiver);
+        NetworkPort boundary = new NetworkPort(receiverRef, NetworkSide.west, "payload-in");
+        ResourceRef copperWall = new ResourceRef(ResourceKind.block, "copper-wall", "Copper Wall");
+
+        assertTrue(network.boundaryInputs.contains(boundary), "the linked sender remains an area-boundary continuation");
+        assertTrue(network.boundaryInputConstraints.get(boundary).allows(copperWall),
+            "the boundary retains the candidate payload identity");
+        assertNotNull(source);
+    }
+
+    @Test
+    void reinforcedPayloadConveyorAndRouterUseTheSameTypedRoutingRules(){
+        Building source = place(Blocks.payloadSource, 6, 10, 0);
+        ((PayloadSource.PayloadSourceBuild)source).configBlock = Blocks.copperWall;
+        Building reinforced = place(Blocks.reinforcedPayloadConveyor,
+            adjacentX(source, NetworkSide.east, Blocks.reinforcedPayloadConveyor.size), 10, 0);
+        Building router = place(Blocks.reinforcedPayloadRouter,
+            adjacentX(reinforced, NetworkSide.east, Blocks.reinforcedPayloadRouter.size), 10, 0);
+        ((PayloadRouter.PayloadRouterBuild)router).sorted = Blocks.copperWall;
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(5, 8, 17, 13), Team.sharded);
+        ResourceRef copperWall = new ResourceRef(ResourceKind.block, "copper-wall", "Copper Wall");
+        assertTrue(network.graph.isReachable(new NetworkPort(AreaProbe.refOf(source), NetworkSide.east, "payload-out"),
+            new NetworkPort(AreaProbe.refOf(router), NetworkSide.east, "payload-out"), copperWall));
+    }
+
+    @Test
+    void payloadMassDriverMovesOnlySupportedPayloadsAcrossItsConfiguredLink(){
+        Building source = place(Blocks.payloadSource, 6, 10, 0);
+        ((PayloadSource.PayloadSourceBuild)source).configBlock = Blocks.copperWall;
+        Building sender = place(Blocks.payloadMassDriver,
+            adjacentX(source, NetworkSide.east, Blocks.payloadMassDriver.size), 10, 0);
+        Building receiver = place(Blocks.payloadMassDriver, 22, 10, 0);
+        ((PayloadMassDriver.PayloadDriverBuild)sender).link = receiver.pos();
+        Building output = place(Blocks.payloadConveyor,
+            adjacentX(receiver, NetworkSide.east, Blocks.payloadConveyor.size), 10, 0);
+
+        ItemNetwork network = MindustryNetworkProbe.scan(AreaSelection.of(6, 8, 28, 13), Team.sharded);
+        ResourceRef copperWall = new ResourceRef(ResourceKind.block, "copper-wall", "Copper Wall");
+        assertTrue(network.graph.isReachable(new NetworkPort(AreaProbe.refOf(source), NetworkSide.east, "payload-out"),
+            new NetworkPort(AreaProbe.refOf(output), NetworkSide.east, "payload-out"), copperWall),
+            () -> "Payload mass-driver route missing: " + network.graph.edges + " resources=" + network.resources
+                + " source=" + source + " sender=" + sender + " receiver=" + receiver + " output=" + output);
+    }
+
     private static NetworkPort input(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "in"); }
     private static NetworkPort output(BuildingRef ref, NetworkSide side){ return new NetworkPort(ref, side, "out"); }
 
@@ -878,6 +1152,14 @@ class MindustryNetworkProbeTest{
 
     private static int dx(NetworkSide side){ return switch(side){ case east -> 1; case west -> -1; default -> 0; }; }
     private static int dy(NetworkSide side){ return switch(side){ case north -> 1; case south -> -1; default -> 0; }; }
+
+    private static int adjacentX(Building source, NetworkSide side, int targetSize){
+        int offset = -(source.block.size - 1) / 2;
+        int targetOffset = -(targetSize - 1) / 2;
+        if(side == NetworkSide.east) return source.tile.x + offset + source.block.size - targetOffset;
+        if(side == NetworkSide.west) return source.tile.x + offset - 1 - targetOffset;
+        return source.tile.x;
+    }
 
     private static NetworkEdge edge(ItemNetwork network, BuildingRef ref, NetworkSide from, NetworkSide to){
         return network.graph.edges.stream().filter(edge -> edge.from.equals(input(ref, from)) && edge.to.equals(output(ref, to)))

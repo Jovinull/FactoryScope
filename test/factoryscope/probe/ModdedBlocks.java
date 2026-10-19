@@ -26,6 +26,7 @@ final class ModdedBlocks{
     static Block oddBuilding;
     static Block coalConsumer;
     static Block unknownTransport;
+    static Block unknownPayloadTransport;
     static Conveyor inheritedConveyor;
     static Conveyor rejectingConveyor;
     static Conduit inheritedConduit;
@@ -103,6 +104,10 @@ final class ModdedBlocks{
         oddBuilding = new OddBlock("fs-test-odd");
         coalConsumer = new ItemConsumerBlock("fs-test-item-consumer", Items.coal);
         unknownTransport = new UnknownTransportBlock("fs-test-unknown-transport");
+        unknownPayloadTransport = new Block("fs-test-unknown-payload-transport"){{
+            group = BlockGroup.payloads;
+            acceptsPayload = true;
+        }};
         inheritedConveyor = new Conveyor("fs-test-inherited-conveyor");
         rejectingConveyor = new RejectingConveyor("fs-test-rejecting-conveyor");
         inheritedConduit = new Conduit("fs-test-inherited-conduit");
