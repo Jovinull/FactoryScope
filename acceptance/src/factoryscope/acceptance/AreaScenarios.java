@@ -64,6 +64,7 @@ final class AreaScenarios{
         new PowerScopeScenarios(harness).queue();
         new LiquidScopeScenarios(harness).queue();
         harness.itemNetwork.queueTransportFamilies();
+        harness.itemNetwork.queueResourceTransportShowcase();
         healthyArea();
         emptyArea();
         configurableBlocks();
@@ -438,7 +439,7 @@ final class AreaScenarios{
         queue(this::armPicker);
         queue(() -> dragTiles(rx() + 1, ry() + 2, rx() + 5, ry() + 6));
         queue(() -> clickNamed("factoryscope-area-network"));
-        queue(() -> clickNamed("factoryscope-network-item-sand"));
+        queue(() -> clickNamed("factoryscope-network-resource-sand"));
         queue(() -> clickNamed("factoryscope-network-building", 1));
         queue(() -> check("the selected factory exposes its item trace",
             Core.scene.find("factoryscope-network-trace-input") != null));

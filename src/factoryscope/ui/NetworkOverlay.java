@@ -38,7 +38,7 @@ final class NetworkOverlay{
         Draw.z(Layer.overlayUI - 0.01f);
         int drawn = 0;
         for(NetworkEdge edge : network.graph.edges){
-            if(drawn >= MAX_DRAWN_EDGES || (item != null && !edge.items.allows(item))) continue;
+            if(drawn >= MAX_DRAWN_EDGES || (item != null && !edge.resources.allows(item))) continue;
             float x1 = worldX(edge.from), y1 = worldY(edge.from);
             float x2 = worldX(edge.to), y2 = worldY(edge.to);
             boolean selected = trace == null || traversed.contains(edge);

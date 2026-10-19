@@ -16,6 +16,8 @@ class TraceAnalyzerTest{
     private static final ResourceRef sand = item("sand", "Sand");
     private static final ResourceRef copper = item("copper", "Copper");
     private static final ResourceRef lead = item("lead", "Lead");
+    private static final ResourceRef copperWall = new ResourceRef(ResourceKind.block, "copper-wall", "Copper Wall");
+    private static final ResourceRef dagger = new ResourceRef(ResourceKind.unit, "dagger", "Dagger");
 
     @Test
     void inputTraceFindsProducerAndOneShortestStructuralPath(){
@@ -27,9 +29,9 @@ class TraceAnalyzerTest{
         NetworkPort beltOut = port(belt, NetworkSide.east, "out");
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(producerOut, beltIn, beltOut, targetIn), List.of(
-            edge(producerOut, beltIn, ItemConstraint.only(sand)),
-            edge(beltIn, beltOut, ItemConstraint.any()),
-            edge(beltOut, targetIn, ItemConstraint.any())));
+            edge(producerOut, beltIn, ResourceConstraint.only(sand)),
+            edge(beltIn, beltOut, ResourceConstraint.any()),
+            edge(beltOut, targetIn, ResourceConstraint.any())));
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(
             producer(producer, sand, DiagnosticReason.active), consumer(target, sand)));
@@ -44,6 +46,30 @@ class TraceAnalyzerTest{
     }
 
     @Test
+    void payloadTraceFindsBlockAndUnitProductsOnDedicatedPorts(){
+        BuildingRef blockSource = ref("payload-source", 1), unitSource = ref("payload-source", 2);
+        BuildingRef blockTarget = ref("constructor", 3), unitTarget = ref("reconstructor", 4);
+        NetworkPort blockOut = port(blockSource, NetworkSide.east, "payload-out");
+        NetworkPort blockIn = port(blockTarget, NetworkSide.west, "payload-in");
+        NetworkPort unitOut = port(unitSource, NetworkSide.east, "payload-out");
+        NetworkPort unitIn = port(unitTarget, NetworkSide.west, "payload-in");
+        NetworkGraph graph = graph(List.of(blockOut, blockIn, unitOut, unitIn), List.of(
+            edge(blockOut, blockIn, ResourceConstraint.anyPayloads()),
+            edge(unitOut, unitIn, ResourceConstraint.only(dagger))));
+        AreaDiagnosticResult area = area(network(graph), List.of(
+            payloadProducer(blockSource, copperWall), payloadConsumer(blockTarget, copperWall),
+            payloadProducer(unitSource, dagger), payloadConsumer(unitTarget, dagger)));
+
+        SupplyTrace blockTrace = TraceAnalyzer.input(area, blockTarget, copperWall);
+        SupplyTrace unitTrace = TraceAnalyzer.input(area, unitTarget, dagger);
+
+        assertTrue(blockTrace.complete);
+        assertEquals(List.of(blockSource), blockTrace.producers().stream().map(endpoint -> endpoint.building).toList());
+        assertTrue(unitTrace.complete);
+        assertEquals(List.of(unitSource), unitTrace.producers().stream().map(endpoint -> endpoint.building).toList());
+    }
+
+    @Test
     void inputTraceReturnsSeveralUniqueProducerPaths(){
         BuildingRef first = ref("drill", 1), second = ref("drill", 2), router = ref("router", 3), target = ref("smelter", 4);
         NetworkPort firstOut = port(first, NetworkSide.east, "out");
@@ -52,8 +78,8 @@ class TraceAnalyzerTest{
         NetworkPort routerOut = port(router, NetworkSide.east, "out");
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(firstOut, secondOut, routerIn, routerOut, targetIn), List.of(
-            edge(firstOut, routerIn, ItemConstraint.any()), edge(secondOut, routerIn, ItemConstraint.any()),
-            edge(routerIn, routerOut, ItemConstraint.any()), edge(routerOut, targetIn, ItemConstraint.any())));
+            edge(firstOut, routerIn, ResourceConstraint.any()), edge(secondOut, routerIn, ResourceConstraint.any()),
+            edge(routerIn, routerOut, ResourceConstraint.any()), edge(routerOut, targetIn, ResourceConstraint.any())));
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(
             producer(first, sand, DiagnosticReason.active), producer(second, sand, DiagnosticReason.disabled),
@@ -76,8 +102,8 @@ class TraceAnalyzerTest{
             lo = port(left, NetworkSide.east, "out"), ri = port(right, NetworkSide.west, "in"),
             ro = port(right, NetworkSide.east, "out"), ti = port(target, NetworkSide.west, "in");
         List<NetworkEdge> edges = List.of(
-            edge(p, li, ItemConstraint.any()), edge(li, lo, ItemConstraint.any()), edge(lo, ti, ItemConstraint.any()),
-            edge(pNorth, ri, ItemConstraint.any()), edge(ri, ro, ItemConstraint.any()), edge(ro, ti, ItemConstraint.any()));
+            edge(p, li, ResourceConstraint.any()), edge(li, lo, ResourceConstraint.any()), edge(lo, ti, ResourceConstraint.any()),
+            edge(pNorth, ri, ResourceConstraint.any()), edge(ri, ro, ResourceConstraint.any()), edge(ro, ti, ResourceConstraint.any()));
         SupplyTrace trace = input(network(graph(List.of(p, pNorth, li, lo, ri, ro, ti), edges)), target, sand,
             List.of(producer(producer, sand, DiagnosticReason.active), consumer(target, sand)));
 
@@ -98,10 +124,10 @@ class TraceAnalyzerTest{
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(producerEast, producerNorth, longAIn, longAOut, longBIn, longBOut,
             shortIn, shortOut, targetIn), List.of(
-            edge(producerEast, longAIn, ItemConstraint.any()), edge(longAIn, longAOut, ItemConstraint.any()),
-            edge(longAOut, longBIn, ItemConstraint.any()), edge(longBIn, longBOut, ItemConstraint.any()),
-            edge(longBOut, targetIn, ItemConstraint.any()), edge(producerNorth, shortIn, ItemConstraint.any()),
-            edge(shortIn, shortOut, ItemConstraint.any()), edge(shortOut, targetIn, ItemConstraint.any())));
+            edge(producerEast, longAIn, ResourceConstraint.any()), edge(longAIn, longAOut, ResourceConstraint.any()),
+            edge(longAOut, longBIn, ResourceConstraint.any()), edge(longBIn, longBOut, ResourceConstraint.any()),
+            edge(longBOut, targetIn, ResourceConstraint.any()), edge(producerNorth, shortIn, ResourceConstraint.any()),
+            edge(shortIn, shortOut, ResourceConstraint.any()), edge(shortOut, targetIn, ResourceConstraint.any())));
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(
             producer(producer, sand, DiagnosticReason.active), consumer(target, sand)));
@@ -127,7 +153,7 @@ class TraceAnalyzerTest{
         NetworkPort beltIn = port(belt, NetworkSide.west, "in"), beltOut = port(belt, NetworkSide.east, "out");
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(beltIn, beltOut, targetIn), List.of(
-            edge(beltIn, beltOut, ItemConstraint.any()), edge(beltOut, targetIn, ItemConstraint.any())));
+            edge(beltIn, beltOut, ResourceConstraint.any()), edge(beltOut, targetIn, ResourceConstraint.any())));
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(consumer(target, sand)));
 
@@ -155,10 +181,10 @@ class TraceAnalyzerTest{
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(producerOut, producerIn, producerOutPort, deadIn, deadOut,
             mergeWest, mergeSouth, mergeEast, targetIn), List.of(
-            edge(producerOut, producerIn, ItemConstraint.any()), edge(producerIn, producerOutPort, ItemConstraint.any()),
-            edge(producerOutPort, mergeWest, ItemConstraint.any()), edge(deadIn, deadOut, ItemConstraint.any()),
-            edge(deadOut, mergeSouth, ItemConstraint.any()), edge(mergeWest, mergeEast, ItemConstraint.any()),
-            edge(mergeSouth, mergeEast, ItemConstraint.any()), edge(mergeEast, targetIn, ItemConstraint.any())));
+            edge(producerOut, producerIn, ResourceConstraint.any()), edge(producerIn, producerOutPort, ResourceConstraint.any()),
+            edge(producerOutPort, mergeWest, ResourceConstraint.any()), edge(deadIn, deadOut, ResourceConstraint.any()),
+            edge(deadOut, mergeSouth, ResourceConstraint.any()), edge(mergeWest, mergeEast, ResourceConstraint.any()),
+            edge(mergeSouth, mergeEast, ResourceConstraint.any()), edge(mergeEast, targetIn, ResourceConstraint.any())));
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(
             producer(producer, sand, DiagnosticReason.active), consumer(target, sand)));
@@ -184,13 +210,13 @@ class TraceAnalyzerTest{
             routerOut = port(router, NetworkSide.east, "out"), targetIn = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(firstOut, secondOut, paIn, paOut, pbIn, pbOut, daIn, daOut,
             dbIn, dbOut, rw, rs, rn, re, routerOut, targetIn), List.of(
-            edge(firstOut, paIn, ItemConstraint.any()), edge(paIn, paOut, ItemConstraint.any()), edge(paOut, rw, ItemConstraint.any()),
-            edge(secondOut, pbIn, ItemConstraint.any()), edge(pbIn, pbOut, ItemConstraint.any()), edge(pbOut, rs, ItemConstraint.any()),
-            edge(daIn, daOut, ItemConstraint.any()), edge(daOut, rn, ItemConstraint.any()),
-            edge(dbIn, dbOut, ItemConstraint.any()), edge(dbOut, re, ItemConstraint.any()),
-            edge(rw, routerOut, ItemConstraint.any()), edge(rs, routerOut, ItemConstraint.any()),
-            edge(rn, routerOut, ItemConstraint.any()), edge(re, routerOut, ItemConstraint.any()),
-            edge(routerOut, targetIn, ItemConstraint.any())));
+            edge(firstOut, paIn, ResourceConstraint.any()), edge(paIn, paOut, ResourceConstraint.any()), edge(paOut, rw, ResourceConstraint.any()),
+            edge(secondOut, pbIn, ResourceConstraint.any()), edge(pbIn, pbOut, ResourceConstraint.any()), edge(pbOut, rs, ResourceConstraint.any()),
+            edge(daIn, daOut, ResourceConstraint.any()), edge(daOut, rn, ResourceConstraint.any()),
+            edge(dbIn, dbOut, ResourceConstraint.any()), edge(dbOut, re, ResourceConstraint.any()),
+            edge(rw, routerOut, ResourceConstraint.any()), edge(rs, routerOut, ResourceConstraint.any()),
+            edge(rn, routerOut, ResourceConstraint.any()), edge(re, routerOut, ResourceConstraint.any()),
+            edge(routerOut, targetIn, ResourceConstraint.any())));
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(
             producer(first, sand, DiagnosticReason.active), producer(second, sand, DiagnosticReason.active),
@@ -209,9 +235,9 @@ class TraceAnalyzerTest{
             right = port(belt, NetworkSide.south, "in"), front = port(belt, NetworkSide.east, "out");
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(producerOut, back, left, right, front, targetIn), List.of(
-            edge(producerOut, back, ItemConstraint.any()), edge(back, front, ItemConstraint.any()),
-            edge(left, front, ItemConstraint.any()), edge(right, front, ItemConstraint.any()),
-            edge(front, targetIn, ItemConstraint.any())));
+            edge(producerOut, back, ResourceConstraint.any()), edge(back, front, ResourceConstraint.any()),
+            edge(left, front, ResourceConstraint.any()), edge(right, front, ResourceConstraint.any()),
+            edge(front, targetIn, ResourceConstraint.any())));
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(
             producer(producer, sand, DiagnosticReason.active), consumer(target, sand)));
@@ -231,11 +257,11 @@ class TraceAnalyzerTest{
         NetworkPort targetSouth = port(target, NetworkSide.south, "in"), targetWest = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(producerOut, fedIn, fedOut, deadIn, deadOut, firstIn, firstOut, secondIn,
             secondOut, targetSouth, targetWest), List.of(
-            edge(producerOut, fedIn, ItemConstraint.any()), edge(fedIn, fedOut, ItemConstraint.any()),
-            edge(deadIn, deadOut, ItemConstraint.any()), edge(fedOut, firstIn, ItemConstraint.any()),
-            edge(firstIn, firstOut, ItemConstraint.any()), edge(firstOut, targetSouth, ItemConstraint.any()),
-            edge(deadOut, secondIn, ItemConstraint.any()), edge(secondIn, secondOut, ItemConstraint.any()),
-            edge(secondOut, targetWest, ItemConstraint.any())));
+            edge(producerOut, fedIn, ResourceConstraint.any()), edge(fedIn, fedOut, ResourceConstraint.any()),
+            edge(deadIn, deadOut, ResourceConstraint.any()), edge(fedOut, firstIn, ResourceConstraint.any()),
+            edge(firstIn, firstOut, ResourceConstraint.any()), edge(firstOut, targetSouth, ResourceConstraint.any()),
+            edge(deadOut, secondIn, ResourceConstraint.any()), edge(secondIn, secondOut, ResourceConstraint.any()),
+            edge(secondOut, targetWest, ResourceConstraint.any())));
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(
             producer(producer, sand, DiagnosticReason.active), consumer(target, sand)));
@@ -267,7 +293,7 @@ class TraceAnalyzerTest{
         NetworkPort beltOut = port(belt, NetworkSide.east, "out");
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         ItemNetwork network = new ItemNetwork(graph(List.of(beltIn, beltOut, targetIn),
-            List.of(edge(beltIn, beltOut, ItemConstraint.any()), edge(beltOut, targetIn, ItemConstraint.any()))),
+            List.of(edge(beltIn, beltOut, ResourceConstraint.any()), edge(beltOut, targetIn, ResourceConstraint.any()))),
             List.of(), List.of(beltIn),
             List.of(), List.of(), List.of(), List.of(sand));
 
@@ -285,7 +311,7 @@ class TraceAnalyzerTest{
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         NetworkInterruption interruption = new NetworkInterruption(beltIn, unknown, NetworkInterruption.Direction.incoming);
         ItemNetwork network = new ItemNetwork(graph(List.of(beltIn, beltOut, targetIn), List.of(
-                edge(beltIn, beltOut, ItemConstraint.any()), edge(beltOut, targetIn, ItemConstraint.any()))), List.of(), List.of(),
+                edge(beltIn, beltOut, ResourceConstraint.any()), edge(beltOut, targetIn, ResourceConstraint.any()))), List.of(), List.of(),
             List.of(unknown), List.of(interruption), List.of(), List.of(sand));
 
         SupplyTrace trace = input(network, target, sand, List.of(consumer(target, sand)));
@@ -320,7 +346,7 @@ class TraceAnalyzerTest{
         NetworkPort beltIn = port(belt, NetworkSide.west, "in"), beltOut = port(belt, NetworkSide.east, "out");
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         ItemNetwork network = new ItemNetwork(graph(List.of(beltIn, beltOut, targetIn), List.of(
-                edge(beltIn, beltOut, ItemConstraint.any()), edge(beltOut, targetIn, ItemConstraint.any()))),
+                edge(beltIn, beltOut, ResourceConstraint.any()), edge(beltOut, targetIn, ResourceConstraint.any()))),
             List.of(), List.of(), List.of(unrelated), List.of(), List.of(), List.of(sand));
 
         SupplyTrace trace = input(network, target, sand, List.of(consumer(target, sand)));
@@ -369,7 +395,7 @@ class TraceAnalyzerTest{
         NetworkPort beltIn = port(belt, NetworkSide.west, "in"), beltOut = port(belt, NetworkSide.east, "out");
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(beltIn, beltOut, targetIn), List.of(
-            edge(beltIn, beltOut, ItemConstraint.any()), edge(beltOut, targetIn, ItemConstraint.any())));
+            edge(beltIn, beltOut, ResourceConstraint.any()), edge(beltOut, targetIn, ResourceConstraint.any())));
         AreaDiagnosticResult area = AreaAnalyzer.analyze(AREA, 3, List.of(consumer(target, sand), limited(belt)))
             .withNetwork(network(graph)).withSkippedBuildings(List.of(skipped));
 
@@ -429,7 +455,7 @@ class TraceAnalyzerTest{
         BuildingRef skippedBesideSourceOutput = ref("modded-building", 2);
         NetworkPort sourceOut = port(sourcePortBuilding, NetworkSide.east, "out");
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
-        NetworkGraph graph = graph(List.of(sourceOut, targetIn), List.of(edge(sourceOut, targetIn, ItemConstraint.any())));
+        NetworkGraph graph = graph(List.of(sourceOut, targetIn), List.of(edge(sourceOut, targetIn, ResourceConstraint.any())));
         AreaDiagnosticResult area = AreaAnalyzer.analyze(AREA, 2, List.of(consumer(target, sand)))
             .withNetwork(network(graph)).withSkippedBuildings(List.of(skippedBesideSourceOutput));
 
@@ -446,18 +472,18 @@ class TraceAnalyzerTest{
         NetworkPort sourceOut = port(source, NetworkSide.east, "out"), targetIn = port(target, NetworkSide.west, "in"),
             targetOut = port(target, NetworkSide.east, "out"), downstreamIn = port(downstream, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(sourceOut, targetIn, targetOut, downstreamIn), List.of(
-            edge(sourceOut, targetIn, ItemConstraint.any()), edge(targetOut, downstreamIn, ItemConstraint.any())));
+            edge(sourceOut, targetIn, ResourceConstraint.any()), edge(targetOut, downstreamIn, ResourceConstraint.any())));
         AreaDiagnosticResult area = area(network(graph), List.of(
             producer(source, copper, DiagnosticReason.active), consumer(target, sand), consumer(downstream, lead)));
 
         SupplyTrace input = TraceAnalyzer.input(area, target, copper);
         SupplyTrace output = TraceAnalyzer.output(area, target, lead);
 
-        assertFalse(input.targetUsesItem);
+        assertFalse(input.targetUsesResource);
         assertTrue(input.endpoints.isEmpty());
         assertTrue(input.boundaryContinuations.isEmpty());
         assertFalse(input.noRouteProven);
-        assertFalse(output.targetUsesItem);
+        assertFalse(output.targetUsesResource);
         assertTrue(output.endpoints.isEmpty());
         assertTrue(output.boundaryContinuations.isEmpty());
         assertFalse(output.noRouteProven);
@@ -480,10 +506,10 @@ class TraceAnalyzerTest{
 
         assertTrue(absentSnapshot.diagnosticsIncomplete);
         assertFalse(absentSnapshot.topologyIncomplete);
-        assertFalse(absentSnapshot.targetUsesItem);
+        assertFalse(absentSnapshot.targetUsesResource);
         assertFalse(absentPorts.diagnosticsIncomplete);
         assertTrue(absentPorts.topologyIncomplete);
-        assertTrue(absentPorts.targetUsesItem);
+        assertTrue(absentPorts.targetUsesResource);
         assertFalse(absentSnapshot.noRouteProven);
         assertFalse(absentPorts.noRouteProven);
     }
@@ -494,8 +520,8 @@ class TraceAnalyzerTest{
         NetworkPort targetIn = port(target, NetworkSide.west, "in"), targetOut = port(target, NetworkSide.east, "out"),
             beltIn = port(belt, NetworkSide.west, "in"), beltOut = port(belt, NetworkSide.east, "out");
         NetworkGraph graph = graph(List.of(targetIn, targetOut, beltIn, beltOut), List.of(
-            edge(targetOut, beltIn, ItemConstraint.any()), edge(beltIn, beltOut, ItemConstraint.any()),
-            edge(beltOut, targetIn, ItemConstraint.any())));
+            edge(targetOut, beltIn, ResourceConstraint.any()), edge(beltIn, beltOut, ResourceConstraint.any()),
+            edge(beltOut, targetIn, ResourceConstraint.any())));
         FactorySnapshot snapshot = FactorySnapshot.builder(target.blockName).support(SupportLevel.full)
             .enabled(true).shouldConsume(true).producedItem(sand)
             .input(ResourceState.of(ResourceKind.item, sand.name).contentId(sand.id).build()).build();
@@ -516,7 +542,7 @@ class TraceAnalyzerTest{
         BuildingRef storage = ref("vault", 1), target = ref("smelter", 2);
         NetworkPort storeOut = port(storage, NetworkSide.east, "out"), targetIn = port(target, NetworkSide.west, "in");
         ItemNetwork network = new ItemNetwork(graph(List.of(storeOut, targetIn),
-            List.of(edge(storeOut, targetIn, ItemConstraint.any()))), List.of(), List.of(), List.of(), List.of(),
+            List.of(edge(storeOut, targetIn, ResourceConstraint.any()))), List.of(), List.of(), List.of(), List.of(),
             List.of(storage), List.of(sand));
         AreaDiagnosticResult area = area(network, List.of(consumer(target, sand)));
 
@@ -535,9 +561,9 @@ class TraceAnalyzerTest{
             leadOut = port(leadProducer, NetworkSide.east, "out"), so = port(sorter, NetworkSide.east, "out"),
             ti = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(p, leadOut, si, so, ti), List.of(
-            edge(p, si, ItemConstraint.only(copper)), edge(leadOut, si, ItemConstraint.only(copper)),
-            edge(si, so, ItemConstraint.only(copper)),
-            edge(so, ti, ItemConstraint.any())));
+            edge(p, si, ResourceConstraint.only(copper)), edge(leadOut, si, ResourceConstraint.only(copper)),
+            edge(si, so, ResourceConstraint.only(copper)),
+            edge(so, ti, ResourceConstraint.any())));
         List<AreaEntry> entries = List.of(producer(producer, copper, DiagnosticReason.active),
             producer(leadProducer, lead, DiagnosticReason.active), consumerWithItems(target, copper, lead));
 
@@ -562,8 +588,8 @@ class TraceAnalyzerTest{
         NetworkPort gateOut = port(gate, NetworkSide.east, "out");
         NetworkPort targetIn = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(source, gateIn, gateOut, targetIn), List.of(
-            edge(source, gateIn, ItemConstraint.any()), edge(gateIn, gateOut, ItemConstraint.any()),
-            new NetworkEdge(gateOut, targetIn, ItemConstraint.any(), true)));
+            edge(source, gateIn, ResourceConstraint.any()), edge(gateIn, gateOut, ResourceConstraint.any()),
+            new NetworkEdge(gateOut, targetIn, ResourceConstraint.any(), true)));
 
         SupplyTrace trace = input(network(graph), target, sand, List.of(
             producer(producer, sand, DiagnosticReason.active), consumer(target, sand)));
@@ -580,9 +606,9 @@ class TraceAnalyzerTest{
             jSouthIn = port(junction, NetworkSide.south, "in"), targetIn = port(northTarget, NetworkSide.south, "in"),
             southOut = port(south, NetworkSide.north, "out");
         NetworkGraph graph = graph(List.of(westOut, jWestIn, jEastOut, jNorthOut, jSouthIn, targetIn, southOut), List.of(
-            edge(westOut, jWestIn, ItemConstraint.any()), edge(jWestIn, jEastOut, ItemConstraint.any()),
-            edge(jSouthIn, jNorthOut, ItemConstraint.any()), edge(jNorthOut, targetIn, ItemConstraint.any()),
-            edge(southOut, jSouthIn, ItemConstraint.any())));
+            edge(westOut, jWestIn, ResourceConstraint.any()), edge(jWestIn, jEastOut, ResourceConstraint.any()),
+            edge(jSouthIn, jNorthOut, ResourceConstraint.any()), edge(jNorthOut, targetIn, ResourceConstraint.any()),
+            edge(southOut, jSouthIn, ResourceConstraint.any())));
         SupplyTrace trace = input(network(graph), northTarget, sand, List.of(
             producer(west, sand, DiagnosticReason.active), producer(south, sand, DiagnosticReason.active), consumer(northTarget, sand)));
 
@@ -596,9 +622,9 @@ class TraceAnalyzerTest{
             ao = port(a, NetworkSide.east, "out"), bi = port(b, NetworkSide.west, "in"),
             bo = port(b, NetworkSide.east, "out"), ti = port(target, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(p, ai, ao, bi, bo, ti), List.of(
-            edge(p, ai, ItemConstraint.any()), edge(ai, ao, ItemConstraint.any()),
-            edge(ao, bi, ItemConstraint.any()), edge(bi, bo, ItemConstraint.any()),
-            edge(bo, ai, ItemConstraint.any()), edge(bo, ti, ItemConstraint.any())));
+            edge(p, ai, ResourceConstraint.any()), edge(ai, ao, ResourceConstraint.any()),
+            edge(ao, bi, ResourceConstraint.any()), edge(bi, bo, ResourceConstraint.any()),
+            edge(bo, ai, ResourceConstraint.any()), edge(bo, ti, ResourceConstraint.any())));
 
         SupplyTrace trace = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> input(network(graph), target, sand, List.of(
             producer(producer, sand, DiagnosticReason.active), consumer(target, sand))));
@@ -612,7 +638,7 @@ class TraceAnalyzerTest{
         BuildingRef producer = ref("crafter", 1), target = ref("factory", 2);
         ResourceRef modA = item("mod-a-alloy", "Alloy"), modB = item("mod-b-alloy", "Alloy");
         NetworkPort source = port(producer, NetworkSide.east, "out"), input = port(target, NetworkSide.west, "in");
-        NetworkGraph graph = graph(List.of(source, input), List.of(edge(source, input, ItemConstraint.only(modA))));
+        NetworkGraph graph = graph(List.of(source, input), List.of(edge(source, input, ResourceConstraint.only(modA))));
         AreaDiagnosticResult area = area(network(graph), List.of(producer(producer, modA, DiagnosticReason.active),
             consumer(target, modA)));
 
@@ -631,9 +657,9 @@ class TraceAnalyzerTest{
             consumerIn = port(consumer, NetworkSide.west, "in"), deadIn = port(deadBelt, NetworkSide.west, "in"),
             deadOut = port(deadBelt, NetworkSide.east, "out");
         NetworkGraph graph = graph(List.of(targetOut, routerWest, routerEast, routerNorth, consumerIn, deadIn, deadOut), List.of(
-            edge(targetOut, routerWest, ItemConstraint.any()), edge(routerWest, routerEast, ItemConstraint.any()),
-            edge(routerWest, routerNorth, ItemConstraint.any()), edge(routerEast, consumerIn, ItemConstraint.any()),
-            edge(routerNorth, deadIn, ItemConstraint.any()), edge(deadIn, deadOut, ItemConstraint.any())));
+            edge(targetOut, routerWest, ResourceConstraint.any()), edge(routerWest, routerEast, ResourceConstraint.any()),
+            edge(routerWest, routerNorth, ResourceConstraint.any()), edge(routerEast, consumerIn, ResourceConstraint.any()),
+            edge(routerNorth, deadIn, ResourceConstraint.any()), edge(deadIn, deadOut, ResourceConstraint.any())));
         AreaDiagnosticResult area = area(network(graph), List.of(
             producer(target, sand, DiagnosticReason.active), consumer(consumer, sand), limited(router), limited(deadBelt)));
 
@@ -650,7 +676,7 @@ class TraceAnalyzerTest{
         NetworkPort targetOut = port(target, NetworkSide.east, "out"), beltIn = port(belt, NetworkSide.west, "in"),
             beltOut = port(belt, NetworkSide.east, "out");
         NetworkGraph graph = graph(List.of(targetOut, beltIn, beltOut), List.of(
-            edge(targetOut, beltIn, ItemConstraint.any()), edge(beltIn, beltOut, ItemConstraint.any())));
+            edge(targetOut, beltIn, ResourceConstraint.any()), edge(beltIn, beltOut, ResourceConstraint.any())));
         SupplyTrace trace = TraceAnalyzer.output(area(network(graph), List.of(
             producer(target, sand, DiagnosticReason.active), limited(belt))), target, sand);
 
@@ -671,8 +697,8 @@ class TraceAnalyzerTest{
         NetworkPort beltIn = port(belt, NetworkSide.west, "in"), beltOut = port(belt, NetworkSide.east, "out");
         NetworkPort firstIn = port(first, NetworkSide.west, "in"), secondIn = port(second, NetworkSide.west, "in");
         NetworkGraph graph = graph(List.of(producerOut, beltIn, beltOut, firstIn, secondIn), List.of(
-            edge(producerOut, beltIn, ItemConstraint.any()), edge(beltIn, beltOut, ItemConstraint.any()),
-            edge(beltOut, firstIn, ItemConstraint.any()), edge(beltOut, secondIn, ItemConstraint.any())));
+            edge(producerOut, beltIn, ResourceConstraint.any()), edge(beltIn, beltOut, ResourceConstraint.any()),
+            edge(beltOut, firstIn, ResourceConstraint.any()), edge(beltOut, secondIn, ResourceConstraint.any())));
         AreaDiagnosticResult area = area(network(graph), List.of(producer(producer, sand, DiagnosticReason.active),
             consumer(first, sand), consumer(second, sand)));
 
@@ -746,6 +772,20 @@ class TraceAnalyzerTest{
         return new AreaEntry(ref, snapshot, new DiagnosticResult(List.of(Finding.of(DiagnosticReason.active, Severity.normal))));
     }
 
+    private static AreaEntry payloadProducer(BuildingRef ref, ResourceRef payload){
+        FactorySnapshot snapshot = FactorySnapshot.builder(ref.blockName).support(SupportLevel.full)
+            .enabled(true).shouldConsume(true).productionValid(true).efficiency(1f, 1f).blockEfficiencyScale(1f)
+            .producedPayload(payload).build();
+        return new AreaEntry(ref, snapshot, FactoryAnalyzer.analyze(snapshot));
+    }
+
+    private static AreaEntry payloadConsumer(BuildingRef ref, ResourceRef payload){
+        FactorySnapshot snapshot = FactorySnapshot.builder(ref.blockName).support(SupportLevel.full)
+            .enabled(true).shouldConsume(true).productionValid(true).efficiency(1f, 1f).blockEfficiencyScale(1f)
+            .input(ResourceState.of(payload.kind, payload.name).contentId(payload.id).build()).build();
+        return new AreaEntry(ref, snapshot, FactoryAnalyzer.analyze(snapshot));
+    }
+
     private static AreaEntry consumerWithItems(BuildingRef ref, ResourceRef... items){
         FactorySnapshot.Builder snapshot = FactorySnapshot.builder(ref.blockName).support(SupportLevel.full)
             .enabled(true).shouldConsume(true).productionValid(true).efficiency(1f, 1f).blockEfficiencyScale(1f);
@@ -759,6 +799,6 @@ class TraceAnalyzerTest{
     private static BuildingRef ref(String block, int x, int y, int team){ return new BuildingRef(x, y, block, block, 1, team); }
     private static ResourceRef item(String id, String name){ return new ResourceRef(ResourceKind.item, id, name); }
     private static NetworkPort port(BuildingRef ref, NetworkSide side, String channel){ return new NetworkPort(ref, side, channel); }
-    private static NetworkEdge edge(NetworkPort from, NetworkPort to, ItemConstraint items){ return new NetworkEdge(from, to, items, false); }
+    private static NetworkEdge edge(NetworkPort from, NetworkPort to, ResourceConstraint items){ return new NetworkEdge(from, to, items, false); }
     private static NetworkGraph graph(List<NetworkPort> ports, List<NetworkEdge> edges){ return new NetworkGraph(ports, edges); }
 }

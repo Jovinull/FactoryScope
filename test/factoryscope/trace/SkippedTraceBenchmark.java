@@ -113,7 +113,7 @@ class SkippedTraceBenchmark{
 
     private static BuildingRef ref(String block, int x, int y){ return new BuildingRef(x, y, block, block, 1, 1); }
     private static NetworkPort port(BuildingRef ref, NetworkSide side, String channel){ return new NetworkPort(ref, side, channel); }
-    private static NetworkEdge edge(NetworkPort from, NetworkPort to){ return new NetworkEdge(from, to, ItemConstraint.any(), false); }
+    private static NetworkEdge edge(NetworkPort from, NetworkPort to){ return new NetworkEdge(from, to, ResourceConstraint.any(), false); }
 
     private enum SkippedLayout{ irrelevant, relevant, mixed }
     private record Fixture(AreaDiagnosticResult area, BuildingRef target, int visitedPorts, int edgeCount){ }

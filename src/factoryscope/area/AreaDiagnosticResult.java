@@ -13,7 +13,7 @@ public final class AreaDiagnosticResult{
     public final List<AreaEntry> entries;
     /** Issue groups, most important first. See {@code AreaAnalyzer} for the ordering. */
     public final List<AreaIssueGroup> issues;
-    /** Static item topology for this same snapshot area, or null for legacy pure aggregation tests. */
+    /** Static item and payload topology for this same snapshot area, or null for legacy pure aggregation tests. */
     public final ItemNetwork network;
     /** Snapshot of the engine-maintained power grids intersecting this area. */
     public final PowerGridReport power;

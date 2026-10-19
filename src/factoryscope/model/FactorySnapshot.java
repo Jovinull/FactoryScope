@@ -82,6 +82,10 @@ public final class FactorySnapshot{
     public final List<ResourceRef> producedItems;
     /** Liquids this building can produce structurally, including conventional producers without a rate model. */
     public final List<ResourceRef> producedLiquids;
+    /** Units or blocks this building can structurally put onto payload routes. */
+    public final List<ResourceRef> producedPayloads;
+    /** Units or blocks this building can structurally accept from payload routes. */
+    public final List<ResourceRef> acceptedPayloads;
     /** Every positive entry in the building's liquid module at snapshot time. */
     public final List<StoredLiquidState> storedLiquids;
     /** False when a declared liquid requirement could not be safely enumerated. */
@@ -120,6 +124,12 @@ public final class FactorySnapshot{
         List<ResourceRef> liquidProducts = new ArrayList<>(b.producedLiquids);
         liquidProducts.sort(Comparator.comparing(ResourceRef::key));
         this.producedLiquids = List.copyOf(new LinkedHashSet<>(liquidProducts));
+        List<ResourceRef> payloadProducts = new ArrayList<>(b.producedPayloads);
+        payloadProducts.sort(Comparator.comparing(ResourceRef::key));
+        this.producedPayloads = List.copyOf(new LinkedHashSet<>(payloadProducts));
+        List<ResourceRef> payloadInputs = new ArrayList<>(b.acceptedPayloads);
+        payloadInputs.sort(Comparator.comparing(ResourceRef::key));
+        this.acceptedPayloads = List.copyOf(new LinkedHashSet<>(payloadInputs));
         this.storedLiquids = List.copyOf(b.storedLiquids);
         this.liquidInputsComplete = b.liquidInputsComplete;
         this.liquidOutputsComplete = b.liquidOutputsComplete;
@@ -183,6 +193,8 @@ public final class FactorySnapshot{
         private final List<OutputState> outputs = new ArrayList<>();
         private final List<ResourceRef> producedItems = new ArrayList<>();
         private final List<ResourceRef> producedLiquids = new ArrayList<>();
+        private final List<ResourceRef> producedPayloads = new ArrayList<>();
+        private final List<ResourceRef> acceptedPayloads = new ArrayList<>();
         private final List<StoredLiquidState> storedLiquids = new ArrayList<>();
         private boolean liquidInputsComplete = true;
         private boolean liquidOutputsComplete = true;
@@ -318,6 +330,22 @@ public final class FactorySnapshot{
                 throw new IllegalArgumentException("only identified liquids can be structural products");
             }
             this.producedLiquids.add(liquid);
+            return this;
+        }
+
+        public Builder producedPayload(ResourceRef payload){
+            if(payload.id == null || (payload.kind != ResourceKind.unit && payload.kind != ResourceKind.block)){
+                throw new IllegalArgumentException("only identified unit and block payloads are structural products");
+            }
+            this.producedPayloads.add(payload);
+            return this;
+        }
+
+        public Builder acceptedPayload(ResourceRef payload){
+            if(payload.id == null || (payload.kind != ResourceKind.unit && payload.kind != ResourceKind.block)){
+                throw new IllegalArgumentException("only identified unit and block payloads are structural inputs");
+            }
+            this.acceptedPayloads.add(payload);
             return this;
         }
 

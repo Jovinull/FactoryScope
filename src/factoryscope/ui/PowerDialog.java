@@ -44,6 +44,7 @@ final class PowerDialog extends BaseDialog{
         }).size(220f, 64f).name("factoryscope-power-view-world");
         buttons.button(FsBundle.ref("area.refresh"), Icon.refresh, this::refresh)
             .size(180f, 64f).name("factoryscope-power-refresh");
+        if(FactoryScopeUI.compactDialogButtons()) buttons.row();
         buttons.button(FsBundle.ref("area.return"), Icon.left, this::back)
             .size(180f, 64f).name("factoryscope-power-back");
     }

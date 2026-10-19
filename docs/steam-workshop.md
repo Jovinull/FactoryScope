@@ -3,7 +3,7 @@
 FactoryScope is distributed through GitHub Releases, the Mindustry Mod Browser, and the
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151) (item `3820843151`, first published
 2026-10-16 with the unchanged 1.1.0 release, updated on 2026-10-18 to 1.2.0, and updated again to 1.2.1
-from the exact public release JAR; this entry records its size and digest below). The Workshop item is updated separately,
+from the exact public release JAR; the 1.3.0 update is pending). The Workshop item is updated separately,
 by hand, from the owner's Steam client. This page records how Mindustry publishes a mod, how the Workshop folder is built from a release,
 and the listing text.
 
@@ -57,10 +57,10 @@ class from the previous version is left behind, then use **Update** (see below).
 2. Open **Mods** and confirm that FactoryScope 1.1.0 is listed once, enabled, and without errors.
 3. Press the publish (export) button on FactoryScope, accept the Steam Workshop legal agreement if Steam asks,
    and confirm. The item is created Private.
-4. On the item's Steam page, set the title and description below and add the 12 captures from
-   [`media/`](media/) in this order: Area Diagnostics, drill, turret, generator, unit factory, Network
-   overlay, Armored Conveyor trace, Unloader/Duct Bridge trace, Supply Trace, PowerScope, LiquidScope
-   (gas), Liquid filter.
+4. On the item's Steam page, set the title and description below and add the 15 captures from
+   [`media/`](media/) in this order: Area Diagnostics, Network overlay, drill, turret, generator, unit
+   factory, payload Network, Reconstructor payload trace, Unit Cargo trace, Supply Trace, Armored
+   Conveyor trace, Unloader/Duct Bridge trace, PowerScope, LiquidScope (gas), Liquid filter.
 5. Edit the `<Created>` change note to the first change note below.
 6. While the item is still Private, test a real Workshop install: close Mindustry, move the local folder out of
    `saves/mods`, subscribe to the item, let Steam download it, start Mindustry, and confirm that only the
@@ -182,13 +182,13 @@ FactoryScope supports:
 
 [h2]Compatibility[/h2]
 
-FactoryScope 1.2.1 targets Mindustry v8 Build 160+.
+FactoryScope 1.3.0 targets Mindustry v8 Build 160+.
 
-FactoryScope 1.2.1 calls out buildings that the topology probe could not read. Network reports unreadable buildings in the selected area; Supply Trace and LiquidScope list unreadable buildings on a route and offer Locate. The route remains explicitly incomplete where evidence is missing.
+FactoryScope calls out buildings that the topology probe could not read. Network reports unreadable buildings in the selected area; Supply Trace and LiquidScope list unreadable buildings on a route and offer Locate. The route remains explicitly incomplete where evidence is missing.
 
-The 1.2.1 release was validated in the real game against Mindustry 160.7, in every supported language, and in multiplayer with an official dedicated server.
+FactoryScope models configured Unit Cargo item routes and typed whole-block/unit payload routes through supported conveyors, routers, loaders, unloaders, deconstructors, constructors, reconstructors, assemblers, and mass drivers. These are structural routes; they do not measure cargo movement or throughput.
 
-Unit cargo and payload logistics are not modeled yet, and modded transport with its own routing code is shown as incomplete rather than guessed.
+The 1.3.0 release was validated in the real game against Mindustry 160.7, in every supported language, and in multiplayer with an official dedicated server.
 
 [h2]Open Source[/h2]
 
@@ -242,4 +242,17 @@ FactoryScope 1.2.1
 - Supply Trace and LiquidScope list unreadable buildings on a route and offer Locate.
 - Routes stay incomplete where evidence is missing.
 - English, Portuguese (Brazil), Russian, Simplified Chinese, Korean, and Spanish.
+```
+
+### 1.3.0 change note
+
+At most 400 characters, for the in-game **Update** dialog.
+
+```text
+FactoryScope 1.3.0
+
+- Network and Supply Trace now support typed block/unit payload routes and Unit Cargo item links.
+- Payload routes include size limits, router selection, deconstructors, reconstructors, and mass drivers.
+- Added Unit Cargo and payload screenshots to the gallery.
+- Validated in all six languages and in multiplayer on Mindustry 160.7.
 ```
