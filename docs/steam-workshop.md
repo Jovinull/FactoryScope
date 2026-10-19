@@ -1,11 +1,30 @@
 # Steam Workshop
 
 FactoryScope is distributed through GitHub Releases, the Mindustry Mod Browser, and the
-[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151) (item `3820843151`, first published
-2026-10-16 with the unchanged 1.1.0 release, updated on 2026-10-18 to 1.2.0, and updated again to 1.2.1
-from the exact public release JAR; the 1.3.0 update is pending). The Workshop item is updated separately,
-by hand, from the owner's Steam client. This page records how Mindustry publishes a mod, how the Workshop folder is built from a release,
-and the listing text.
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3820843151) (item `3820843151`). It was first
+published on 2026-10-16 with the unchanged 1.1.0 release, updated on 2026-10-18 to 1.2.0, updated again
+to 1.2.1 from the exact public release JAR, and updated on 2026-10-19 to 1.3.0 from the exact public
+release JAR. The Workshop item is updated separately, by hand, from the owner's Steam client. This page
+records how Mindustry publishes a mod, how the Workshop folder is built from a release, and the listing text.
+
+## 1.3.0 release artifact and Workshop update
+
+The public [FactoryScope 1.3.0 GitHub release](https://github.com/Jovinull/FactoryScope/releases/tag/v1.3.0)
+contains a 642,665-byte `FactoryScope.jar` with SHA-256
+`fd57f2a2d70f4832a2b37d2b681e3935d079182b89bdaf95cb89d9377bb41994`.
+
+The folder staged for the Workshop update was extracted from that public JAR. Its 149 JAR entries were
+compared file-by-file against the public artifact; every entry matched, with no missing, changed, or extra
+files. Adding the 478,541-byte `preview.png` produced a 1,946,972-byte Workshop folder. Steam's published
+file metadata reports the same size, and records the public item as updated at 2026-10-19 15:19:50 -03
+(18:19:50 UTC). The item description identifies FactoryScope 1.3.0 and includes the payload and Unit Cargo
+coverage; it matches the prepared 1.3.0 description. The Workshop gallery has 15 screenshots matching
+the current 1.3.0 captures. Steam does not expose a server-side content hash, so byte-for-byte verification
+of the remote stored archive is unavailable.
+
+A post-update unsubscribe/resubscribe and client launch using only the Workshop copy was not recorded
+for 1.3.0. Earlier upload evidence does not substitute for that check; repeat it if a 1.3.0 client install
+check is required.
 
 ## 1.2.1 release artifact
 
