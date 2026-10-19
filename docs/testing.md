@@ -318,7 +318,20 @@ Inspects whichever jars have been built and fails if one carries classes outside
 acceptance or test code, duplicate entries, or is missing `mod.hjson` or one of the six locale bundles. The universal jar must
 also contain `classes.dex`. CI runs this after `deploy`.
 
+## Android runtime validation
+
+Issue [#1](https://github.com/Jovinull/FactoryScope/issues/1) records the Android runtime check completed
+on 2026-10-18 with FactoryScope 1.2.1 and Mindustry Android 160.7. It used the
+`FactoryScope_Pixel6_API35` Android 15 / API 35 x86_64 emulator at 1080x2400 portrait and 420 dpi.
+The mod loaded, the HUD button opened the picker, touch selected a factory, and the panels were readable
+and closable. Drag selection was tested for Area Diagnostics. Network, Liquid, Power, and Locate → Return
+→ Area report were also exercised. The picker hint and dialog actions remained visible after the
+compact-screen layout fixes.
+
+No separate Android emulator run for 1.3.0 is recorded, and no physical Android handset has been tested.
+
 ## What is not covered
 
-Android runtime behaviour. The universal jar is built and structurally verified by CI, but nothing has
-run it on a device or emulator. See the release notes for the current status.
+Physical Android handset behavior and a 1.3.0-specific Android runtime acceptance run remain unverified.
+Graphical Mindustry execution on Linux and macOS also remains unverified; CI covers launcher/path
+portability on those platforms, not the graphical client.
