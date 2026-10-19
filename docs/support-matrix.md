@@ -116,6 +116,13 @@ measure per-edge transfer, prove quantitative supply sufficiency, or assign caus
 ## Platform validation
 
 The desktop client has been exercised end to end. The universal artifact is DEX-built and structurally
-checked, but Android runtime/touch behavior has not been validated on an Android device or emulator.
+checked. Android runtime/touch behavior was validated on the Android 15 API 35 x86_64 emulator
+(`FactoryScope_Pixel6_API35`, 1080x2400 portrait at 420 dpi) with FactoryScope 1.2.1 and Mindustry
+Android 160.7. The check covered loading the mod, the HUD button, touch selection in the picker,
+readable and closable panels, and drag selection for Area Diagnostics. Network, Liquid, Power, and
+Locate → Return → Area report were also exercised. The picker hint and dialog actions remained visible
+after the compact-screen layout fixes.
+
+No separate Android emulator run for 1.3.0 is recorded, and no physical Android handset has been tested.
 The acceptance launcher and its path/sandbox logic are tested on Windows, Linux, and macOS CI; graphical
 Mindustry execution is validated only on platforms where it has actually been run.
