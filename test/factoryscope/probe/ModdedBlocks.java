@@ -317,6 +317,7 @@ final class ModdedBlocks{
             group = BlockGroup.payloads;
             acceptsPayload = true;
             solid = true;
+            update = true;
             buildType = UnknownPayloadTransportBuild::new;
         }
 
